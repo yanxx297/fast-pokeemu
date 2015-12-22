@@ -1,0 +1,60 @@
+--- execution/sym_path_frag_machine.ml	2015-12-01 16:33:04.886525074 -0600
++++ execution/sym_path_frag_machine.ml	2015-10-19 15:49:17.621395000 -0500
+@@ -76,8 +76,8 @@
+ 	     match self#match_input_var var_s with
+ 	       | Some n -> 
+ 		   assert(n < !max_input_string_length);
+-		   str.[n] <-
+-		     char_of_int_unbounded (Int64.to_int value)
++		   Bytes.set str n
++		     (char_of_int_unbounded (Int64.to_int value))
+ 	       | None -> ())
+ 	  ce;
+ 	let str' = ref str in
+@@ -289,8 +289,8 @@
+ 	    NotConcrete _ ->
+ 	      let e = D.to_symbolic_1 v in
+ 		if !opt_trace_conditions then 
+-		  Printf.printf "Symbolic branch condition %s\n"
+-		    (V.exp_to_string e);
++		  Printf.printf "Symbolic branch condition %s at %08Lx\n"
++		    (V.exp_to_string e) (self#get_word_var R_EIP);
+ 		if !opt_concrete_path then
+ 		  self#eval_bool_exp_conc_path e
+ 		else 
+@@ -341,8 +341,8 @@
+ 	else
+ 	  let e = D.to_symbolic_1 v in
+ 	    if !opt_trace_conditions then 
+-	      Printf.printf "Symbolic branch condition %s\n"
+-		(V.exp_to_string e);
++	      Printf.printf "Symbolic branch condition %s @ %08Lx\n"
++		(V.exp_to_string e) (self#get_word_var R_EIP);
+ 	    if !opt_concrete_path then
+ 	      let (b, _) = self#eval_bool_exp_conc_path e in
+ 		b
+@@ -492,9 +494,22 @@
+ 	      opt_trace_registers := r;
+ 	      opt_trace_segments := sg;
+ 	      opt_trace_taint := ta)
+-	!opt_trace_detailed_ranges
+-	  
++       !opt_trace_detailed_ranges;
++        
++    val mutable finish_path_hook = None
++
++    method set_finish_path_hook f = 
++      finish_path_hook <- Some f				
++	 
++    method private call_finish_path_hook = 
++      match finish_path_hook with
++	| None -> ()
++	| Some h -> h ()
++
+     method finish_path =
++      (match finish_path_hook with
++       | None -> ()
++       | Some h -> h ());			
+       dt#mark_all_seen;
+       infl_man#finish_path;
+       if !opt_trace_binary_paths then
