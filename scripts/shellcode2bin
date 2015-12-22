@@ -1,0 +1,6 @@
+#!/usr/bin/python
+
+from common import *
+import sys
+
+sys.stdout.write(to_bin_str(sys.argv[1].replace("x", "\\x")))

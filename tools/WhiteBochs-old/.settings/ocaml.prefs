@@ -1,0 +1,9 @@
+compil_mode/concrete-whitebochs=native
+compil_mode/concrete-whitedisasm=native
+compil_mode/fuzzball-whitebochs=native
+compil_mode/fuzzball-whitedisasm=native
+compil_mode/run-fuzzball-whitebochs=native
+compil_mode/run-on-cpu=native
+compil_mode/test-cache=native
+compil_mode/whitebochs=native
+eclipse.preferences.version=1

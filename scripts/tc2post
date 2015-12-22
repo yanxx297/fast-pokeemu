@@ -1,0 +1,7 @@
+#!/usr/bin/python
+
+import sys, os
+
+assert sys.argv[1].endswith("/testcase")
+testcase = os.path.abspath(sys.argv[1]).split("/")
+print "%s/%s.post" % (testcase[-3], testcase[-2])

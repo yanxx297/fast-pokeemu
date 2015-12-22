@@ -1,0 +1,13 @@
+compil_mode/decode=native
+compil_mode/diff_behavior=native
+compil_mode/emu_fuzzball=native
+compil_mode/emu_fuzzball_old=native
+compil_mode/fuzzball=native
+compil_mode/multi_path=native
+compil_mode/multi_path_test=native
+compil_mode/run-emu-fuzzball=native
+compil_mode/run-emu-fuzzball-cache=native
+compil_mode/run-emu-fuzzball~=native
+compil_mode/run-fuzzball=native
+compil_mode/simple=native
+eclipse.preferences.version=1

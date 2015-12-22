@@ -1,0 +1,10 @@
+#!/bin/bash
+
+here=$(readlink -f "$0")
+here=$(dirname "$here")
+simhash=$here/simhash
+
+f0="$1"
+f1="$2"
+
+$simhash -c <($simhash $f0) <($simhash $f1)

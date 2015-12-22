@@ -1,0 +1,15 @@
+#!/usr/bin/python
+
+import sys, os
+
+assert sys.argv[1].endswith(".diff")
+name = os.path.abspath(sys.argv[1]).split("/")
+post = "%s/%s" % (name[-2], name[-1].replace(".diff", ".post"))
+emu = name[-3].split("_")
+if sys.argv[2] == "1":
+    emu = emu[0]
+elif sys.argv[2] == "2":
+    emu = emu[1]
+else:
+    emu = emu[2]
+print "%s/%s" % (emu, post)

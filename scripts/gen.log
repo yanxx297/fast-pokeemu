@@ -1,0 +1,93 @@
+Done in 0.037s
+load_fuzzball_tc in TCGen
+
+================================================================================
+[*] Test-case                            /tmp/00/00000000/testcase
+[*] Snapshot                             d1d72d00565aefa72d617581637ebb54
+[*] Shellcode                            '?????????????' '\x00\x00'
+[*] Eip                                  0x200a6c
+[*] Exception                            0xd
+[*] Registers
+[0;31m    [*] EAX                              00000090 [was 00000000][0m
+[*] Memory
+[0;31m    [*] 0020804d-0020804d [GDT_9_8_5]    '\x80' [was '\x93'][0m
+[*] Kernel                               /tmp/kernel-00-0000
+[*] Floppy                               /tmp/floppy-00-0000
+================================================================================
+Forcing gadgets for:  FS, GS, DS, ES
+
+Gadget 'rebase page 0'
+   [*] asm:    movl $0x003fe027, 0x00206000; invlpg 0x0; // rebase page 0
+   [*] define: 
+   [*] kill:   
+   [*] use:    
+
+
+Gadget 'eax'
+   [*] asm:    movl $0x00000090,%eax; // eax
+   [*] define: EAX
+   [*] kill:   
+   [*] use:    
+
+
+Gadget '0020804d GDT_9_8_5'
+   [*] asm:    movb $0x80,0x0020804d; // GDT_9_8_5 + 0
+   [*] define: 0020804d
+   [*] kill:   FS, GS, DS, ES
+   [*] use:    mem*
+
+
+Gadget 'fs'
+   [*] asm:    mov $0x0048,%ax; mov %ax,%fs; // fs
+   [*] define: FS
+   [*] kill:   EAX
+   [*] use:    
+
+
+Gadget 'gs'
+   [*] asm:    mov $0x0048,%ax; mov %ax,%gs; // gs
+   [*] define: GS
+   [*] kill:   EAX
+   [*] use:    
+
+
+Gadget 'ds'
+   [*] asm:    mov $0x0048,%ax; mov %ax,%ds; // ds
+   [*] define: DS, mem*
+   [*] kill:   EAX
+   [*] use:    
+
+
+Gadget 'es'
+   [*] asm:    mov $0x0048,%ax; mov %ax,%es; // es
+   [*] define: ES
+   [*] kill:   EAX
+   [*] use:    
+
+
+Gadget 'shellcode'
+   [*] asm:    jmp forward_be410f42;forward_be410f42:.byte 0x00,0x00; // shellcode: ?????????????
+   [*] define: 
+   [*] kill:   
+   [*] use:    
+
+
+Gadget 'the end'
+   [*] asm:    jmp forward_335ac86a;forward_335ac86a:hlt; // notify the end of the test-case
+   [*] define: 
+   [*] kill:   
+   [*] use:    
+
+================================================================================
+
+movl $0x003fe027, 0x00206000; invlpg 0x0; // rebase page 0
+movb $0x80,0x0020804d; // GDT_9_8_5 + 0
+mov $0x0048,%ax; mov %ax,%ds; // ds
+mov $0x0048,%ax; mov %ax,%es; // es
+mov $0x0048,%ax; mov %ax,%fs; // fs
+mov $0x0048,%ax; mov %ax,%gs; // gs
+movl $0x00000090,%eax; // eax
+jmp forward_be410f42;forward_be410f42:.byte 0x00,0x00; // shellcode: ?????????????
+jmp forward_335ac86a;forward_335ac86a:hlt; // notify the end of the test-case
+jmp forward_962729be; forward_962729be:
+

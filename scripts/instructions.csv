@@ -1,0 +1,26 @@
+\x0d\x00\x00	3	or ax, 0x0000	OR_AXIw	3
+\xf0\xf0\xf0\x00\x00	5	lock lock lock add byte ptr ds:[bx+si], al	ADD_EbGbM	3
+\x2e\xf0\x64\x00\x00	5	lock add byte ptr fs:[bx+si], al	ADD_EbGbM	4
+\xf2\x64\xfc	3	repne cld 	CLD	6
+\xf0\xf2\xf0\x00\x00	5	lock repne lock add byte ptr ds:[bx+si], al	ADD_EbGbM	3
+\x2e\x2e\x0f\x00\x00	5	sldt word ptr cs:[bx+si]	SLDT_Ew	1
+\x0f\x61\xc0	3	punpcklwd mm0, mm0	PUNPCKLWD_PqQd	43
+\xf5	1	cmc 	CMC	3
+\xfc	1	cld 	CLD	3
+\x2e\x64\xf0\x00\x00	5	lock add byte ptr fs:[bx+si], al	ADD_EbGbM	4
+\xf7\x3e\x00\x00	4	idiv ax, word ptr ds:0x0	IDIV_AXEwM	3
+\x2e\xf8	2	clc 	CLC	1
+\xfb	1	sti 	STI	3
+\x2e\x0f\xb5\x00	4	lgs ax, cs:[bx+si]	LGS_GwMp	1
+\x1b\x01	2	sbb ax, word ptr ds:[bx+di]	SBB_GwEwM	3
+\x64\xf2\x2e\x00\x00	5	repne add byte ptr cs:[bx+si], al	ADD_EbGbM	3
+\x64\x64\x64\x00\x00	5	add byte ptr fs:[bx+si], al	ADD_EbGbM	4
+\x64\x67\x25\x00\x00	5	and ax, 0x0000	AND_AXIw	4
+\x66\x64\x2e\x00\x00	5	add byte ptr cs:[bx+si], al	ADD_EbGbM	1
+\xf0\x67\x64\x00\x00	5	lock add byte ptr fs:[eax], al	ADD_EbGbM	4
+\x2e\x64\xf2\x00\x00	5	repne add byte ptr fs:[bx+si], al	ADD_EbGbM	6
+\x2e\xf0\x66\x00\x00	5	lock add byte ptr cs:[bx+si], al	ADD_EbGbM	1
+\xf0\x2e\x64\x00\x00	5	lock add byte ptr fs:[bx+si], al	ADD_EbGbM	4
+\xf4	1	hlt 	HLT	3
+\x26\xf0\x64\x00\x00	5	lock add byte ptr fs:[bx+si], al	ADD_EbGbM	4
+\x6d	1	insw word ptr es:[di], dx	REP_INSW_YwDX	3
