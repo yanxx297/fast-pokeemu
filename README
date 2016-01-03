@@ -1,16 +1,25 @@
+COMPILE 
+-------
+1 Compile tools/fuzzball
+2 Download z3-2.15 from http://research.microsoft.com/en-us/um/redmond/projects/z3/z3-x64-2.15.tar.gz and build it according to z3/ocaml/README. 
+3 Add "Z3_OP_FD_LE," to z3/include/z3_api.h, one line after "Z3_OP_FD_LT,"
+4 Compile tools/emuFuzzBall
+
+
+
 INSTRUCTION EXPLORING
 ---------------------
 
 Step 1 - symbolic execution
 Run symbolic execution with 3 symbolic instruction bytes as input. 
 This step use fuzzball-whitedisasm.
-	cd ~/Project/nsf-EmuVerify/tools/emuFuzzBall-old
+	cd ~/Project/pokemu-oras/tools/emuFuzzBall
 	python run-fuzzball.py ../WhiteBochs-old/fuzzball-whitedisasm
 
 Step2 - concrete execution
 Given the testcases generated in step 1, run them with concrete bochs (concrete-whitedisasm) to turn them into instructions.
 Result is stored in /scripts/instructions.csv. 
-	cd ~/Project/nsf-EmuVerify/scripts
+	cd ~/Project/pokemu-oras/scripts
 	./run_analyze_shell_code.sh /tmp/fuzzball-fuzzball-whitedisasm-output/
 
 Notes:
@@ -24,14 +33,14 @@ MACHINE STATE EXPLORING
 
 Enter tools/emuFuzzBall-old/ folder and run the following command:
 
-	python run-emu-fuzzball.py /home/yanxx297/Project/nsf-EmuVerify/tools/WhiteBochs-old/fuzzball-whitebochs /home/yanxx297/Project/nsf-EmuVerify/base.snap <shellcode>
+	python run-emu-fuzzball.py /home/yanxx297/Project/pokemu-oras/tools/WhiteBochs-old/fuzzball-whitebochs /home/yanxx297/Project/pokemu-oras/base.snap <shellcode>
 
 The shellcode is in the format of \\x__\\x__\\x__ ... where each __ is one byte(2 letters).
 Note that if the input shellcode is not in full length, the actually instruction executed by bochs will be a mixture of the given shellcode and what left in inital memory.
 
 To run old binaries, replace emu_fuzzball with emu_fuzzball_old in run-emu-fuzzball.py, and run this command:
 
-	python run-emu-fuzzball.py /home/yanxx297/Project/nsf-EmuVerify/tools/WhiteBochs-old/fuzzball-whitebochs-old /home/yanxx297/Project/nsf-EmuVerify/base.snap <shellcode>
+	python run-emu-fuzzball.py /home/yanxx297/Project/pokemu-oras/tools/WhiteBochs-old/fuzzball-whitebochs-old /home/yanxx297/Project/pokemu-oras/base.snap <shellcode>
 
 
 

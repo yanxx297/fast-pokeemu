@@ -13,6 +13,4 @@ This repository doesn't include the following
 - Emulators for testing and comparison (Various QEMUs and KVM)
 	* Please copy them to emu/ from Pokemu old files
 
-To compile FuzzBALL-for-Pokemu, first compile tools/fuzzball, then compile tools/emuFuzzBall
-
-For instructions about running Pokemu, read README in root dir.
+For instructions about compiling and running Pokemu, read README in root dir.

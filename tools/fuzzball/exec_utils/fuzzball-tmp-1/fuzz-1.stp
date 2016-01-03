@@ -1,9 +1,0 @@
-mem_byte_0x501c3621 : BV(8);
-mem_byte_0x501c3620 : BV(8);
-mem_byte_0x501c3623 : BV(8);
-mem_byte_0x501c3622 : BV(8);
-mem_short_0x501c3622 : BV(16) = (mem_byte_0x501c3623 @ mem_byte_0x501c3622);
-mem_short_0x501c3620 : BV(16) = (mem_byte_0x501c3621 @ mem_byte_0x501c3620);
-mem_word_0x501c3620 : BV(32) = (mem_short_0x501c3622 @ mem_short_0x501c3620);
-QUERY(NOT ((mem_word_0x501c3620 = 0h00000000)));
-COUNTEREXAMPLE;

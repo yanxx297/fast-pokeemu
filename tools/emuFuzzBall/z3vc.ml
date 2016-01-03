@@ -19,6 +19,7 @@ let make_numbered_var ctx (n,_,ty) =
   Z3.mk_const ctx (Z3.mk_int_symbol ctx n) (vine_type_to_z3_sort ctx ty)
 
 let vine_exp_to_z3_term ctx vnm e =
+	Printf.printf "%s\n" (V.exp_to_string e);
   let bindings = V.VarHash.create 101 in
   let rec loop = function
     | V.Constant(V.Int(V.REG_1, b)) ->

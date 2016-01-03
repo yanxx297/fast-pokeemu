@@ -1,4 +1,4 @@
-export VINEROOT=$(HOME)/Project/nsf-EmuVerify/tools/fuzzball
+export VINEROOT=$(HOME)/Project/pokemu-oras/tools/fuzzball
 export VINEPATH=$(VINEROOT)
 export VINE_PROJECTS=$(VINEROOT)/projects
 export OCAMLMAKEFILE=$(VINEPATH)/ocaml/OCamlMakefile
@@ -64,7 +64,7 @@ define PROJ_emu_fuzzball
 	LIBS := stpvc $(LIBS)
 	LIBS += trace execution
         RESULT=emu_fuzzball
-        SOURCES=interpreter.mli interpreter.ml z3vc.mli z3vc.ml \
+        SOURCES= interpreter.ml z3vc.mli z3vc.ml \
 	        z3vc_query_engine.mli z3vc_query_engine.ml \
 		emu_fuzzball.ml
         DOC_FILES=$(SOURCES)
@@ -106,7 +106,7 @@ export PROJ_multi_path_test
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg
 
-all: nc 
+all: nc
 #dc
 
 OCAMLLIB := $(shell ocamlc -v | grep library | awk '{ print $$4 }')

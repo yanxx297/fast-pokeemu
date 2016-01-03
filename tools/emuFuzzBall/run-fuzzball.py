@@ -8,7 +8,8 @@ HOME = os.getenv("HOME")
 CHROOT = "" # "dchroot -d -c karmic-x86 --"
 FUZZBALL = os.path.join(os.path.dirname(__file__), "./emu_fuzzball")
 cmdline = sys.argv[1:]
-# SOLVER = "-stp-path /usr/bin/stp"
+#SOLVER = "-solver stpvc"
+#SOLVER = "-stp-path /home/yanxx297/Project/lib/stp/build"
 SOLVER = "-solver z3vc"
 OUTDIR = os.getenv("FUZZBALL_OUTDIR", 
                    "/tmp/fuzzball-%s-output" % os.path.basename(cmdline[0]))

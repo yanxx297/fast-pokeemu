@@ -2669,6 +2669,8 @@ object(self)
       | X64 -> (R_RAX, [| R_RDI; R_RSI; R_RDX; R_R10; R_R8; R_R9 |], R_RAX)
 
     in
+		if not (callnum_reg = R_EAX) then
+			failwith "callnum_reg != EAX\n";
     (let syscall_num = Int64.to_int (get_reg callnum_reg) and
 	 read_1_reg () = get_reg arg_regs.(0) in
      let read_2_regs () =
@@ -4523,7 +4525,8 @@ object(self)
 	    Some []	    
 	| "sysenter" ->
 	    let sysenter_eip = fm#get_word_var R_EIP in
-	    let sysexit_eip = (Int64.logor 0xd80L
+	    (*0xd80L for kernel 3.16*)
+			let sysexit_eip = (Int64.logor 0xb9eL
 				 (Int64.logand 0xfffff000L sysenter_eip)) in
 	    let label = "pc_0x" ^ (Printf.sprintf "%08Lx" sysexit_eip) in
 	      handle_catch ();
