@@ -19,7 +19,7 @@ let make_numbered_var ctx (n,_,ty) =
   Z3.mk_const ctx (Z3.mk_int_symbol ctx n) (vine_type_to_z3_sort ctx ty)
 
 let vine_exp_to_z3_term ctx vnm e =
-	Printf.printf "%s\n" (V.exp_to_string e);
+  (* Printf.printf "%s\n" (V.exp_to_string e); *)
   let bindings = V.VarHash.create 101 in
   let rec loop = function
     | V.Constant(V.Int(V.REG_1, b)) ->
@@ -157,6 +157,17 @@ let vine_exp_to_z3_term ctx vnm e =
     | V.Lval(V.Mem(_, _, _))
     | V.Let(V.Mem(_, _, _), _, _) ->
 	failwith "Arrays unimplemented in Z3 translation"
+    | V.Ite(exp_cond, exp_t, exp_f) ->
+	let (z_c, ty_c) = loop exp_cond and
+	    (z_t, ty_t) = loop exp_t and
+	    (z_f, ty_f) = loop exp_f in
+	  assert(ty_c = V.REG_1);
+	  assert(ty_t = ty_f);
+	  (Z3.mk_ite ctx z_c z_t z_f), ty_t
+    | V.FUnOp(_, _, _)
+    | V.FBinOp(_, _, _, _)
+    | V.FCast(_, _, _, _) ->
+	failwith "Floating point unimplemented in Z3 2.x"
     | V.Unknown(_) -> failwith "Unknowns not handled in Z3 translation"
     | V.Name(_) -> failwith "Unknowns not handled in Z3 translation"
   in
