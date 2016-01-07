@@ -49,8 +49,7 @@ let list_unique l =
 
 (* ===--------------------------------------------------------------------=== *)
 let print_ce chan ce =
-  List.iter (fun (var, value) -> Printf.fprintf chan "%s=0x%Lx\n" var value)
-    ce
+  Query_engine.ce_iter ce (fun var value -> Printf.fprintf chan "%s=0x%Lx\n" var value)
 
 let var_to_string v = 
   strip(Vine.var_to_string v)

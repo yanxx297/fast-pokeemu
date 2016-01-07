@@ -1,4 +1,4 @@
-export VINEROOT=$(HOME)/Project/pokemu-oras/tools/fuzzball
+export VINEROOT=$(shell pwd)/../fuzzball
 export VINEPATH=$(VINEROOT)
 export VINE_PROJECTS=$(VINEROOT)/projects
 export OCAMLMAKEFILE=$(VINEPATH)/ocaml/OCamlMakefile
@@ -9,7 +9,11 @@ export VINE_EXECDIR=$(VINEPATH)/execution
 export VINE_TRACEDIR=$(VINEPATH)/trace
 include $(LIBASMIR)/libasmir/makefile.inc
 
+# TODO: standardize on a location for Z3 that can be within the
+# pokemu-oras subtree (if only by symlink), so that this Makefile
+# doesn't need to be changed between users.
 Z3ROOT = $(HOME)/Project/lib
+# Z3ROOT = $(HOME)/emu/pokeemu/pokemu-oras # (Stephen's system)
 UNAME_ARCH = $(shell uname -m)
 ifeq ($(UNAME_ARCH),i386)
     Z3_DIR = $(Z3ROOT)/z3-2.15-32bit/z3
@@ -34,13 +38,14 @@ export EXTLIBDIRS += $(VINEPATH)/stp/ocaml $(VINEPATH)/stp $(VINE_OCAMLDIR)
 export STATIC = 1
 export CLIBS = asmir vex bfd iberty z3 stdc++ gmp pthread z
 export CFLAGS = -O2
-export OCAMLFLAGS = -dtypes -I $(VINE_OCAMLDIR) -I $(VINE_EXECDIR) -I $(Z3_DIR)/ocaml 
+export OCAMLINCLUDES = -I $(VINE_OCAMLDIR) -I $(VINE_EXECDIR) -I $(Z3_DIR)/ocaml
+export OCAMLFLAGS = -dtypes $(OCAMLINCLUDES)
 export LDFLAGS = $(LIBASMIR_LDFLAGS) -static
 export CLIBFLAGS= $(LDFLAGS)
 export LIBDIRS = $(VINE_OCAMLDIR) $(VINEPATH)/libasmir/src $(VINEPATH)/stp \
                  $(Z3_DIR)/lib
 
-export OCAMLDEP = ocamldep $(OCAMLFLAGS)
+export OCAMLDEP = ocamldep $(OCAMLINCLUDES)
 
 # default subprojects to build
 ifndef SUBPROJS
@@ -98,7 +103,7 @@ define PROJ_multi_path_test
 	LIBS := stpvc $(LIBS)
 	LIBS += trace execution
         RESULT=multi_path_test
-        SOURCES=interpreter.mli interpreter.ml multi_path_test.ml
+        SOURCES=interpreter.ml multi_path_test.ml
         DOC_FILES=$(SOURCES)
 endef
 export PROJ_multi_path_test
