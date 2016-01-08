@@ -4525,8 +4525,8 @@ object(self)
 	    Some []	    
 	| "sysenter" ->
 	    let sysenter_eip = fm#get_word_var R_EIP in
-	    (*0xd80L for kernel 3.16*)
-			let sysexit_eip = (Int64.logor 0xb9eL
+	    (*0xd80L for kernel 3.16, 0xba0L for kernel 4.2*)
+			let sysexit_eip = (Int64.logor 0xd80L
 				 (Int64.logand 0xfffff000L sysenter_eip)) in
 	    let label = "pc_0x" ^ (Printf.sprintf "%08Lx" sysexit_eip) in
 	      handle_catch ();
