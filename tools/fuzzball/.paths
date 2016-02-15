@@ -30,14 +30,12 @@ examples/newton-fp
 examples/fp-small
 config
 /usr/lib/ocaml
-autom4te.cache
 exec_utils/fuzzball-tmp-1
 exec_utils/fuzzball-tmp-2
 exec_utils/fuzzball-tmp-3
 exec_utils/fuzzball-tmp-4
 exec_utils/fuzzball-tmp-5
 exec_utils/fuzzball-tmp-6
-autom4te.cache
 config
 examples
 examples/fp-small
@@ -74,3 +72,4 @@ stp
 stp/ocaml
 stp/ocaml/tests
 trace
+autom4te.cache

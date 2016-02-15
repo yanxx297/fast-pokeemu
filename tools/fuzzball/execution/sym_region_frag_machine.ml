@@ -58,7 +58,11 @@ struct
       | i when i < 0x100000000L -> 16 + loop(Int64.shift_right_logical i 16)
       | _ -> 32 + loop(Int64.shift_right_logical i 32)
     in
-      loop i
+      (*loop i*)
+			let res = (loop i) in
+			(*Printf.printf "floor_log2 of 0x%08Lx: %d\n" i res;*)
+			res
+			
 
   (* Conservatively anayze the smallest number of non-zero
      least-significant bits into which a value will fit. This is a fairly
@@ -99,9 +103,16 @@ struct
 	| V.Lval(V.Mem(_, _, V.REG_8))  ->  8
 	| V.Lval(V.Mem(_, _, V.REG_16)) -> 16
 	| V.Lval(V.Mem(_, _, V.REG_32)) -> 32
-	| V.Lval(V.Mem(_, _, _))
-	| V.Lval(V.Temp(_)) ->
-	    V.bits_of_width (Vine_typecheck.infer_type_fast e)
+	| V.Lval(V.Mem(_, _, _)) -> V.bits_of_width (Vine_typecheck.infer_type_fast e)
+	| V.Lval(V.Temp(var)) ->
+		(			Printf.printf "%s\n" (V.exp_to_string (V.Lval(V.Temp(var))));
+					FormMan.if_expr_temp form_man var
+	      (fun e' -> (
+					Printf.printf "if_expr_temp = true, %s\n" (V.exp_to_string e');
+					loop e')) 
+					(V.bits_of_width (Vine_typecheck.infer_type_fast e)) 
+					(fun v -> (Printf.printf "if_expr_temp = false\n"))
+				)
 	| V.BinOp((V.EQ|V.NEQ|V.LT|V.LE|V.SLT|V.SLE), _, _) -> 1
 	| V.BinOp(V.LSHIFT, e1, V.Constant(V.Int(_, v))) ->
 	    (loop e1) + (Int64.to_int v)
@@ -120,7 +131,9 @@ struct
 	| V.Unknown(_) ->
 	    failwith "Unhandled unknown in narrow_bitwidth"
     in
-      FormMan.map_expr_temp form_man e f combine
+      let res = (FormMan.map_expr_temp form_man e f combine) in
+			Printf.printf "narrow_bitwidth %s: %d\n" (V.exp_to_string e) res;
+			res
 
   (* Similar to narrow_bitwidth, but count negative numbers of small
      absolute value (i.e. with many leading 1s) as narrow as well. I
@@ -132,7 +145,10 @@ struct
       | V.Constant(V.Int(ty, v)) ->
 	  min (1 + floor_log2 v)
 	    (1 + floor_log2 (Int64.neg (fix_s ty v)))
-      | V.BinOp(V.BITAND, e1, e2) -> max (loop e1) (loop e2)
+      | V.BinOp(V.BITAND, e1, e2) -> (
+				Printf.printf "\t%s: %d" (V.exp_to_string e1) (loop e1);
+				Printf.printf "\t%s: %d" (V.exp_to_string e2) (loop e2);
+				max (loop e1) (loop e2))
       | V.BinOp(V.BITOR, e1, e2) -> max (loop e1) (loop e2)
       | V.BinOp(V.XOR, e1, e2) -> max (loop e1) (loop e2)
       | V.BinOp(V.PLUS, e1, e2) -> 1 + (max (loop e1) (loop e2))
@@ -159,8 +175,7 @@ struct
       | V.Lval(V.Mem(_, _, V.REG_16)) -> 16
       | V.Lval(V.Mem(_, _, V.REG_32)) -> 32
       | V.Lval(V.Mem(_, _, _))
-      | V.Lval(V.Temp(_)) ->
-	  V.bits_of_width (Vine_typecheck.infer_type_fast e)
+      | V.Lval(V.Temp(_)) -> V.bits_of_width (Vine_typecheck.infer_type_fast e)
       | V.BinOp((V.EQ|V.NEQ|V.LT|V.LE|V.SLT|V.SLE), _, _) -> 1
       | V.BinOp(V.LSHIFT, e1, V.Constant(V.Int(_, v))) ->
 	  (loop e1) + (Int64.to_int v)
@@ -249,10 +264,12 @@ struct
       !l
 
   let split_terms e form_man =
+		Printf.printf "split_terms_in : %s\n" (V.exp_to_string e);
     let rec loop e =
       match e with
 	| V.BinOp(V.PLUS, e1, e2) -> (loop e1) @ (loop e2)
-(*	| V.BinOp(V.BITAND, e, V.Constant(V.Int(ty, v)))
+(**)
+ 	| V.BinOp(V.BITAND, e, V.Constant(V.Int(ty, v)))
 	    when is_high_mask ty v ->
 	    (* x & 0xfffffff0 = x - (x & 0xf), etc. *)
 	    (loop e) @
@@ -261,18 +278,21 @@ struct
 			 V.BinOp(V.BITAND, e,
 				 V.UnOp(V.NOT, V.Constant(V.Int(ty, v)))))))
 	| V.BinOp(V.BITOR, e1, e2) ->
-	    let (w1, w2) = (narrow_bitwidth e1), (narrow_bitwidth e2) in
+	    let (w1, w2) = (narrow_bitwidth form_man e1), (narrow_bitwidth form_man e2) in
 (* 	      Printf.printf "In %s (OR) %s, widths are %d and %d\n" *)
 (* 		(V.exp_to_string e1) (V.exp_to_string e2) w1 w2; *)
-	      if min w1 w2 <= 8 then
+  		let (e_x, e_y, w) = 
+  		  if w1 < w2 then
+  		    (e2, e1, w1)
+  		  else
+  		    (e1, e2, w2)
+  		in			
+				let min_bw = min w1 w2 in
+				Printf.printf "min bitwidth: %d\n" (min w1 w2);
+				if min_bw <= 8 then
+					(
 		(* x | y = x - (x & m) + ((x & m) | y)
 		   where m is a bitmask >= y. *)
-		let (e_x, e_y, w) = 
-		  if w1 < w2 then
-		    (e2, e1, w1)
-		  else
-		    (e1, e2, w2)
-		in
 		  assert(w >= 0); (* x & 0 should have been optimized away *)
 		  let mask = Int64.pred (Int64.shift_left 1L w) in
 		  let ty_y = Vine_typecheck.infer_type None e_y in
@@ -281,14 +301,57 @@ struct
 		    (loop e_x) @ 
 		      [V.UnOp(V.NEG, masked);
 		       V.BinOp(V.BITOR, masked, e_y)]
-	      else
-		[e] *)
+					)
+	      else if min_bw <= 12 then
+		(
+			(*whether a temp's content is in the form bellow*)
+			(* temp = cast(cast(t1:reg32_t + 0xfffffffc:reg32_t)L:reg16_t)U:reg32_t
+              + t2:reg32_t
+             & mask:reg32_t	*)
+			let func t = (
+				match t with
+				| V.BinOp(V.BITAND, 
+						V.BinOp(V.PLUS,
+  						V.Cast(V.CAST_UNSIGNED, V.REG_32, 
+  							V.Cast(V.CAST_LOW, V.REG_16, 
+  								V.BinOp(V.PLUS,
+										(V.Lval(_) as t1), 
+										V.Constant(V.Int(_, 0xfffffffcL))))),
+							(V.Lval(_) as t2)), 
+						V.Constant(V.Int(_, m))) -> (t1, t2, m)
+				| _ -> raise Not_found) in
+			let get_var t_expr = (
+				match t_expr with
+				| V.Lval(V.Temp(v)) -> v
+				| _ -> raise Not_found)
+			in
+			try
+				let var_x = get_var e_x
+				and var_y = get_var e_y in
+				let (t1, t2, m1) = FormMan.if_expr_temp form_man var_x func 
+					(V.Unknown("t_1"), V.Unknown("t_2"), 0L) (fun v -> ()) in 
+				let (t1', t2', m2) = FormMan.if_expr_temp form_man var_y func 
+					(V.Unknown("t_1"), V.Unknown("t_2"), 0L) (fun v -> ()) in 
+				if (t1 == t1') && (t2 == t2') && 
+					((Int64.logor m1 m2) == 0xffffffffL) then
+					[e_x; e_y]
+				else (
+					Printf.printf "split_terms: match but some problems 0x%08Lx\n" (Int64.logor m1 m2);
+					[e])
+			with Not_found -> (Printf.printf "split_terms: doesn't match\n";[e]);			
+			)
+				else
+		[e] 
+		(**)
 	| V.Lval(V.Temp(var)) ->
 	    FormMan.if_expr_temp form_man var
 	      (fun e' -> loop e') [e] (fun v -> ())
 	| e -> [e]
     in
-      loop e
+			(*loop e*)
+      let res = loop e in
+			List.iter (fun x -> Printf.printf "split_terms_out : %s\n" (V.exp_to_string x)) res;
+			res
 
   type term_kind = | ConstantBase of int64
 		   | ConstantOffset of int64

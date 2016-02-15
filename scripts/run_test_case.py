@@ -116,7 +116,8 @@ if __name__ == "__main__":
     for v in opts.itervalues():
         assert v is not None
 
-    assert os.path.isfile(opts["testcase"])
+    #TODO: check that each testcase is a file
+    #assert os.path.isfile(opts["testcase"])
     assert os.path.isdir(opts["outdir"])
     print "outdir valid\n"
     assert os.path.isfile(opts["script"]), opts["script"]

@@ -380,10 +380,35 @@ class Gadget:
     def gen_shellcode(shellcode):
         r = random.randint(0, 0xffffffff)
         x = ",".join("0x%.2x" % ord(b) for b in shellcode)
-        asm = "jmp forward_%.8x;forward_%.8x:" \
-            ".byte %s; // shellcode: %s" % \
-            (r, r, x, disasm(shellcode)[0])
-        return [Gadget(asm = asm, mnemonic = "shellcode")]
+        insn = disasm(shellcode)[0]
+        f = Tempfile()
+        f.write(shellcode)
+        p = subprocess.Popen(["objdump", "-b", "binary", "-m", "i386", "-EL", "-D", "%s" % f], 
+                             stdin=subprocess.PIPE, 
+                             stdout=subprocess.PIPE)
+        s = p.communicate()[0]
+        s = s.split('\n')[-2]
+        print "s = %s\n" % s
+        dest = s.split()[-1]
+        str = s.split()[3:]
+        print "str = %s\n" % str
+        dest = dest.split(",")[-1]
+        print "destination: %s #####################" % dest
+        addr = random.randint(0x00218008, 0x003fffff)   
+        faddr = random.randint(0x00218008, 0x003fffff)        
+        asm0 = "jmp forward_%.8x;forward_%.8x: " \
+            ".byte %s;// shellcode: %s" % (r, r, x, insn)
+        asm1 = "mov %s,%%eax; " \
+            "mov %%eax,0x%x; " \
+            "xor %%eax,%%eax; " \
+            "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
+        asm2 = "pushf; " \
+            "pop 0x%x; " \
+            "popf;//store and reset flag register" % (faddr)
+        g0 = Gadget(asm = asm0, mnemonic = "shellcode")
+        g1 = Gadget(asm = asm1, mnemonic = "shellcode")
+        g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
+        return [g0, g1, g2]
 
 
     @staticmethod
@@ -396,7 +421,7 @@ class Gadget:
         pte1022 = in_snapshot_mem((((deref4(pde0) & 0xfffff000) + 1022*4), 4), 
                                   snapshot)
         newpte0 = (deref4(pte0) & 0xfff) | (deref4(pte1022) & 0xfffff000)
-        asm = "movl $0x%.8x, 0x%.8x; invlpg 0x0; // rebase page 0" % \
+        asm = "pushf; movl $0x%.8x, 0x%.8x; invlpg 0x0; // rebase page 0" % \
             (newpte0, deref4(pde0) & 0xfffff000)
         mnemonic = "rebase page 0"
         return [Gadget(asm = asm, mnemonic = mnemonic)]
@@ -488,24 +513,26 @@ def topological_sort(graph):
 # ===-----------------------------------------------------------------------===
 # Compile a sequence of gadgets into x86 code
 # ===-----------------------------------------------------------------------===
-def compile_gadgets(prologue, body, epilogue, directive = ""):
+def compile_gadgets(gadget, directive = ""):
     # Build a graph representing dependencies among gadgets and order the
     # gadgets to make sure all dependencies are satisfied
-    depgraph = build_dependency_graph(body)
-    if DEBUG >= 2:
-        open("/tmp/depgraph.dot", "w").write(dot_dependency_graph(depgraph))
-
-    body = topological_sort(depgraph)
-
-    # Generate the assembly code
-    code = ""
-    i = 0
-    for g in prologue + body + epilogue:
-        code += "%s\n" % (g.asm)
-        if i and i % 8 == 0:
-            r = random.randint(0, 0xffffffff)
-            code += "jmp forward_%.8x; forward_%.8x:\n" % (r, r)
-        i += 1
+    code = "";
+    for tuple in gadget:
+        (prologue, body, epilogue) = tuple;
+        depgraph = build_dependency_graph(body)
+        if DEBUG >= 2:
+            open("/tmp/depgraph.dot", "w").write(dot_dependency_graph(depgraph))
+    
+        body = topological_sort(depgraph)
+    
+        # Generate the assembly code
+        i = 0
+        for g in prologue + body + epilogue:
+            code += "%s\n" % (g.asm)
+            if i and i % 8 == 0:
+                r = random.randint(0, 0xffffffff)
+                code += "jmp forward_%.8x; forward_%.8x:\n" % (r, r)
+            i += 1
 
     # Assemble
     tmpobj = Tempfile()
@@ -670,93 +697,100 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None):
     assert isfile
 
     snapshot = cpustate_x86.X86Dump(open(SNAPSHOT).read())
-
-    snapshot_md5, shellcode, exitstatus, regs, memlocs = \
-        load_fuzzball_testcase(testcase, snapshot)
-
-    assert snapshot_md5 == md5(open(SNAPSHOT))
-
-    eip = Register("EIP").in_snapshot(snapshot)
-
-    print "="*columns()
-    print "[*] %-36s %s" % ("Test-case", testcase)
-    print "[*] %-36s %s" % ("Snapshot", snapshot_md5)
-    print "[*] %-36s '%s' '%s'" % ("Shellcode", disasm(shellcode, eip)[0], 
-                               hexstr(shellcode))
-    for n, v in exitstatus:
-        print "[*] %-36s %s" % (n[0].upper() + n[1:], v)
-    print "[*] Registers"
-    for reg in regs:
-        name, value = reg.name, reg.value
-        s = "    [*] %-32s %.8x" % (name, value)
-        orig_value = reg.in_snapshot(snapshot) 
-        if orig_value != value:
-            print red(s + " [was %.8x]" % orig_value)
-        else:
-            print s
-    print "[*] Memory"
-    for mem in memlocs:
-        addr, value, sym = mem.address, mem.value, mem.symbol
-        size = len(value)
-        s = "    [*] %-32s %r" % ("%.8x-%.8x [%s]" % 
-                                     (addr, addr + size - 1, sym), value)
-        orig_value = in_snapshot_mem((addr, size), snapshot) 
-        if orig_value != value:
-            print red(s + " [was %r]" % orig_value)
-        else:
-            print s
-
-    if floppy or kernel:
-        if kernel:
-            print "[*] %-36s %s" % ("Kernel", kernel)
-        if floppy:
-            print "[*] %-36s %s" % ("Floppy", floppy)
-            
-    print "="*columns()
-
-    body = []
-    done = set()
+    gadget = []
     
-    # Generate code for initializing registers and memory locations
-    for rm in regs + memlocs:
-        orig_value = rm.in_snapshot(snapshot)
-        if orig_value != rm.value:
-            body += rm.gen_gadget(snapshot)
-            done.add(rm)
+    count = 0
+    num = len(testcase.split(","))
+    for tc in testcase.split(","):     
+        count += 1
+        snapshot_md5, shellcode, exitstatus, regs, memlocs = \
+            load_fuzzball_testcase(tc, snapshot)
+    
+        assert snapshot_md5 == md5(open(SNAPSHOT))
+    
+        eip = Register("EIP").in_snapshot(snapshot)
+    
+        print "="*columns()
+        print "[*] %-36s %s" % ("Test-case", tc)
+        print "[*] %-36s %s" % ("Snapshot", snapshot_md5)
+        print "[*] %-36s '%s' '%s'" % ("Shellcode", disasm(shellcode, eip)[0], 
+                                   hexstr(shellcode))
+        for n, v in exitstatus:
+            print "[*] %-36s %s" % (n[0].upper() + n[1:], v)
+        print "[*] Registers"
+        for reg in regs:
+            name, value = reg.name, reg.value
+            s = "    [*] %-32s %.8x" % (name, value)
+            orig_value = reg.in_snapshot(snapshot) 
+            if orig_value != value:
+                print red(s + " [was %.8x]" % orig_value)
+            else:
+                print s
+        print "[*] Memory"
+        for mem in memlocs:
+            addr, value, sym = mem.address, mem.value, mem.symbol
+            size = len(value)
+            s = "    [*] %-32s %r" % ("%.8x-%.8x [%s]" % 
+                                         (addr, addr + size - 1, sym), value)
+            orig_value = in_snapshot_mem((addr, size), snapshot) 
+            if orig_value != value:
+                print red(s + " [was %r]" % orig_value)
+            else:
+                print s
+    
+        if floppy or kernel:
+            if kernel:
+                print "[*] %-36s %s" % ("Kernel", kernel)
+            if floppy:
+                print "[*] %-36s %s" % ("Floppy", floppy)
+                
+        print "="*columns()
+    
+        body = []
+        done = set()
         
-    # Need one or more extra passes to define what has been killed but not
-    # defined
-    stable = False
-    while not stable:
-        stable = True
+        # Generate code for initializing registers and memory locations
+        for rm in regs + memlocs:
+            orig_value = rm.in_snapshot(snapshot)
+            if orig_value != rm.value:
+                body += rm.gen_gadget(snapshot)
+                done.add(rm)
+            
+        # Need one or more extra passes to define what has been killed but not
+        # defined
+        stable = False
+        while not stable:
+            stable = True
+    
+            killed = set()
+            defined = set()
+            for g in body:
+                killed |= g.kill
+                defined |= g.define
+    
+            if len(killed - defined):
+                print "Forcing gadgets for: ", \
+                    ", ".join([str(v) for v in killed - defined])
+    
+            for rm in killed - defined:
+                assert rm not in done
+                stable = False
+                rm.value = rm.in_snapshot(snapshot)
+                body += rm.gen_gadget(snapshot)
+    
+    
+        prologue = Gadget.gen_prologue(snapshot)
+        epilogue = Gadget.gen_shellcode(shellcode);
+        if count == num:
+            epilogue = epilogue + Gadget.gen_end_testcase()
+        gadget.append((prologue, body, epilogue))
+    
+        if DEBUG >= 1:
+            for g in prologue + body + epilogue:
+                print
+                print g
 
-        killed = set()
-        defined = set()
-        for g in body:
-            killed |= g.kill
-            defined |= g.define
-
-        if len(killed - defined):
-            print "Forcing gadgets for: ", \
-                ", ".join([str(v) for v in killed - defined])
-
-        for rm in killed - defined:
-            assert rm not in done
-            stable = False
-            rm.value = rm.in_snapshot(snapshot)
-            body += rm.gen_gadget(snapshot)
-
-
-    prologue = Gadget.gen_prologue(snapshot)
-    epilogue = Gadget.gen_shellcode(shellcode) + Gadget.gen_end_testcase()
-
-    if DEBUG >= 1:
-        for g in prologue + body + epilogue:
-            print
-            print g
-
-    code, obj = compile_gadgets(prologue = prologue, body = body, 
-                                epilogue = epilogue)
+    code, obj = compile_gadgets(gadget)
 
     if DEBUG >= 2:
         print "="*columns()

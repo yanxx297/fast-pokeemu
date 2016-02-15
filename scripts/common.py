@@ -90,6 +90,7 @@ def disasm(s, base = 0):
     except OSError:
         return ["?????????????"]
 
+    print out
     insts = []
     for l in out.split("\n"):
         l = l.strip(" \t\r\n")
@@ -98,6 +99,7 @@ def disasm(s, base = 0):
         l = l.split()
         insts.append(" ".join(l[2:]))
 
+    print "%s" % (insts)
     return insts
 
 

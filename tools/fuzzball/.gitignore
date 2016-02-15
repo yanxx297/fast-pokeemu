@@ -25,3 +25,4 @@ missing
 /compile
 .z3-trace
 fuzzball-tmp-*
+.paths

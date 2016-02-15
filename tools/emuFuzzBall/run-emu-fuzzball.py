@@ -25,7 +25,7 @@ OUTDIR = os.getenv("FUZZBALL_OUTDIR", "/tmp/fuzzball-output")
 print OUTDIR
 FUZZBALL_ENV_ARGS = os.getenv("FUZZBALL_ARGS", "")
 FUZZBALL_MAX_ITERS = os.getenv("FUZZBALL_MAX_ITERATIONS", "4096")
-FUZZBALL_ARGS = "-solver z3vc -linux-syscalls -trace-iterations -zero-memory -trace-insns " \
+FUZZBALL_ARGS = "-solver z3vc -linux-syscalls -trace-iterations -zero-memory -trace-temps -trace-insns -no-fail-on-huer -implied-value-conc " \
     "-paths-limit %s -output-dir %s %s" % \
     (FUZZBALL_MAX_ITERS, OUTDIR, FUZZBALL_ENV_ARGS)
 EXTRA_DESC_COND = os.path.join(HERE, "extra-desc-conds.txt")

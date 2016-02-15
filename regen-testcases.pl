@@ -19,8 +19,8 @@ foreach my $s (@seqs) {
 	my $tc = "/tmp/$s/$n/testcase";
 	my $kern = "/tmp/kernel-$s-$short_n";
 	my $floppy = "/tmp/floppy-$s-$short_n";
-	system("/home/yanxx297/Project/nsf-EmuVerify/scripts/print_test_case.py $tc >$outdir/ptc.txt");
-	system("/home/yanxx297/Project/nsf-EmuVerify/scripts/gen_floppy_image.py debug:2 testcase:$tc kernel:$kern floppy:$floppy >$outdir/gen.log");
+	system("/home/yanxx297/Project/pokemu-oras/scripts/print_test_case.py $tc >$outdir/ptc.txt");
+	system("/home/yanxx297/Project/pokemu-oras/scripts/gen_floppy_image.py debug:2 testcase:$tc kernel:$kern floppy:$floppy >$outdir/gen.log");
 	open(DIS, ">", "$outdir/test.dis");
 	open(OBJDUMP, "objdump -d -j .testcase $kern |");
 	while (<OBJDUMP>) {

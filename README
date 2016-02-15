@@ -67,6 +67,9 @@ e.g. for qemu-0.12.4+dfsg, the cmd is:
 
 	python run_test_case.py testcase:/path/to/testcase timeout:5 outdir:/tmp/out/ script:/emu/qemu-0.12.4+dfsg/run-testcase
 
+For example: 
+	python run_test_case.py testcase:/tmp/00/00000001/testcase,/tmp/00/00000000/testcase timeout:5 outdir:/tmp/out/ script:/emu/qemu-0.12.4+dfsg/run-testcase
+
 Notes: 
 	- run-testcase call functions in gen_floppy_image.py to generate floppy disk, which include all the content of kernel disk.
 	- Must run on (software based) emulators first to generate the *.pre file, which is the input of kvm.
@@ -95,7 +98,7 @@ Before running this script, must uncomment lines in /scripts/common.py after "#F
 
 To regen single testcase:
 
-	python gen_floppy_image.py debug:2 testcase:/path/to/a/testcase kernel:kernel-base floppy:floppy-base
+	python gen_floppy_image.py debug:2 testcase:/path/to/testcases kernel:kernel-base floppy:floppy-base
 
 Note that this step is not included in the working flow of Pokemu.
 The goal of this step is to REgenerate testcases, while the regenerated testcases are used in nowhere.  
