@@ -105,13 +105,11 @@ struct
 	| V.Lval(V.Mem(_, _, V.REG_32)) -> 32
 	| V.Lval(V.Mem(_, _, _)) -> V.bits_of_width (Vine_typecheck.infer_type_fast e)
 	| V.Lval(V.Temp(var)) ->
-		(			Printf.printf "%s\n" (V.exp_to_string (V.Lval(V.Temp(var))));
-					FormMan.if_expr_temp form_man var
+		(		FormMan.if_expr_temp form_man var
 	      (fun e' -> (
-					Printf.printf "if_expr_temp = true, %s\n" (V.exp_to_string e');
 					loop e')) 
 					(V.bits_of_width (Vine_typecheck.infer_type_fast e)) 
-					(fun v -> (Printf.printf "if_expr_temp = false\n"))
+					(fun v -> ())
 				)
 	| V.BinOp((V.EQ|V.NEQ|V.LT|V.LE|V.SLT|V.SLE), _, _) -> 1
 	| V.BinOp(V.LSHIFT, e1, V.Constant(V.Int(_, v))) ->
@@ -132,7 +130,7 @@ struct
 	    failwith "Unhandled unknown in narrow_bitwidth"
     in
       let res = (FormMan.map_expr_temp form_man e f combine) in
-			Printf.printf "narrow_bitwidth %s: %d\n" (V.exp_to_string e) res;
+			(*Printf.printf "narrow_bitwidth %s: %d\n" (V.exp_to_string e) res;*)
 			res
 
   (* Similar to narrow_bitwidth, but count negative numbers of small
@@ -264,7 +262,7 @@ struct
       !l
 
   let split_terms e form_man =
-		Printf.printf "split_terms_in : %s\n" (V.exp_to_string e);
+		(*Printf.printf "split_terms_in : %s\n" (V.exp_to_string e);*)
     let rec loop e =
       match e with
 	| V.BinOp(V.PLUS, e1, e2) -> (loop e1) @ (loop e2)
@@ -278,7 +276,10 @@ struct
 			 V.BinOp(V.BITAND, e,
 				 V.UnOp(V.NOT, V.Constant(V.Int(ty, v)))))))
 	| V.BinOp(V.BITOR, e1, e2) ->
-	    let (w1, w2) = (narrow_bitwidth form_man e1), (narrow_bitwidth form_man e2) in
+		let (w1, w2) = (narrow_bitwidth form_man e1), (narrow_bitwidth form_man e2) in
+		let min_bw = min w1 w2 in
+	  if min_bw <= 12 then
+		(
 (* 	      Printf.printf "In %s (OR) %s, widths are %d and %d\n" *)
 (* 		(V.exp_to_string e1) (V.exp_to_string e2) w1 w2; *)
   		let (e_x, e_y, w) = 
@@ -287,23 +288,6 @@ struct
   		  else
   		    (e1, e2, w2)
   		in			
-				let min_bw = min w1 w2 in
-				Printf.printf "min bitwidth: %d\n" (min w1 w2);
-				if min_bw <= 8 then
-					(
-		(* x | y = x - (x & m) + ((x & m) | y)
-		   where m is a bitmask >= y. *)
-		  assert(w >= 0); (* x & 0 should have been optimized away *)
-		  let mask = Int64.pred (Int64.shift_left 1L w) in
-		  let ty_y = Vine_typecheck.infer_type None e_y in
-		  let masked = V.BinOp(V.BITAND, e_y,
-				       V.Constant(V.Int(ty_y, mask))) in
-		    (loop e_x) @ 
-		      [V.UnOp(V.NEG, masked);
-		       V.BinOp(V.BITOR, masked, e_y)]
-					)
-	      else if min_bw <= 12 then
-		(
 			(*whether a temp's content is in the form bellow*)
 			(* temp = cast(cast(t1:reg32_t + 0xfffffffc:reg32_t)L:reg16_t)U:reg32_t
               + t2:reg32_t
@@ -332,13 +316,31 @@ struct
 					(V.Unknown("t_1"), V.Unknown("t_2"), 0L) (fun v -> ()) in 
 				let (t1', t2', m2) = FormMan.if_expr_temp form_man var_y func 
 					(V.Unknown("t_1"), V.Unknown("t_2"), 0L) (fun v -> ()) in 
-				if (t1 == t1') && (t2 == t2') && 
-					((Int64.logor m1 m2) == 0xffffffffL) then
+				if (t1 = t1') && (t2 = t2') && 
+					((Int64.logor m1 m2) = 0xffffffffL) then
 					[e_x; e_y]
 				else (
-					Printf.printf "split_terms: match but some problems 0x%08Lx\n" (Int64.logor m1 m2);
-					[e])
-			with Not_found -> (Printf.printf "split_terms: doesn't match\n";[e]);			
+					Printf.printf "split_terms: match but some problems \n";
+					Printf.printf "t1 = %s\n" (V.exp_to_string t1);
+					Printf.printf "t1' = %s\n" (V.exp_to_string t1');
+					if t1 = t1' then Printf.printf "Passed T1 check\n";
+					Printf.printf "t2 = %s\n" (V.exp_to_string t2);
+					Printf.printf "t2' = %s\n" (V.exp_to_string t2');
+					if t2 = t2' then Printf.printf "Passed T2 check\n";
+					Printf.printf "Int64.logor m1 m2 = 0x%08Lx\n" (Int64.logor m1 m2);
+					if ((Int64.logor m1 m2) = 0xffffffffL) then Printf.printf "Passed mask check\n";					
+					raise Not_found)
+			with Not_found -> (
+  		(* x | y = x - (x & m) + ((x & m) | y)
+  		   where m is a bitmask >= y. *)
+  		  assert(w >= 0); (* x & 0 should have been optimized away *)
+  		  let mask = Int64.pred (Int64.shift_left 1L w) in
+  		  let ty_y = Vine_typecheck.infer_type None e_y in
+  		  let masked = V.BinOp(V.BITAND, e_y,
+  				       V.Constant(V.Int(ty_y, mask))) in
+  		    (loop e_x) @ 
+  		      [V.UnOp(V.NEG, masked);
+  		       V.BinOp(V.BITOR, masked, e_y)]);			
 			)
 				else
 		[e] 
@@ -350,7 +352,7 @@ struct
     in
 			(*loop e*)
       let res = loop e in
-			List.iter (fun x -> Printf.printf "split_terms_out : %s\n" (V.exp_to_string x)) res;
+			(*List.iter (fun x -> Printf.printf "split_terms_out : %s\n" (V.exp_to_string x)) res;*)
 			res
 
   type term_kind = | ConstantBase of int64

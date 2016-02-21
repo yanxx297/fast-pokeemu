@@ -392,23 +392,53 @@ class Gadget:
         dest = s.split()[-1]
         str = s.split()[3:]
         print "str = %s\n" % str
-        dest = dest.split(",")[-1]
-        print "destination: %s #####################" % dest
-        addr = random.randint(0x00218008, 0x003fffff)   
-        faddr = random.randint(0x00218008, 0x003fffff)        
-        asm0 = "jmp forward_%.8x;forward_%.8x: " \
-            ".byte %s;// shellcode: %s" % (r, r, x, insn)
-        asm1 = "mov %s,%%eax; " \
-            "mov %%eax,0x%x; " \
-            "xor %%eax,%%eax; " \
-            "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
-        asm2 = "pushf; " \
-            "pop 0x%x; " \
-            "popf;//store and reset flag register" % (faddr)
-        g0 = Gadget(asm = asm0, mnemonic = "shellcode")
-        g1 = Gadget(asm = asm1, mnemonic = "shellcode")
-        g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
-        return [g0, g1, g2]
+        op = str[0]
+        args = str[1]
+        print "operation = %s, operands = %s\n" % (op, args)
+        n = len(args.split(","))
+        print "There are %d operands\n" % n
+        if n == 0:
+            #TODO: handle non-operand operations
+            #pushf(and also popf?)
+            #sysexit
+            #rdtsc
+            #rdmsr
+            #vmcall
+            sys.exit(1)
+        else:
+            if op == "call" and n == 1 and args == "*(%eax)":
+                #handle call *(%eax)
+                r1 = random.randint(0, 0xffffffff)
+                r2 = random.randint(0, 0xffffffff)
+                faddr = random.randint(0x00218008, 0x003fffff)
+                asm0 = "mov $forward_%.8x,%%eax;" \
+                    "call *(%%eax);//shellcode: %s" % (r2, insn)
+                asm1 = "forward_%.8x: pushf; " \
+                    "pop 0x%x; " \
+                    "popf;//store and reset flag register" % (r1, faddr)
+                asm2 = "forward_%.8x: jmp forward_%.8x; //call target" % (r2, r1)
+                g0 = Gadget(asm = asm0, mnemonic = "shellcode")
+                g1 = Gadget(asm = asm1, mnemonic = "shellcode")
+                g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
+                return [g0, g1, g2]
+            else:
+                dest = dest.split(",")[-1]
+                print "destination: %s #####################" % dest
+                addr = random.randint(0x00218008, 0x003fffff)   
+                faddr = random.randint(0x00218008, 0x003fffff)        
+                asm0 = "jmp forward_%.8x;forward_%.8x: " \
+                    ".byte %s;// shellcode: %s" % (r, r, x, insn)
+                asm1 = "mov %s,%%eax; " \
+                    "mov %%eax,0x%x; " \
+                    "xor %%eax,%%eax; " \
+                    "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
+                asm2 = "pushf; " \
+                    "pop 0x%x; " \
+                    "popf;//store and reset flag register" % (faddr)
+                g0 = Gadget(asm = asm0, mnemonic = "shellcode")
+                g1 = Gadget(asm = asm1, mnemonic = "shellcode")
+                g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
+                return [g0, g1, g2]
 
 
     @staticmethod

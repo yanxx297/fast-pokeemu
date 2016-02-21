@@ -111,7 +111,7 @@ export PROJ_multi_path_test
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg
 
-all: nc
+all: dc
 #dc
 
 OCAMLLIB := $(shell ocamlc -v | grep library | awk '{ print $$4 }')
