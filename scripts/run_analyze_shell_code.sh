@@ -9,13 +9,15 @@ touch $IN
 cd $1
 for FILENAME in *
 do	
+	IN=input	
 	DIR=$1$FILENAME
 	echo $DIR
-	$TCGEN/analyze_shell_code.sh $DIR > $IN
+	cd $TCGEN 
+	./analyze_shell_code.sh $DIR > $IN
+	IN=$TCGEN"/"$IN
+	cd $DIR 	
 	cat $IN
 	echo $WBOCHS/concrete-whitedisasm $(cat $IN)
 	$WBOCHS/concrete-whitedisasm $(cat $IN) >> $TMP 
 done
-rm $IN
-cd $TCGEN
 rm $IN
