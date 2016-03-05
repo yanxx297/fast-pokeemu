@@ -14,6 +14,7 @@ import StringIO
 import hashlib
 import cpustate_x86
 from common import *
+from numpy.f2py.f2py_testing import cmdline
 
 ROOT = abspath(joinpath(dirname(abspath(__file__)), ".."))
 KERNEL = joinpath(ROOT, "kernel")
@@ -410,17 +411,25 @@ class Gadget:
                 #handle call *(%eax)
                 r1 = random.randint(0, 0xffffffff)
                 r2 = random.randint(0, 0xffffffff)
+                fp = random.randint(0x00218008, 0x003fffff)
                 faddr = random.randint(0x00218008, 0x003fffff)
+                #asm0 = "mov $0x214000, %%eax;" \
+                #    "add $forward_%.8x,%%eax;" \
+                #    "call *(%%eax);//shellcode: %s" % (r2, insn)
                 asm0 = "mov $forward_%.8x,%%eax;" \
-                    "call *(%%eax);//shellcode: %s" % (r2, insn)
-                asm1 = "forward_%.8x: pushf; " \
-                    "pop 0x%x; " \
-                    "popf;//store and reset flag register" % (r1, faddr)
+                    "mov %%eax, 0x%x;"\
+                    "mov $0x%x,%%eax;" % (r2, fp, fp)                    
+                asm1 = "jmp forward_%.8x;forward_%.8x: " \
+                    ".byte %s;// shellcode: %s" % (r, r, x, insn)
                 asm2 = "forward_%.8x: jmp forward_%.8x; //call target" % (r2, r1)
+                asm3 = "forward_%.8x: pushf; " \
+                    "pop 0x%x; " \
+                    "popf;//store and reset flag register" % (r1, faddr)  
                 g0 = Gadget(asm = asm0, mnemonic = "shellcode")
                 g1 = Gadget(asm = asm1, mnemonic = "shellcode")
-                g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
-                return [g0, g1, g2]
+                g2 = Gadget(asm = asm2, mnemonic = "shellcode")
+                g3 = Gadget(asm = asm3, mnemonic = "shellcode")    
+                return [g0, g1, g2, g3]
             else:
                 dest = dest.split(",")[-1]
                 print "destination: %s #####################" % dest
@@ -566,6 +575,7 @@ def compile_gadgets(gadget, directive = ""):
 
     # Assemble
     tmpobj = Tempfile()
+    tmpelf = Tempfile()
     cmdline = "as -32 -o %s -" % tmpobj
     p = subprocess.Popen(cmdline.split(), 
                          stdin = subprocess.PIPE, 
@@ -576,11 +586,17 @@ def compile_gadgets(gadget, directive = ""):
     if stderr != "":
         print "[E] Can't compile code:\n%s\n-%s-" % (prog, stderr)
         exit(1)
+        
+    #For correct direct jump location, use linker
+    #.testcase start at 0x00214000 in base state kernel
+    cmdline = "ld -m elf_i386 -Ttext 0x214000 -o %s %s" % (tmpelf, tmpobj)
+    subprocess.call(cmdline.split())
 
     # Extract the code of the gadgets (.text section) from the elf object
-    cmdline = "objcopy -O binary -j .text %s" % str(tmpobj)
+    cmdline = "objcopy -O binary -j .text %s" % str(tmpelf)
+    print "cmdlind: %s\n" % cmdline
     subprocess.call(cmdline.split())
-    obj = open(str(tmpobj)).read()
+    obj = open(str(tmpelf)).read()
 
     return code, obj
 
@@ -592,6 +608,7 @@ def patch_kernel(orig_kernel, where, obj, new_kernel):
     kernel = elf.Elf(orig_kernel)
     testcase = kernel.getSection(where)
     assert testcase is not None
+    print "%d %d\n" % (len(obj), testcase.getSize())
     assert len(obj) < testcase.getSize()
     
     padding = "\xf4"*(testcase.getSize() - len(obj))
