@@ -144,9 +144,9 @@ struct
 	  min (1 + floor_log2 v)
 	    (1 + floor_log2 (Int64.neg (fix_s ty v)))
       | V.BinOp(V.BITAND, e1, e2) -> (
-				Printf.printf "\t%s: %d" (V.exp_to_string e1) (loop e1);
-				Printf.printf "\t%s: %d" (V.exp_to_string e2) (loop e2);
-				max (loop e1) (loop e2))
+	  Printf.printf "\t%s: %d\n" (V.exp_to_string e1) (loop e1);
+	  Printf.printf "\t%s: %d\n" (V.exp_to_string e2) (loop e2);
+	  max (loop e1) (loop e2))
       | V.BinOp(V.BITOR, e1, e2) -> max (loop e1) (loop e2)
       | V.BinOp(V.XOR, e1, e2) -> max (loop e1) (loop e2)
       | V.BinOp(V.PLUS, e1, e2) -> 1 + (max (loop e1) (loop e2))
@@ -486,6 +486,29 @@ struct
 (*       | V.BinOp(V.BITOR, _, _) (* XXX happens in Windows 7, don't know why *) *)
 (* 	  -> ExprOffset(e) *)
       | V.Cast(V.CAST_SIGNED, _, _) -> ExprOffset(e)
+      | V.BinOp(V.BITOR,
+		V.Cast(V.CAST_UNSIGNED, V.REG_32,
+                       V.BinOp(V.BITOR,
+                               V.Cast(V.CAST_UNSIGNED, V.REG_16,
+                                      b1),
+                               V.BinOp(V.LSHIFT,
+                                       V.Cast(V.CAST_UNSIGNED, V.REG_16, b2),
+                                       V.Constant(V.Int(_, 8L))))),
+		V.BinOp(V.LSHIFT,
+			V.Cast(V.CAST_UNSIGNED, V.REG_32,
+                               V.BinOp(V.BITOR,
+                                       V.Cast(V.CAST_UNSIGNED, V.REG_16,
+                                              b3),
+                                       V.BinOp(V.LSHIFT,
+                                               V.Cast(V.CAST_UNSIGNED,
+                                                      V.REG_16, b4),
+                                               V.Constant(V.Int(_, 8L))))),
+			V.Constant(V.Int(_, 16L)))) ->
+          (* A 32-bit value made by reassembling 8-bite bytes. If
+             FuzzBALL hasn't already been able to simplify it back to a
+             full-width value, there's not much hope of syntactically
+             analyzing it here. *)
+          AmbiguousExpr(e)
       | V.Lval(_) -> Symbol(e)
       | _ -> if (!opt_fail_offset_heuristic) then (
 	  failwith ("Strange term "^(V.exp_to_string e)^" in address")
