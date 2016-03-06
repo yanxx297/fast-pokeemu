@@ -2393,15 +2393,7 @@ struct
 
     method parse_symbolic_expr str =
       let expr = Vine_parser.parse_exp_from_string (form_man#input_dl) str in
-			let expr' = D.from_symbolic expr in
-			let ty = Vine_typecheck.infer_type_fast expr in
-			match ty with
-			| V.REG_1 -> D.to_symbolic_1 (form_man#simplify1 expr')
-			| V.REG_8 -> D.to_symbolic_8 (form_man#simplify8 expr')
-			| V.REG_16 -> D.to_symbolic_16 (form_man#simplify16 expr')
-			| V.REG_32 -> D.to_symbolic_32 (form_man#simplify32 expr')
-			| V.REG_64 -> D.to_symbolic_64 (form_man#simplify64 expr')
-			| _ -> failwith "fragment_machine: Unable to simplify"
+	form_man#unlet_retemp expr
 
     method store_cstr base idx str =
       self#store_str base idx str;

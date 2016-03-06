@@ -697,6 +697,85 @@ struct
 			     V.Lval(V.Temp(self#make_temp_var e2 ty))))
 	) v
 
+    method unlet_retemp expr =
+      let tempify e =
+	let e' = simplify_fp e in
+          match e' with
+            | V.Constant(_) -> e'
+            | V.Lval(V.Temp(_)) -> e'
+            | _ ->
+		let ty = Vine_typecheck.infer_type_fast e' in
+                  V.Lval(V.Temp(self#make_temp_var e' ty))
+      in
+      let simplify e =
+	let e' = simplify_fp e in
+	let ty = Vine_typecheck.infer_type_fast e' in
+          assert(expr_size e' < 100);
+          if expr_size e' < 10 then
+            e'
+          else
+            V.Lval(V.Temp(self#make_temp_var e' ty))
+      in
+      let replaced = V.VarHash.create 101 in
+      let rec loop e =
+	match e with
+          | V.BinOp(V.BITOR,
+                    V.BinOp(V.BITAND,
+                            V.Cast(V.CAST_SIGNED, ty1, cond1), x),
+                    V.BinOp(V.BITAND,
+                            V.UnOp(V.NOT,
+                                   V.Cast(V.CAST_SIGNED, ty2, cond2)), y))
+          | V.BinOp(V.BITOR,
+                    V.BinOp(V.BITAND,
+                            x, V.Cast(V.CAST_SIGNED, ty1, cond1)),
+                    V.BinOp(V.BITAND,
+                            V.UnOp(V.NOT,
+                                   V.Cast(V.CAST_SIGNED, ty2, cond2)), y))
+          | V.BinOp(V.BITOR,
+                    V.BinOp(V.BITAND,
+                            V.Cast(V.CAST_SIGNED, ty1, cond1), x),
+                    V.BinOp(V.BITAND,
+                            y, V.UnOp(V.NOT,
+                                      V.Cast(V.CAST_SIGNED, ty2, cond2))))
+          | V.BinOp(V.BITOR,
+                    V.BinOp(V.BITAND,
+                            x, V.Cast(V.CAST_SIGNED, ty1, cond1)),
+                    V.BinOp(V.BITAND,
+                            y, V.UnOp(V.NOT,
+                                      V.Cast(V.CAST_SIGNED, ty2, cond2))))
+              when ty1 = ty2 && cond1 = cond2 &&
+		(Vine_typecheck.infer_type_fast cond1) = V.REG_1
+		->
+              simplify (V.Ite((loop cond1), (loop x), (loop y)))
+          | V.BinOp(op, e1, e2) -> simplify (V.BinOp(op, (loop e1), (loop e2)))
+          | V.FBinOp(op, rm, e1, e2) ->
+              simplify (V.FBinOp(op, rm, (loop e1), (loop e2)))
+          | V.UnOp(op, e1) -> simplify (V.UnOp(op, (loop e1)))
+          | V.FUnOp(op, rm, e1) -> simplify (V.FUnOp(op, rm, (loop e1)))
+          | V.Constant(_) -> e
+          | V.Lval(V.Temp(v)) ->
+              (try
+                 V.VarHash.find replaced v
+               with Not_found -> e)
+          | V.Lval(V.Mem(v, e, ty)) -> V.Lval(V.Mem(v, (loop e), ty))
+          | V.Name(_) -> e
+          | V.Cast(kind, ty, e1) -> simplify (V.Cast(kind, ty, (loop e1)))
+          | V.FCast(kind, rm, ty, e1) ->
+              simplify (V.FCast(kind, rm, ty, (loop e1)))
+          | V.Unknown(_) -> e
+          | V.Let(V.Temp(v), e1, e2) ->
+              let e1' = tempify (loop e1) in
+		V.VarHash.add replaced v e1';
+		let e2' = loop e2 in
+                  V.VarHash.remove replaced v;
+                  e2'
+          | V.Let(V.Mem(_,_,_), _, _) ->
+              failwith "Unexpected memory let in unlet_retemp"
+          | V.Ite(ce, te, fe) ->
+              simplify (V.Ite((loop ce), (loop te), (loop fe)))
+      in
+	loop expr
+
     method make_ite cond_v ty v_true v_false =
       let cond_v'  = self#tempify  cond_v  V.REG_1 and
 	  v_true'  = self#simplify v_true  ty      and

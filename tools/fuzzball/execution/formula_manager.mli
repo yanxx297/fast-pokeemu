@@ -41,7 +41,7 @@ sig
 
     method make_concolic_mem_8 : string -> int64 -> int -> D.t
 		
-		method make_symbolic_expr : Vine.exp -> Vine.typ -> Vine.exp
+    method make_symbolic_expr : Vine.exp -> Vine.typ -> Vine.exp
 
     method rewrite_for_solver : Vine.exp -> Vine.exp
 
@@ -71,6 +71,8 @@ sig
 
     method simplify_with_callback :
       (Vine.exp -> Vine.typ -> Vine.exp option) -> D.t -> Vine.typ -> D.t
+
+    method unlet_retemp : Vine.exp -> Vine.exp
 
     method make_ite : D.t -> Vine.typ -> D.t -> D.t -> D.t
 
