@@ -586,7 +586,7 @@ struct
       self#on_missing_symbol_m sink_mem "sink";
       sink_regions <- ((self#region_for e), size) :: sink_regions
 
-    method private choose_conc_offset_uniform ty e =
+    method private choose_conc_offset_uniform ty e ident =
       let byte x = V.Constant(V.Int(V.REG_8, (Int64.of_int x))) in
       let bits = ref 0L in
 	self#restore_path_cond
@@ -595,28 +595,29 @@ struct
 	       (* This special case avoids shifting REG_1s, which appears
 		  to be legal in Vine IR but tickles bugs in multiple of
 		  our solver backends. *)		  
-	       let bit = self#extend_pc_random e false in
+	       let bit = self#extend_pc_random e false ident in
 		 bits := (if bit then 1L else 0L)
 	     else
 	       for b = (V.bits_of_width ty) - 1 downto 0 do
 		 let bit = self#extend_pc_random
 		   (V.Cast(V.CAST_LOW, V.REG_1,
 			   (V.BinOp(V.ARSHIFT, e,
-				    (byte b))))) false
+				    (byte b))))) false (ident + b)
 		 in
 		   bits := (Int64.logor (Int64.shift_left !bits 1)
 			      (if bit then 1L else 0L));
 	       done);
 	!bits
 
-    method private choose_conc_offset_biased ty e =
+    method private choose_conc_offset_biased ty e ident =
       let const x = V.Constant(V.Int(ty, x)) in
       let rec try_list l =
 	match l with
-	  | [] -> self#choose_conc_offset_uniform ty e
+	  | [] -> self#choose_conc_offset_uniform ty e ident
 	  | v :: r ->
-	      if self#extend_pc_random (V.BinOp(V.EQ, e, (const v))) false then
-		v
+	      if self#extend_pc_random (V.BinOp(V.EQ, e, (const v))) false
+		(ident + 0x80 + (Int64.to_int v)) then
+		  v
 	      else
 		try_list r
       in
@@ -629,7 +630,7 @@ struct
 
     val mutable concrete_cache = Hashtbl.create 101
 
-    method private choose_conc_offset_cached ty e =
+    method private choose_conc_offset_cached ty e ident =
       let const x = V.Constant(V.Int(ty, x)) in
       let (bits, verb) = 
 	if Hashtbl.mem concrete_cache e then
@@ -641,7 +642,9 @@ struct
 	       | None -> *)
 		   match !opt_offset_strategy with
 		     | UniformStrat -> self#choose_conc_offset_uniform ty e
+			 ident
 		     | BiasedSmallStrat -> self#choose_conc_offset_biased ty e
+			 ident
 	   in
 	     Hashtbl.replace concrete_cache e bits;
 	     (bits, "Picked")) in
@@ -651,7 +654,7 @@ struct
 	self#add_to_path_cond (V.BinOp(V.EQ, e, (const bits)));
 	bits
 
-    method private concretize_inner ty e =
+    method private concretize_inner ty e ident =
       match e with 
 	| V.Cast((V.CAST_UNSIGNED|V.CAST_SIGNED) as ckind, cty, e2) ->
 	    if cty <> ty then
@@ -659,7 +662,7 @@ struct
 		(V.type_to_string ty) (V.exp_to_string e);
 	    assert(cty = ty);
 	    let ty2 = Vine_typecheck.infer_type None e2 in
-	    let bits = self#choose_conc_offset_cached ty2 e2 in
+	    let bits = self#choose_conc_offset_cached ty2 e2 ident in
 	    let expand =
 	      match (ckind, ty2) with
 		| (V.CAST_UNSIGNED, V.REG_32) -> fix_u32
@@ -673,33 +676,34 @@ struct
 		| _ -> failwith "unhandled cast kind in concretize_inner"
 	    in
 	      expand bits
-	| _ -> self#choose_conc_offset_cached ty e
+	| _ -> self#choose_conc_offset_cached ty e ident
 
-    method private concretize ty e =
+    method private concretize ty e ident =
       let eip = self#get_word_var R_EIP in
       Printf.printf "Concretize %.8Lx %s\n" eip (Vine.exp_to_string e);
       dt#start_new_query;
-      let v = self#concretize_inner ty e in
+      let v = self#concretize_inner ty e ident in
 	dt#count_query;
 	v
 
     val mutable sink_read_count = 0L
 
-    method private check_cond cond_e = 
+    method private check_cond cond_e ident =
       dt#start_new_query_binary;
       let choices = ref None in 
 	self#restore_path_cond
 	  (fun () ->
-	     let b = self#extend_pc_random cond_e false in
+	     let b = self#extend_pc_random cond_e false ident in
 	       choices := dt#check_last_choices;
 	       dt#count_query;
 	       ignore(b));
 	!choices
 
-    method private region_expr e =
+    method private region_expr e ident =
       if !opt_check_for_null then
 	(match
 	   self#check_cond (V.BinOp(V.EQ, e, addr_const 0L))
+	     (0x3100 + self#get_stmt_num)
 	 with
 	   | Some true -> Printf.printf "Can be null.\n"
 	   | Some false -> Printf.printf "Cannot be null.\n"
@@ -733,12 +737,15 @@ struct
 		let (known_regions, not_known) =
 		  List.partition (fun e -> self#is_region_base e) vl
 		in
+		let split_count = ref (-1) in
 		  match known_regions with
 		    | [v] -> (v, not_known)
 		    | _ -> 
 			select_one vl
-			  (fun () -> self#random_case_split
-			     !opt_trace_decisions)
+			  (fun () ->
+			     split_count := !split_count + 1;
+			     self#random_case_split !opt_trace_decisions
+			       (!split_count + 0x100 + ident))
 	      in
 		if !opt_trace_sym_addrs then
 		  Printf.printf "Choosing %s as the base address\n"
@@ -759,7 +766,7 @@ struct
 			(fun () ->
 			   sat_dir := self#extend_pc_random
 			     (V.BinOp(V.LT, e, addr_const size))
-			     false);
+			     false (ident + 0x600));
 		      if !sat_dir = true then
 			Printf.printf "Can be in bounds.\n"
 		      else
@@ -773,13 +780,13 @@ struct
 		      | ([], []) -> 0L
 		      | (el, vel) -> 
 			  (self#concretize_inner (reg_addr())
-			     (sum_list (el @ vel)))) in
+			     (sum_list (el @ vel))) (ident + 0x200)) in
 		   (base, (fix_u32 offset)))
 	in
 	  dt#count_query;
 	  (region, offset)
 
-    method private eval_addr_exp_region_conc_path e =
+    method private eval_addr_exp_region_conc_path e ident =
       let term_is_known_base = function
 	| V.Lval(V.Temp(var)) -> form_man#known_region_base var
 	| _ -> false
@@ -795,7 +802,7 @@ struct
 		if !opt_solve_path_conditions then
 		  (let cond = V.BinOp(V.EQ, e, addr_const a)
 		   in
-		   let sat = self#extend_pc_known cond false true in
+		   let sat = self#extend_pc_known cond false ident true in
 		     assert(sat));
 		(Some 0, a)
 	  | [V.Lval(V.Temp(var)) as vexp] ->
@@ -810,13 +817,15 @@ struct
 		  (sum <> a_const)
 		then
 		  (let cond = V.BinOp(V.EQ, sum, a_const) in
-		   let sat = self#extend_pc_known cond false true in
+		   let sat = self#extend_pc_known cond false
+		     (ident + 0x400) true
+		   in
 		     assert(sat));
 		(Some(self#region_for vexp), a)
 	  | [_] -> failwith "known_base invariant failure"
 	  | _ -> failwith "multiple bases"
 
-    method eval_addr_exp_region exp =
+    method eval_addr_exp_region exp ident =
       let (to_concrete, to_symbolic) = match !opt_arch with
 	| (X86|ARM) -> (D.to_concrete_32, D.to_symbolic_32)
 	| X64       -> (D.to_concrete_64, D.to_symbolic_64)
@@ -831,14 +840,14 @@ struct
 	      Printf.printf "Symbolic address %s @ (0x%Lx)\n"
 		(V.exp_to_string e) eip;
 	    if !opt_concrete_path then
-	      self#eval_addr_exp_region_conc_path e
+	      self#eval_addr_exp_region_conc_path e ident
 	    else
-	      self#region_expr e
+	      self#region_expr e ident
 		  
     (* Because we override handle_{load,store}, this should only be
        called for jumps. *)
     method eval_addr_exp exp =
-      let (r, addr) = self#eval_addr_exp_region exp in
+      let (r, addr) = self#eval_addr_exp_region exp 0xa000 in
 	match r with
 	  | Some 0 -> addr
 	  | Some r_num ->
@@ -858,6 +867,26 @@ struct
 		Printf.printf "Unsupported jump into sink region\n";
 	      raise SymbolicJump
 
+    method private register_num reg =
+      match reg with
+	| R_RAX | R_EAX | R0 -> 0
+	| R_RBX | R_EBX | R1 -> 1
+	| R_RCX | R_ECX | R2 -> 2
+	| R_RDX | R_EDX | R3 -> 3
+	| R_RSI | R_ESI | R4 -> 4
+	| R_RDI | R_EDI | R5 -> 5
+	| R_RBP | R_EBP | R6 -> 6
+	| R_RSP | R_ESP | R7 -> 7
+	| R_R8  | R8  ->  8
+	| R_R9  | R9  ->  9
+	| R_R10 | R10 -> 10
+	| R_R11 | R11 -> 11
+	| R_R12 | R12 -> 12
+	| R_R13 | R13 -> 13
+	| R_R14 | R14 -> 14
+	| R_R15 | R15 -> 15
+	| _ -> 15
+
     method get_word_var_concretize reg do_influence name : int64 =
       let v = self#get_int_var (Hashtbl.find reg_to_var reg) in
       try (D.to_concrete_32 v)
@@ -866,7 +895,7 @@ struct
 	  if do_influence then 
 	    (Printf.printf "Measuring symbolic %s influence..." name;
 	     infl_man#measure_point_influence name e);
-	  self#concretize V.REG_32 e
+	  self#concretize V.REG_32 e (0x5000 + 0x100 * (self#register_num reg))
 
     method get_long_var_concretize reg do_influence name : int64 =
       let v = self#get_int_var (Hashtbl.find reg_to_var reg) in
@@ -876,7 +905,7 @@ struct
 	  if do_influence then
 	    (Printf.printf "Measuring symbolic %s influence..." name;
 	     infl_man#measure_point_influence name e);
-	  self#concretize V.REG_64 e
+	  self#concretize V.REG_64 e (0x5000 + 0x100 * (self#register_num reg))
 
     method load_word_concretize addr do_influence name =
       let v = self#load_word addr in
@@ -886,7 +915,7 @@ struct
 	  if do_influence then 
 	    (Printf.printf "Measuring symbolic %s influence..." name;
 	     infl_man#measure_point_influence name e);
-	  self#concretize V.REG_32 e
+	  self#concretize V.REG_32 e 0x6400
 
     method load_short_concretize addr do_influence name =
       let v = self#load_short addr in
@@ -896,7 +925,7 @@ struct
 	  if do_influence then 
 	    (Printf.printf "Measuring symbolic %s influence..." name;
 	     infl_man#measure_point_influence name e);
-	  Int64.to_int (self#concretize V.REG_16 e)
+	  Int64.to_int (self#concretize V.REG_16 e 0x6200)
 
     method load_byte_concretize addr do_influence name =
       let v = self#load_byte addr in
@@ -906,7 +935,7 @@ struct
 	  if do_influence then 
 	    (Printf.printf "Measuring symbolic %s influence..." name;
 	     infl_man#measure_point_influence name e);
-	  Int64.to_int (self#concretize V.REG_8 e)
+	  Int64.to_int (self#concretize V.REG_8 e 0x6100)
 
     method private maybe_concretize_binop op v1 v2 ty1 ty2 =
       let conc t v =
@@ -916,29 +945,29 @@ struct
 	       with NotConcrete _ ->
 		 (D.from_concrete_1
 		    (Int64.to_int
-		       (self#concretize t (D.to_symbolic_1 v)))))
+		       (self#concretize t (D.to_symbolic_1 v) 0x6b00))))
 	  | V.REG_8 ->
 	      (try ignore(D.to_concrete_8 v); v
 	       with NotConcrete _ ->
 		 (D.from_concrete_8
 		    (Int64.to_int
-		       (self#concretize t (D.to_symbolic_8 v)))))
+		       (self#concretize t (D.to_symbolic_8 v) 0x6b00))))
 	  | V.REG_16 ->
 	      (try ignore(D.to_concrete_16 v); v
 	       with NotConcrete _ ->
 		 (D.from_concrete_16
 		    (Int64.to_int
-		       (self#concretize t (D.to_symbolic_16 v)))))
+		       (self#concretize t (D.to_symbolic_16 v) 0x6b00))))
 	  | V.REG_32 ->
 	      (try ignore(D.to_concrete_32 v); v
 	       with NotConcrete _ ->
 		 (D.from_concrete_32
-		    (self#concretize t (D.to_symbolic_32 v))))
+		    (self#concretize t (D.to_symbolic_32 v) 0x6b00)))
 	  | V.REG_64 ->
 	      (try ignore(D.to_concrete_64 v); v
 	       with NotConcrete _ ->
 		 (D.from_concrete_64
-		    (self#concretize t (D.to_symbolic_64 v))))
+		    (self#concretize t (D.to_symbolic_64 v) 0x6b00)))
 	  | _ -> failwith "Bad type in maybe_concretize_binop"
       in
 	match op with
@@ -1282,7 +1311,7 @@ struct
       match self#maybe_table_or_concrete_load addr_e ty with
         | Some v -> (v, ty)
         | None ->
-      let (r, addr) = self#eval_addr_exp_region addr_e in
+      let (r, addr) = self#eval_addr_exp_region addr_e 0x8000 in
       let v =
 	(match ty with
 	   | V.REG_8  -> form_man#simplify8  (self#load_byte_region  r addr)
@@ -1306,7 +1335,7 @@ struct
 	  raise NullDereference;
 	(v, ty)
 
-    method private push_cond_prefer_true cond_v = 
+    method private push_cond_prefer_true cond_v ident =
       try
 	if (D.to_concrete_1 cond_v) = 1 then
 	  (true, Some true)
@@ -1316,7 +1345,7 @@ struct
 	  NotConcrete _ ->
 	    let e = D.to_symbolic_1 cond_v in
 	      (dt#start_new_query_binary;
-	       let b = self#extend_pc_pref e true true in
+	       let b = self#extend_pc_pref e true ident true in
 	       let choices = dt#check_last_choices in
 		 dt#count_query;
 		 (b, choices))
@@ -1424,8 +1453,8 @@ struct
 		Some (offset, cond0, 1)
 	  | _ -> None
 
-    method private target_solve cond_v =
-      let (b, choices) = self#push_cond_prefer_true cond_v in
+    method private target_solve cond_v ident =
+      let (b, choices) = self#push_cond_prefer_true cond_v ident in
 	if !opt_trace_target then
 	  Printf.printf "%s, %b\n"
 	    (match choices with
@@ -1440,7 +1469,7 @@ struct
 	true
 
     method private target_solve_single offset cond_v wd =
-      if self#target_solve cond_v then
+      if self#target_solve cond_v 0x9300 then
 	((if !opt_target_guidance <> 0.0 then
 	    let depth = self#input_depth in
 	    let score = if depth = 0 then offset else
@@ -1460,7 +1489,7 @@ struct
       if !opt_trace_target then
 	Printf.printf "Checking for full match: ";
       match
-	self#push_cond_prefer_true (D.from_symbolic all_match)
+	self#push_cond_prefer_true (D.from_symbolic all_match) 0x9130
       with
 	| (_, Some true) ->
 	    if !opt_trace_target then
@@ -1529,7 +1558,7 @@ struct
 	     all_match = conjoin !target_conds in
 	   if !opt_trace_target then
 	     Printf.printf "Checking for any match to target: ";
-	   ignore(self#target_solve (D.from_symbolic any_match));
+	   ignore(self#target_solve (D.from_symbolic any_match) 0x9320);
 	   self#table_check_full_match all_match cloc maxval);
 	true
 
@@ -1581,7 +1610,7 @@ struct
       if (!opt_no_table_store) ||
 	not (self#maybe_table_or_concrete_store addr_e ty value)
       then
-      let (r, addr) = self#eval_addr_exp_region addr_e in
+      let (r, addr) = self#eval_addr_exp_region addr_e 0x9000 in
 	if r = Some 0 && (Int64.abs (fix_s32 addr)) < 4096L then
 	  raise NullDereference;
 	if !opt_trace_stores then
@@ -1630,7 +1659,7 @@ struct
 	      if e <> V.Unknown("uninit") then
 		self#set_int_var var
 		  (D.from_concrete_32 
-		     (self#concretize V.REG_32 e))
+		     (self#concretize V.REG_32 e 0x6a00))
 
     method make_sink_region varname size =
       self#add_sink_region
