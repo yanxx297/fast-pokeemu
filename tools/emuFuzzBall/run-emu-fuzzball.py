@@ -34,7 +34,10 @@ EXTRA_DESC_COND = os.path.join(HERE, "extra-desc-conds.txt")
 
 usrcmdline = sys.argv[1:]
 
+# To disable use of GDB core file generation, set the "corefile" variable
+# to empty, as in the second line
 corefile = Tempfile(suffix = ".core")
+# corefile = ""
 
 symbolic_regs = True
 symbolic_sregs = True
