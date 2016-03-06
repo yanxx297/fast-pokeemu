@@ -540,9 +540,22 @@ let eip_hook fm dt gamma eip =
 		    (* | None -> concretize curval *)
 		) in
 		let cond = Vine.exp_eq curval (Vine.const_of_int64 ty newval) in
-		fm#add_to_path_cond cond;
+
+		let feasible, _ = fm#query_with_path_cond cond false in
+		let (newval', cond') =
+                  if feasible then (newval, cond) else
+		    (* The randomly chosen value is infeasible. Try to
+		       concretize based on the path condition. *)
+                    let nv' = concretize curval in
+                    let cond' = Vine.exp_eq curval (Vine.const_of_int64 ty nv')
+                    in
+                    let feasible, _ = fm#query_with_path_cond cond' false in
+                      assert(feasible);
+                      (nv', cond')
+		in
+		fm#add_to_path_cond cond';
 		Printf.printf "At 0x%08Lx, concretizing %s [0x%08Lx] to 0x%Lx (using extracond. %s)\n" 
-		  eip (exp_to_string exp) addr newval (exp_to_string cond)
+		  eip (exp_to_string exp) addr newval' (exp_to_string cond')
 	      | _ -> failwith "unsupported expression"
 	  )
 	)
