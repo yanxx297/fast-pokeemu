@@ -84,6 +84,7 @@ let eval_exp e =
       | V.BinOp(op, e1, e2) -> cf_eval (V.BinOp(op, loop e1, loop e2))
       | V.UnOp(op, e1) -> cf_eval (V.UnOp(op, loop e1))
       | V.Cast(op, ty, e1) -> cf_eval (V.Cast(op, ty, loop e1))
+      | V.Ite(ce, te, fe) -> cf_eval (V.Ite((loop ce), (loop te), (loop fe)))
       | V.Constant(V.Int(_, _)) -> e
       | V.Lval(V.Mem(_, a, ty) as lv) ->
 	let v = eval_var lv in
