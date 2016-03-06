@@ -450,10 +450,7 @@ let concretize exp =
 
   let feasible, ce = fm#query_with_path_cond Vine.exp_true false in
   assert (feasible);
-  let pc = fm#get_path_cond in
-	let ctx = (hash (Query_engine.ce_filter ce (fun n v -> not (starts_with n "t")))) in
-  (*let ctx = (hash (List.filter (fun (n,v) -> not (starts_with n "t")) ce)) in*)
-	evaluate pc ctx exp
+    form_man#eval_expr_from_ce ce exp
 
 
 let eip_hook fm dt gamma eip =
