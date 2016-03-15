@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     DEBUG_LEVEL = atoi(getenv("WHITEDISASM_DEBUG"));
   }
 
-  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.d_b = 0;
+  BX_CPU_THIS_PTR sregs[BX_SEG_REG_CS].cache.u.segment.d_b = 1;
 
   INIT_SYMBOLIC_EXECUTION();
 
