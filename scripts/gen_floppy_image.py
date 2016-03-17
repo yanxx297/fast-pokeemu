@@ -15,6 +15,7 @@ import hashlib
 import cpustate_x86
 from common import *
 from numpy.f2py.f2py_testing import cmdline
+from telnetlib import theNULL
 
 ROOT = abspath(joinpath(dirname(abspath(__file__)), ".."))
 KERNEL = joinpath(ROOT, "kernel")
@@ -25,6 +26,7 @@ TESTCASE = ".testcase"
 NULL = open("/dev/null", "w")
 FLOPPY_TEMPLATE = "/tmp/gen-floppy-image.template"
 DEBUG = 0
+
 
 # ===-----------------------------------------------------------------------===
 # Return true if the symbolic variable represents a memory location
@@ -107,6 +109,17 @@ def strip(sym):
         return sym[0] + "_" + sym[1]
     else:
         return sym
+    
+# ===-------------------------------------------------------------------===
+# Return true if str contains a pair of "()"
+# ===-------------------------------------------------------------------===
+def parentheses(str):
+    l1 = str.find("(")
+    l2 = str.find(")")
+    if l2 > l1 and l1 >= 0:
+        return True
+    else:
+        return False    
 
 class Register:
     def __init__(self, name, value = None, size = 32):
@@ -221,7 +234,6 @@ class Gadget:
     def depend(g1, g0):
         return (g1.define & g0.kill) or \
             (g0.use & g1.define or "*" in g1.define)
-
 
     # ===-------------------------------------------------------------------===
     # Generate a gadget to set a register
@@ -388,37 +400,53 @@ class Gadget:
                              stdin=subprocess.PIPE, 
                              stdout=subprocess.PIPE)
         s = p.communicate()[0]
+        print "s = %s\n" % s
         s = s.split('\n')[-2]
         print "s = %s\n" % s
         dest = s.split()[-1]
-        str = s.split()[3:]
+        str = s.split('\t')[2]
         print "str = %s\n" % str
-        op = str[0]
-        args = str[1]
+        op = str.split('   ')[0]
+        args = str.split('   ')[1]
         print "operation = %s, operands = %s\n" % (op, args)
         n = len(args.split(","))
         print "There are %d operands\n" % n
+        
+        ignore = ["vmcall",
+                  "vmoff",
+                  "vmresume",
+                  "vmxoff"
+                  "vmread",
+                  "vmwrite",
+                  "wbinvd"]
         if n == 0:
-            #TODO: handle non-operand operations
-            #pushf(and also popf?)
-            #sysexit
-            #rdtsc
-            #rdmsr
-            #vmcall
-            sys.exit(1)
+            if op in ignore:
+                sys.exit(1)
+            else:
+                print "%s: Unsupported 0-op instruction\n" % op
+                sys.exit(1)
         else:
-            if op == "call" and n == 1 and args == "*(%eax)":
-                #handle call *(%eax)
+            if op == "call" and n == 1:
                 r1 = random.randint(0, 0xffffffff)
                 r2 = random.randint(0, 0xffffffff)
                 fp = random.randint(0x00218008, 0x003fffff)
                 faddr = random.randint(0x00218008, 0x003fffff)
-                #asm0 = "mov $0x214000, %%eax;" \
-                #    "add $forward_%.8x,%%eax;" \
-                #    "call *(%%eax);//shellcode: %s" % (r2, insn)
-                asm0 = "mov $forward_%.8x,%%eax;" \
-                    "mov %%eax, 0x%x;"\
-                    "mov $0x%x,%%eax;" % (r2, fp, fp)                    
+                asm0 = ""
+                print "pos of *: %d\n" % args.find("*")
+                if args.find("*") == 0:
+                    if parentheses(args):
+                        #Call_EdM/EwM
+                        asm0 = "mov $forward_%.8x,%%eax;" \
+                            "mov %%eax, 0x%x;"\
+                            "mov $0x%x,%%eax;" % (r2, fp, fp)
+                    else:
+                        #Call_EdR/EwR
+                        asm0 = "mov $forward_%.8x,%%eax;" % r2
+                else:
+                    #Call_Jd/Jw
+                    #call label also work
+                    asm0 = "mov $forward_%.8x,%%eax;" \
+                        "mov %%eax,%s;" % (r2, args)            
                 asm1 = "jmp forward_%.8x;forward_%.8x: " \
                     ".byte %s;// shellcode: %s" % (r, r, x, insn)
                 asm2 = "forward_%.8x: jmp forward_%.8x; //call target" % (r2, r1)
@@ -431,6 +459,7 @@ class Gadget:
                 g3 = Gadget(asm = asm3, mnemonic = "shellcode")    
                 return [g0, g1, g2, g3]
             else:
+                #Normal insns
                 dest = dest.split(",")[-1]
                 print "destination: %s #####################" % dest
                 addr = random.randint(0x00218008, 0x003fffff)   

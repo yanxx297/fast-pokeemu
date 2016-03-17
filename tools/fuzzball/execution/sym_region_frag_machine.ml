@@ -280,8 +280,6 @@ struct
 		let min_bw = min w1 w2 in
 	  if min_bw <= 12 then
 		(
-(* 	      Printf.printf "In %s (OR) %s, widths are %d and %d\n" *)
-(* 		(V.exp_to_string e1) (V.exp_to_string e2) w1 w2; *)
   		let (e_x, e_y, w) = 
   		  if w1 < w2 then
   		    (e2, e1, w1)

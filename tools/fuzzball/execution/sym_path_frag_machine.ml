@@ -832,9 +832,11 @@ struct
 	| Some h -> h ()
 		
     method finish_path =
-      (match finish_path_hook with
+      (try 
+			(match finish_path_hook with
        | None -> ()
-       | Some h -> h ());					
+       | Some h -> h ())
+			with NotConcrete(e) -> Printf.printf "finish_path: %s not concrete\n" (V.exp_to_string e));
       dt#set_heur 1;
       dt#mark_all_seen;
       infl_man#finish_path;
