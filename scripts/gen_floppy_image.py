@@ -27,6 +27,17 @@ NULL = open("/dev/null", "w")
 FLOPPY_TEMPLATE = "/tmp/gen-floppy-image.template"
 DEBUG = 0
 
+prefix = ["es",
+          "ss",
+          "fs",
+          "gs",
+          "cs",
+          "ds",
+          "data16",
+          "addr16",
+          "lock",
+          "repnz",
+          "repz"]
 
 # ===-----------------------------------------------------------------------===
 # Return true if the symbolic variable represents a memory location
@@ -406,12 +417,18 @@ class Gadget:
         dest = s.split()[-1]
         str = s.split('\t')[2]
         print "str = %s\n" % str
-        op = str.split('   ')[0].strip()
+        
+        #remove prefixs
+        while str.split()[0] in prefix:
+            str = ' '.join(str.split()[1:])
+        
+        print "after stripping: %s\n" % str
+        op = str.split()[0].strip()
         args = "<no operand>"
         n = 0
-        print "len: %d\n" % len(str.split('   '))
-        if len(str.split('   ')) > 1:
-            args = str.split('   ')[1]
+        print "len: %d\n" % len(str.split())
+        if len(str.split()) > 1:
+            args = str.split()[1]
             n = len(args.split(","))
         print "operation = %s, operands = %s\n" % (op, args)
         print "There are %d operands\n" % n
