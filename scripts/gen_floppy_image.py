@@ -406,10 +406,14 @@ class Gadget:
         dest = s.split()[-1]
         str = s.split('\t')[2]
         print "str = %s\n" % str
-        op = str.split('   ')[0]
-        args = str.split('   ')[1]
+        op = str.split('   ')[0].strip()
+        args = "<no operand>"
+        n = 0
+        print "len: %d\n" % len(str.split('   '))
+        if len(str.split('   ')) > 1:
+            args = str.split('   ')[1]
+            n = len(args.split(","))
         print "operation = %s, operands = %s\n" % (op, args)
-        n = len(args.split(","))
         print "There are %d operands\n" % n
         
         ignore = ["vmcall",
@@ -421,7 +425,10 @@ class Gadget:
                   "wbinvd"]
         if n == 0:
             if op in ignore:
-                sys.exit(1)
+                asm = "jmp forward_%.8x;forward_%.8x: " \
+                    ".byte %s;// shellcode: %s" % (r, r, x, insn)
+                g = Gadget(asm = asm, mnemonic= "shellcode")
+                return [g]
             else:
                 print "%s: Unsupported 0-op instruction\n" % op
                 sys.exit(1)
