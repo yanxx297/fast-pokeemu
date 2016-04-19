@@ -292,6 +292,40 @@ let assemble_testcase pc ctx =
   tcs
 
 
+let evaluate pc ctx exp =
+  let (decls, temps) = vars_in_pathcond pc in
+  let ctx' = ref (List.filter (fun (n,v) -> starts_with n "in_") (items ctx)) in
+  (* Add missing variables from the PC to the CTX *)
+  List.iter(fun (_,n,_) -> if not (Hashtbl.mem ctx n) then
+      ctx' := (n, Random.int64 0xffL) :: !ctx') decls;
+
+  List.iter(fun (v, e) -> Printf.printf "TMP: %s  -->  %s\n" (var_to_string v) (exp_to_string e)) temps;
+  Printf.printf "\n\n";
+  List.iter(fun (v,n) -> Printf.printf "CTX: %s %Lx\n" v n) !ctx';
+
+  (* Initialize the context (i.e., assign to each input var a concrete value) *)
+  Interpreter.ctx_init !ctx';
+  (* Evaluate temporaries *)
+  Interpreter.eval_assgns temps;
+  Printf.printf "TEMPS evaluated\n";
+  (* Evaluate expression *)
+  let r = Interpreter.eval_exp exp in
+  Printf.printf "Expression %s ---> %Lx\n" (exp_to_string exp) r;
+  r
+
+
+let concretize exp = 
+  let fm = Option.get !fm_ref in
+  let form_man = Option.get !form_man_ref in
+  let dt = Option.get !dt_ref in
+
+  Printf.printf "Concretize %s in %s\n" (exp_to_string exp) (dt#get_hist_str);
+
+  let feasible, ce = fm#query_with_path_cond Vine.exp_true false in
+  assert (feasible);
+    form_man#eval_expr_from_ce ce exp
+
+
 (* ===--------------------------------------------------------------------=== *)
 
 let finish_path_hook fm dt form_man gamma = 
@@ -319,8 +353,14 @@ let finish_path_hook fm dt form_man gamma =
 
     let fname = sprintf "%s/exitstatus" curoutdir in
     let chan = open_out fname in
-    List.iter (fun (n,e) -> Printf.fprintf chan "%s=0x%Lx\n" 
-      n (fm#eval_expr_to_int64 e)) !exit_status_exps;
+    List.iter (fun (n,e) -> 
+			(try 
+				Printf.fprintf chan "%s=0x%Lx\n" 
+      n (fm#eval_expr_to_int64 e) 
+			with Exec_exceptions.NotConcrete(e) -> (
+				let (_, ce) = fm#query_with_path_cond Vine.exp_true false in
+				Printf.fprintf chan "%s=0x%Lx\n"  
+			n (evaluate fm#get_path_cond (hash (Query_engine.ce_filter ce (fun n v -> not (starts_with n "t")))) e)));) !exit_status_exps;
     close_out chan;
 
     let (decls, pathcond_temps, pathcond, _, _) = 
@@ -417,40 +457,6 @@ let finish_path_hook_wrapper () =
   let gamma = Option.get !gamma_ref in
   let form_man = Option.get !form_man_ref in
   finish_path_hook fm dt form_man gamma
-
-
-let evaluate pc ctx exp =
-  let (decls, temps) = vars_in_pathcond pc in
-  let ctx' = ref (List.filter (fun (n,v) -> starts_with n "in_") (items ctx)) in
-  (* Add missing variables from the PC to the CTX *)
-  List.iter(fun (_,n,_) -> if not (Hashtbl.mem ctx n) then
-      ctx' := (n, Random.int64 0xffL) :: !ctx') decls;
-
-  List.iter(fun (v, e) -> Printf.printf "TMP: %s  -->  %s\n" (var_to_string v) (exp_to_string e)) temps;
-  Printf.printf "\n\n";
-  List.iter(fun (v,n) -> Printf.printf "CTX: %s %Lx\n" v n) !ctx';
-
-  (* Initialize the context (i.e., assign to each input var a concrete value) *)
-  Interpreter.ctx_init !ctx';
-  (* Evaluate temporaries *)
-  Interpreter.eval_assgns temps;
-  Printf.printf "TEMPS evaluated\n";
-  (* Evaluate expression *)
-  let r = Interpreter.eval_exp exp in
-  Printf.printf "Expression %s ---> %Lx\n" (exp_to_string exp) r;
-  r
-
-
-let concretize exp = 
-  let fm = Option.get !fm_ref in
-  let form_man = Option.get !form_man_ref in
-  let dt = Option.get !dt_ref in
-
-  Printf.printf "Concretize %s in %s\n" (exp_to_string exp) (dt#get_hist_str);
-
-  let feasible, ce = fm#query_with_path_cond Vine.exp_true false in
-  assert (feasible);
-    form_man#eval_expr_from_ce ce exp
 
 
 let eip_hook fm dt gamma eip =
