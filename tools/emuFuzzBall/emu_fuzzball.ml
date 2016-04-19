@@ -236,34 +236,43 @@ let compute_preferred_value decls temps pc ctx var curval prefval verbose =
 
   (* sanity check *)
   assert (test_satisfiability decls temps pc ctx);
+  assert((get_ctx()) = curval);
 
-  for i = 0 to 7 do
-    let m = Int64.of_int (1 lsl i) in 
-    (* Process only differing bits *)
-    if (and64 m diff) <> 0L then (
-      (* Flip the bit (as in the preferred value) *)
-      set_ctx (xor64 (get_ctx ()) m);
+  set_ctx prefval;
+  if test_satisfiability decls temps pc ctx then
+    (if verbose then
+       Printf.printf "Preferred value is immediately sat\n")
+  else
+    (set_ctx curval;
+     for i = 0 to 7 do
+       let m = Int64.of_int (1 lsl i) in
+	 (* Process only differing bits *)
+	 if (and64 m diff) <> 0L then (
+	   (* Flip the bit (as in the preferred value) *)
+	   set_ctx (xor64 (get_ctx ()) m);
 
-      (* Check whether the path is feasible if the bit is flipped *)
-      if not (test_satisfiability decls temps pc ctx) then (
-	(* the bit is relevant, re-flip it (as in the current value) *)
-	set_ctx (xor64 (get_ctx ()) m);
-	if verbose then
-	  Printf.printf "Bit %d of %s is relevant (unsat)\n" i var;
-      ) else (
-	(* the bit is irrelevant, keep it flipped (as in the preferred
-	   value) *)
-	if verbose then
-	  Printf.printf "Bit %d of %s is irrelevant (sat)\n" i var;
-      )
-    );
-  done;
+	   (* Check whether the path is feasible if the bit is flipped *)
+	   if not (test_satisfiability decls temps pc ctx) then (
+	     (* the bit is relevant, re-flip it (as in the current value) *)
+	     set_ctx (xor64 (get_ctx ()) m);
+	     if verbose then
+	       Printf.printf "Bit %d of %s is relevant (unsat)\n" i var;
+	   ) else (
+	     (* the bit is irrelevant, keep it flipped (as in the preferred
+		value) *)
+	     if verbose then
+	       Printf.printf "Bit %d of %s is irrelevant (sat)\n" i var;
+	   )
+	 );
+     done);
 
   Printf.printf "Relevance analysis (%s): 0x%.2Lx vs. 0x%.2Lx --> 0x%.2Lx\n" 
     var curval prefval (get_ctx ());
 
   get_ctx ()
 
+
+let opt_omit_unchanged_vars = ref false
 
 (* Build the test-case (skip variables used only in extra conditions and try to
    return ideal assignments) *)
@@ -273,17 +282,23 @@ let assemble_testcase pc ctx =
   let tcs = 
     Hashtbl.fold (fun var curval acc -> 
       if List.mem var decls' then (
-	let tc = 
+	let maybe_tc =
 	  if Hashtbl.mem preferred_values var then (
 	    let prefval = Hashtbl.find preferred_values var in
 	    let ctx' = Hashtbl.copy ctx in 
-	    (var, (compute_preferred_value decls temps pc ctx' var curval 
-		     prefval true))
+	    let newval = (compute_preferred_value decls temps pc ctx' var
+			    curval prefval true) in
+	      if newval = prefval && !opt_omit_unchanged_vars then
+		None
+	      else
+		Some (var, newval)
 	  ) else (
-	    (var, curval)
+	    Some (var, curval)
 	  )
 	in
-	tc :: acc
+	  match maybe_tc with
+	    | Some tc -> tc :: acc
+	    | None -> acc
       ) else (
 	acc
       )
@@ -759,6 +774,8 @@ let main argv =
 		     opt_symbolic_bytes_lazy := (first, last, name) :: 
 		       !opt_symbolic_bytes_lazy),
 		   "addr:size=name Make symbolic bytes lazily");
+		  ("-omit-unchanged-vars", Arg.Set(opt_omit_unchanged_vars),
+		   " Don't include vars matching the baseline state");
 		]))
     (fun arg -> Exec_set_options.set_program_name arg)
     "fuzzball [options]* program\n";
