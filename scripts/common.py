@@ -397,12 +397,13 @@ def load_fuzzball_tc(f, full = False):
         
         #For testcase generation
         _, t, n, d, s, i = var
-        var = (t, n)
+        var = (t, n)  
         
         if not var in inputs:
-            inputs[var] = ["\x00" for j in range(int(s))]
+            inputs[var] = [None for j in range(int(s))]
             assert not var in vars_info
             vars_info[var] = decode(d)
+            print vars_info[var]
 
         assert vars_info[var] == decode(d)
         inputs[var][int(i)] = chr(int(val, 16))
