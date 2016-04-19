@@ -16,6 +16,7 @@ import cpustate_x86
 from common import *
 from numpy.f2py.f2py_testing import cmdline
 from telnetlib import theNULL
+import binascii
 
 ROOT = abspath(joinpath(dirname(abspath(__file__)), ".."))
 KERNEL = joinpath(ROOT, "kernel")
@@ -430,6 +431,15 @@ class Gadget:
         if len(str.split()) > 1:
             args = str.split()[1]
             n = len(args.split(","))
+        
+        if parentheses(args):
+            f = False
+            for arg in args.split(","):
+                if parentheses(arg):
+                    f = True
+                    break
+            if f == False:
+                n = 1
         print "operation = %s, operands = %s\n" % (op, args)
         print "There are %d operands\n" % n
         
@@ -439,83 +449,170 @@ class Gadget:
                   "vmxoff"
                   "vmread",
                   "vmwrite",
-                  "wbinvd"]
-        if n == 0:
-            if op in ignore:
-                asm = "jmp forward_%.8x;forward_%.8x: " \
-                    ".byte %s;// shellcode: %s" % (r, r, x, insn)
-                g = Gadget(asm = asm, mnemonic= "shellcode")
-                return [g]
-            else:
-                print "%s: Unsupported 0-op instruction\n" % op
-                sys.exit(1)
-        else:
-            if op == "call" and n == 1:
-                r1 = random.randint(0, 0xffffffff)
-                r2 = random.randint(0, 0xffffffff)
-                fp = random.randint(0x00218008, 0x003fffff)
-                faddr = random.randint(0x00218008, 0x003fffff)
-                asm0 = ""
-                print "pos of *: %d\n" % args.find("*")
-                if args.find("*") == 0:
-                    if parentheses(args):
-                        #Call_EdM/EwM
-                        asm0 = "mov $forward_%.8x,%%eax;" \
-                            "mov %%eax, 0x%x;"\
-                            "mov $0x%x,%%eax;" % (r2, fp, fp)
-                    else:
-                        #Call_EdR/EwR
-                        asm0 = "mov $forward_%.8x,%%eax;" % r2
-                else:
-                    #Call_Jd/Jw
-                    #call label also work
-                    asm0 = "mov $forward_%.8x,%%eax;" \
-                        "mov %%eax,%s;" % (r2, args)            
-                asm1 = "jmp forward_%.8x;forward_%.8x: " \
-                    ".byte %s;// shellcode: %s" % (r, r, x, insn)
-                asm2 = "forward_%.8x: jmp forward_%.8x; //call target" % (r2, r1)
-                asm3 = "forward_%.8x: pushf; " \
-                    "pop 0x%x; " \
-                    "popf;//store and reset flag register" % (r1, faddr)  
-                g0 = Gadget(asm = asm0, mnemonic = "shellcode")
-                g1 = Gadget(asm = asm1, mnemonic = "shellcode")
-                g2 = Gadget(asm = asm2, mnemonic = "shellcode")
-                g3 = Gadget(asm = asm3, mnemonic = "shellcode")    
-                return [g0, g1, g2, g3]
-            else:
-                #Normal insns
-                dest = dest.split(",")[-1]
-                print "destination: %s #####################" % dest
-                addr = random.randint(0x00218008, 0x003fffff)   
-                faddr = random.randint(0x00218008, 0x003fffff)        
-                asm0 = "jmp forward_%.8x;forward_%.8x: " \
-                    ".byte %s;// shellcode: %s" % (r, r, x, insn)
-                asm1 = "mov %s,%%eax; " \
-                    "mov %%eax,0x%x; " \
-                    "xor %%eax,%%eax; " \
-                    "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
-                asm2 = "pushf; " \
-                    "pop 0x%x; " \
-                    "popf;//store and reset flag register" % (faddr)
-                g0 = Gadget(asm = asm0, mnemonic = "shellcode")
-                g1 = Gadget(asm = asm1, mnemonic = "shellcode")
-                g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
-                return [g0, g1, g2]
-
-
-    @staticmethod
-    def gen_prologue(snapshot):
+                  "wbinvd",
+                  "pause",
+                  "lfence",
+                  "mfence",
+                  "sfence",
+                  "ud1",
+                  "nop"]
+        
+        tc = "jmp forward_%.8x;forward_%.8x: " \
+            ".byte %s;// shellcode: %s" % (r, r, x, insn) 
+        gtc = Gadget(asm = tc, mnemonic = "shellcode")
+        
         # Map virtual page 0 to a higher physical page
         deref4 = lambda x: deref(x, 0, 4)
+        cr0 = in_snapshot_creg("CR0", snapshot)
         cr3 = in_snapshot_creg("CR3", snapshot) & 0xfffff000
         pde0 = in_snapshot_mem((cr3, 4), snapshot)
+        print "gen_prologue: pde0 = #%s#\n" % pde0
         pte0 = in_snapshot_mem((deref4(pde0) & 0xfffff000, 4), snapshot)
         pte1022 = in_snapshot_mem((((deref4(pde0) & 0xfffff000) + 1022*4), 4), 
                                   snapshot)
         newpte0 = (deref4(pte0) & 0xfff) | (deref4(pte1022) & 0xfffff000)
-        asm = "pushf; movl $0x%.8x, 0x%.8x; invlpg 0x0; // rebase page 0" % \
-            (newpte0, deref4(pde0) & 0xfffff000)
-        mnemonic = "rebase page 0"
+        rs = "mov $0x%.8x,%%eax; mov %%eax,%%cr0; " \
+            "movl $0x%s,0x%.8x; " \
+            "movl $0x%.8x,0x%.8x; // rebase page 0" % \
+            (cr0, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000)
+        grs = Gadget(asm = rs, mnemonic = "rebase page 0")      
+        
+        if int(aggreg) == 0:
+            #Generate non-aggregate testcase
+            return [grs, gtc]
+        else:
+            if n == 0:
+                if op in ignore:
+                    return [grs, gtc]
+                elif op in ["clc", "cli", "rsm"]:
+                    #eflags only
+                    r1 = random.randint(0x00218008, 0x003fffff)
+                    asm = "pushf; " \
+                        "pop 0x%x; " \
+                        "popf;//store and reset flag register" % r1
+                    g = Gadget(asm = asm, mnemonic = "shellcode")
+                    return [grs. gtc, g]
+                elif op in ["pushf"]:
+                    r1 = random.randint(0x00218008, 0x003fffff)
+                    asm = "pop 0x%x;" % r1
+                    g = Gadget(asm = asm, mnemonic = "shellcode")
+                    return [grs, gtc, g]
+                elif op in ["lahf"]:
+                    #eax only
+                    r1 = random.randint(0x00218008, 0x003fffff)
+                    asm = "mov %%eax,0x%x;//store eax" % r1
+                    g = Gadget(asm = asm, mnemonic = "shellcode")
+                    return [grs, gtc, g]
+                elif op in ["xsetbv"]:
+                    #CRX, X = {0, 2, 3, 4}
+                    r1 = random.randint(0x00218008, 0x003fffff)
+                    r2 = random.randint(0x00218008, 0x003fffff)
+                    r3 = random.randint(0x00218008, 0x003fffff)
+                    r4 = random.randint(0x00218008, 0x003fffff)
+                    asm = "mov %%cr0,%%eax;" \
+                        "mov %%eax,0x%x;" \
+                        "mov %%cr2,%%eax;" \
+                        "mov %%eax,0x%x;" \
+                        "mov %%cr3,%%eax;" \
+                        "mov %%eax,0x%x;" \
+                        "mov %%cr4,%%eax;" \
+                        "mov %%eax,0x%x;//store CRX" % (r1, r2, r3, r4)
+                    g = Gadget(asm = asm, mnemonic = "shellcode")
+                    return [grs, gtc, g]
+                elif op in ["xgetbv", "rdmsr", "rdtsc", "cbtw", "cwtl", "cwtd"]:
+                    #eax, edx
+                    r1 = random.randint(0x00218008, 0x003fffff)
+                    r2 = random.randint(0x00218008, 0x003fffff)                    
+                    asm = "mov %%eax,0x%x;" \
+                        "mov %%edx,0x%x;" % (r1, r2)
+                    g = Gadget(asm = asm, mnemonic = "shellcode")
+                    return [grs, gtc, g]
+                elif op in ["sysexit", "sysenter", "ret", "lret"]:
+                    #esp, eip, cs, ss
+                    #Currently doesn't work since those instructions change control flow
+                    l = random.randint(0, 0xffffffff)
+                    r1 = random.randint(0x00218008, 0x003fffff)
+                    r2 = random.randint(0x00218008, 0x003fffff)
+                    r3 = random.randint(0x00218008, 0x003fffff)
+                    r4 = random.randint(0x00218008, 0x003fffff)
+                    asm1 = "mov %%esp,0x%x;" \
+                        "mov %%cs,0x%x;" \
+                        "mov %%ss,0x%x;// store esp, cs, and ss" % (r1, r2, r3)
+                    asm2 = "call forward_%.8x;forward_%.8x:" \
+                        "pop 0x%x;//store eip" % (l, l, r4)
+                    g1 = Gadget(asm = asm1, mnemonic = "shellcode")
+                    g2 = Gadget(asm = asm2, mnemonic = "shellcode")
+                    return [grs, gtc, g1, g2]
+                elif op in ["daa", "das", "aaa", "aad", "aam", "aas"]:
+                    #eax, eflags
+                    r1 = random.randint(0x00218008, 0x003fffff)
+                    r2 = random.randint(0x00218008, 0x003fffff)
+                    asm1 = "mov %%eax,0x%x;//store eax" % r1                
+                    asm2 = "pushf; " \
+                        "pop 0x%x; " \
+                        "popf;//store and reset flag register" % r2
+                    g1 = Gadget(asm = asm1, mnemonic = "shellcode")
+                    g2 = Gadget(asm = asm2, mnemonic = "shellcode")   
+                    return [grs, gtc, g1, g2]                 
+                else:
+                    print "%s: Unsupported 0-op instruction\n" % op
+                    sys.exit(1)
+            else:
+                if op == "call" and n == 1:
+                    r1 = random.randint(0, 0xffffffff)
+                    r2 = random.randint(0, 0xffffffff)
+                    fp = random.randint(0x00218008, 0x003fffff)
+                    faddr = random.randint(0x00218008, 0x003fffff)
+                    asm1 = ""
+                    print "pos of *: %d\n" % args.find("*")
+                    if args.find("*") == 0:
+                        if parentheses(args):
+                            #Call_EdM/EwM
+                            asm1 = "mov $forward_%.8x,%%eax;" \
+                                "mov %%eax, 0x%x;"\
+                                "mov $0x%x,%%eax;" % (r2, fp, fp)
+                        else:
+                            #Call_EdR/EwR
+                            asm1 = "mov $forward_%.8x,%%eax;" % r2
+                    else:
+                        #Call_Jd/Jw
+                        #call label also work
+                        asm1 = "mov $forward_%.8x,%%eax;" \
+                            "mov %%eax,%s;" % (r2, args)       
+                    asm2 = "forward_%.8x: jmp forward_%.8x; //call target" % (r2, r1)
+                    asm3 = "forward_%.8x: pushf; " \
+                        "pop 0x%x; " \
+                        "popf;//store and reset flag register" % (r1, faddr)  
+                    g1 = Gadget(asm = asm1, mnemonic = "shellcode")
+                    g2 = Gadget(asm = asm2, mnemonic = "shellcode")
+                    g3 = Gadget(asm = asm3, mnemonic = "shellcode")    
+                    return [grs, g1, gtc, g2, g3]
+                else:
+                    #Normal insns
+                    if n > 1:
+                        dest = dest.split(",")[-1]
+                    print "destination: %s #####################" % dest
+                    addr = random.randint(0x00218008, 0x003fffff)   
+                    faddr = random.randint(0x00218008, 0x003fffff)     
+                    asm1 = "mov %s,%%eax; " \
+                        "mov %%eax,0x%x; " \
+                        "xor %%eax,%%eax; " \
+                        "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
+                    asm2 = "pushf; " \
+                        "pop 0x%x; " \
+                        "popf;//store and reset flag register" % (faddr)
+                    g1 = Gadget(asm = asm1, mnemonic = "shellcode")
+                    g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
+                    return [grs, gtc, g1, g2]
+
+
+    @staticmethod
+    def gen_prologue(snapshot, aggreg = 0):
+        asm = ""
+        if int(aggreg) != 0:
+            asm += "pushf; " 
+        asm += "invlpg 0x0;" 
+        mnemonic = "prologue"
         return [Gadget(asm = asm, mnemonic = mnemonic)]
 
 # ===-----------------------------------------------------------------------===
