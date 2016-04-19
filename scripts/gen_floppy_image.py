@@ -16,7 +16,6 @@ import cpustate_x86
 from common import *
 from numpy.f2py.f2py_testing import cmdline
 from telnetlib import theNULL
-import binascii
 
 ROOT = abspath(joinpath(dirname(abspath(__file__)), ".."))
 KERNEL = joinpath(ROOT, "kernel")
@@ -133,25 +132,6 @@ def parentheses(str):
     else:
         return False    
 
-
-# ===-------------------------------------------------------------------===
-# Given an hex, return corresponding mask so that all non zero bytes are 
-# masked off
-# ===-------------------------------------------------------------------===    
-def get_mask(value):
-    i = 0
-    div = 0x1000000
-    mask = 0x0
-    while div != 0:
-        if value/div == 0:
-            mask += 0xff
-        value =value % div
-        i = i + 1
-        div = div / 0x100
-        if div != 0:
-            mask = mask * 0x100
-    return mask
-
 class Register:
     def __init__(self, name, value = None, size = 32):
         self.name = name
@@ -234,7 +214,7 @@ class Memory:
 # Snippets of code for setting the state of the CPU
 # ===-----------------------------------------------------------------------===
 class Gadget:
-    def __init__(self, asm, mnemonic, define = None, kill = None, use = None, affect = None):
+    def __init__(self, asm, mnemonic, define = None, kill = None, use = None):
         self.asm = asm
         self.mnemonic = mnemonic
 
@@ -244,8 +224,6 @@ class Gadget:
         self.kill = set(kill)
         if use is None: use = set()
         self.use = set(use)
-        if affect is None: affect = set()
-        self.affect = set(affect)
 
     def __str__(self):
         r = "Gadget '%s'\n" % (self.mnemonic)
@@ -262,13 +240,11 @@ class Gadget:
     # ===-------------------------------------------------------------------===
     # Return true if any of the followings is true:
     # * g1 defines what g0 kills 
-    # * g0 uses what g1 defines
-    # * g0 use what g1 affects
+    # * g1 uses what g1 defines
     # ===-------------------------------------------------------------------===
     def depend(g1, g0):
         return (g1.define & g0.kill) or \
-            (g0.use & g1.define or "*" in g1.define) or \
-            (g1.affect & g0.use)
+            (g0.use & g1.define or "*" in g1.define)
 
     # ===-------------------------------------------------------------------===
     # Generate a gadget to set a register
@@ -346,11 +322,6 @@ class Gadget:
         define, kill, use = [reg], [Register("EAX")], []
         asm = "mov $0x%.8x, %%eax; mov %%eax,%%%s; // %s" % \
             (reg.value, reg.name.lower(), reg.name.lower())
-#         mask = get_mask(reg.value) 
-#         asm = "mov %%%s,%%eax;" \
-#             "and $0x%.8x,%%eax;" \
-#             "or $0x%.8x,%%eax;" \
-#             "mov %%eax, %%%s;//%s" % (reg.name.lower(), mask, reg.value, reg.name.lower(), reg.name.lower())
         return [Gadget(asm = asm, mnemonic = reg.name.lower(), define = define,
                        kill = kill, use = use)]
 
@@ -372,10 +343,8 @@ class Gadget:
         invlpg = ""
         for i in range(len(data)):
             define = [mem]
-            #use = ["mem*"]
-            use = []
+            use = ["mem*"]
             kill = []
-            affect = []
 
             if sym: sym_ = sym
             else: sym_ = hex(addr)
@@ -385,12 +354,6 @@ class Gadget:
                 page = entry << 22
                 invlpg = " mov %cr3,%eax; mov %eax,%cr3;"
                 kill += [Register("EAX")]
-                if sym.startswith("PDE_"):
-                    use += ["pde"]
-                    affect += ["pte", "gdt", "mem*"]
-                else:
-                    use += ["pte"]
-                    affect += ["gdt", "mem*"]
             # elif sym.startswith("PTE_"):
             #     deref4 = lambda x: deref(x, 0, 4)
             #     cr3 = in_snapshot_creg("CR3", snapshot) & 0xfffff000
@@ -399,17 +362,14 @@ class Gadget:
             #     print hex(pte0)
             #     j = ((addr - pte0) / 4) << 12
             #     invlpg = " invlpg 0x%x;" % j
-            
 
             asm = "movb $0x%.2x,0x%.8x;%s // %s + %d" % \
-                    (ord(data[i]), addr + i, invlpg, sym_, i);
+                (ord(data[i]), addr + i, invlpg, sym_, i);
             mnemonic = "%.8x %s" % (addr + i, sym)
 
             # If address belongs to the GDT kill the corresponding segment
             # selector
             if isgdt(sym):
-                use += ["gdt"]
-                affect += ["mem*"]
                 idx = int(sym.split("_")[1])
                 sregs = [SegmentRegister(r) for r in \
                              ["DS", "CS", "SS", "ES", "FS", "GS"]]
@@ -417,10 +377,9 @@ class Gadget:
                     sel = sreg.in_snapshot(snapshot) >> 3
                     if sel == idx:
                         kill += [sreg]
-            if use == []:
-                use += ["mem*"]
+
             gadgets += [Gadget(asm = asm, mnemonic = mnemonic, define = define,
-                               kill = kill, use = use, affect = affect)]
+                               kill = kill, use = use)]
 
         return gadgets
 
@@ -442,7 +401,7 @@ class Gadget:
     # Generate a gadget to run the shellocde (i.e., the real testcase)
     # ===-------------------------------------------------------------------===
     @staticmethod
-    def gen_shellcode(snapshot, shellcode, aggreg = 0):
+    def gen_shellcode(shellcode):
         r = random.randint(0, 0xffffffff)
         x = ",".join("0x%.2x" % ord(b) for b in shellcode)
         insn = disasm(shellcode)[0]
@@ -471,15 +430,6 @@ class Gadget:
         if len(str.split()) > 1:
             args = str.split()[1]
             n = len(args.split(","))
-        
-        if parentheses(args):
-            f = False
-            for arg in args.split(","):
-                if parentheses(arg):
-                    f = True
-                    break
-            if f == False:
-                n = 1
         print "operation = %s, operands = %s\n" % (op, args)
         print "There are %d operands\n" % n
         
@@ -489,170 +439,83 @@ class Gadget:
                   "vmxoff"
                   "vmread",
                   "vmwrite",
-                  "wbinvd",
-                  "pause",
-                  "lfence",
-                  "mfence",
-                  "sfence",
-                  "ud1",
-                  "nop"]
-        
-        tc = "jmp forward_%.8x;forward_%.8x: " \
-            ".byte %s;// shellcode: %s" % (r, r, x, insn) 
-        gtc = Gadget(asm = tc, mnemonic = "shellcode")
-        
+                  "wbinvd"]
+        if n == 0:
+            if op in ignore:
+                asm = "jmp forward_%.8x;forward_%.8x: " \
+                    ".byte %s;// shellcode: %s" % (r, r, x, insn)
+                g = Gadget(asm = asm, mnemonic= "shellcode")
+                return [g]
+            else:
+                print "%s: Unsupported 0-op instruction\n" % op
+                sys.exit(1)
+        else:
+            if op == "call" and n == 1:
+                r1 = random.randint(0, 0xffffffff)
+                r2 = random.randint(0, 0xffffffff)
+                fp = random.randint(0x00218008, 0x003fffff)
+                faddr = random.randint(0x00218008, 0x003fffff)
+                asm0 = ""
+                print "pos of *: %d\n" % args.find("*")
+                if args.find("*") == 0:
+                    if parentheses(args):
+                        #Call_EdM/EwM
+                        asm0 = "mov $forward_%.8x,%%eax;" \
+                            "mov %%eax, 0x%x;"\
+                            "mov $0x%x,%%eax;" % (r2, fp, fp)
+                    else:
+                        #Call_EdR/EwR
+                        asm0 = "mov $forward_%.8x,%%eax;" % r2
+                else:
+                    #Call_Jd/Jw
+                    #call label also work
+                    asm0 = "mov $forward_%.8x,%%eax;" \
+                        "mov %%eax,%s;" % (r2, args)            
+                asm1 = "jmp forward_%.8x;forward_%.8x: " \
+                    ".byte %s;// shellcode: %s" % (r, r, x, insn)
+                asm2 = "forward_%.8x: jmp forward_%.8x; //call target" % (r2, r1)
+                asm3 = "forward_%.8x: pushf; " \
+                    "pop 0x%x; " \
+                    "popf;//store and reset flag register" % (r1, faddr)  
+                g0 = Gadget(asm = asm0, mnemonic = "shellcode")
+                g1 = Gadget(asm = asm1, mnemonic = "shellcode")
+                g2 = Gadget(asm = asm2, mnemonic = "shellcode")
+                g3 = Gadget(asm = asm3, mnemonic = "shellcode")    
+                return [g0, g1, g2, g3]
+            else:
+                #Normal insns
+                dest = dest.split(",")[-1]
+                print "destination: %s #####################" % dest
+                addr = random.randint(0x00218008, 0x003fffff)   
+                faddr = random.randint(0x00218008, 0x003fffff)        
+                asm0 = "jmp forward_%.8x;forward_%.8x: " \
+                    ".byte %s;// shellcode: %s" % (r, r, x, insn)
+                asm1 = "mov %s,%%eax; " \
+                    "mov %%eax,0x%x; " \
+                    "xor %%eax,%%eax; " \
+                    "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
+                asm2 = "pushf; " \
+                    "pop 0x%x; " \
+                    "popf;//store and reset flag register" % (faddr)
+                g0 = Gadget(asm = asm0, mnemonic = "shellcode")
+                g1 = Gadget(asm = asm1, mnemonic = "shellcode")
+                g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
+                return [g0, g1, g2]
+
+
+    @staticmethod
+    def gen_prologue(snapshot):
         # Map virtual page 0 to a higher physical page
         deref4 = lambda x: deref(x, 0, 4)
-        cr0 = in_snapshot_creg("CR0", snapshot)
         cr3 = in_snapshot_creg("CR3", snapshot) & 0xfffff000
         pde0 = in_snapshot_mem((cr3, 4), snapshot)
-        print "gen_prologue: pde0 = #%s#\n" % pde0
         pte0 = in_snapshot_mem((deref4(pde0) & 0xfffff000, 4), snapshot)
         pte1022 = in_snapshot_mem((((deref4(pde0) & 0xfffff000) + 1022*4), 4), 
                                   snapshot)
         newpte0 = (deref4(pte0) & 0xfff) | (deref4(pte1022) & 0xfffff000)
-        rs = "mov $0x%.8x,%%eax; mov %%eax,%%cr0; " \
-            "movl $0x%s,0x%.8x; " \
-            "movl $0x%.8x,0x%.8x; // rebase page 0" % \
-            (cr0, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000)
-        grs = Gadget(asm = rs, mnemonic = "rebase page 0")      
-        
-        if int(aggreg) == 0:
-            #Generate non-aggregate testcase
-            return [grs, gtc]
-        else:
-            if n == 0:
-                if op in ignore:
-                    return [grs, gtc]
-                elif op in ["clc", "cli", "rsm"]:
-                    #eflags only
-                    r1 = random.randint(0x00218008, 0x003fffff)
-                    asm = "pushf; " \
-                        "pop 0x%x; " \
-                        "popf;//store and reset flag register" % r1
-                    g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs. gtc, g]
-                elif op in ["pushf"]:
-                    r1 = random.randint(0x00218008, 0x003fffff)
-                    asm = "pop 0x%x;" % r1
-                    g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs, gtc, g]
-                elif op in ["lahf"]:
-                    #eax only
-                    r1 = random.randint(0x00218008, 0x003fffff)
-                    asm = "mov %%eax,0x%x;//store eax" % r1
-                    g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs, gtc, g]
-                elif op in ["xsetbv"]:
-                    #CRX, X = {0, 2, 3, 4}
-                    r1 = random.randint(0x00218008, 0x003fffff)
-                    r2 = random.randint(0x00218008, 0x003fffff)
-                    r3 = random.randint(0x00218008, 0x003fffff)
-                    r4 = random.randint(0x00218008, 0x003fffff)
-                    asm = "mov %%cr0,%%eax;" \
-                        "mov %%eax,0x%x;" \
-                        "mov %%cr2,%%eax;" \
-                        "mov %%eax,0x%x;" \
-                        "mov %%cr3,%%eax;" \
-                        "mov %%eax,0x%x;" \
-                        "mov %%cr4,%%eax;" \
-                        "mov %%eax,0x%x;//store CRX" % (r1, r2, r3, r4)
-                    g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs, gtc, g]
-                elif op in ["xgetbv", "rdmsr", "rdtsc", "cbtw", "cwtl", "cwtd"]:
-                    #eax, edx
-                    r1 = random.randint(0x00218008, 0x003fffff)
-                    r2 = random.randint(0x00218008, 0x003fffff)                    
-                    asm = "mov %%eax,0x%x;" \
-                        "mov %%edx,0x%x;" % (r1, r2)
-                    g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs, gtc, g]
-                elif op in ["sysexit", "sysenter", "ret", "lret"]:
-                    #esp, eip, cs, ss
-                    #Currently doesn't work since those instructions change control flow
-                    l = random.randint(0, 0xffffffff)
-                    r1 = random.randint(0x00218008, 0x003fffff)
-                    r2 = random.randint(0x00218008, 0x003fffff)
-                    r3 = random.randint(0x00218008, 0x003fffff)
-                    r4 = random.randint(0x00218008, 0x003fffff)
-                    asm1 = "mov %%esp,0x%x;" \
-                        "mov %%cs,0x%x;" \
-                        "mov %%ss,0x%x;// store esp, cs, and ss" % (r1, r2, r3)
-                    asm2 = "call forward_%.8x;forward_%.8x:" \
-                        "pop 0x%x;//store eip" % (l, l, r4)
-                    g1 = Gadget(asm = asm1, mnemonic = "shellcode")
-                    g2 = Gadget(asm = asm2, mnemonic = "shellcode")
-                    return [grs, gtc, g1, g2]
-                elif op in ["daa", "das", "aaa", "aad", "aam", "aas"]:
-                    #eax, eflags
-                    r1 = random.randint(0x00218008, 0x003fffff)
-                    r2 = random.randint(0x00218008, 0x003fffff)
-                    asm1 = "mov %%eax,0x%x;//store eax" % r1                
-                    asm2 = "pushf; " \
-                        "pop 0x%x; " \
-                        "popf;//store and reset flag register" % r2
-                    g1 = Gadget(asm = asm1, mnemonic = "shellcode")
-                    g2 = Gadget(asm = asm2, mnemonic = "shellcode")   
-                    return [grs, gtc, g1, g2]                 
-                else:
-                    print "%s: Unsupported 0-op instruction\n" % op
-                    sys.exit(1)
-            else:
-                if op == "call" and n == 1:
-                    r1 = random.randint(0, 0xffffffff)
-                    r2 = random.randint(0, 0xffffffff)
-                    fp = random.randint(0x00218008, 0x003fffff)
-                    faddr = random.randint(0x00218008, 0x003fffff)
-                    asm1 = ""
-                    print "pos of *: %d\n" % args.find("*")
-                    if args.find("*") == 0:
-                        if parentheses(args):
-                            #Call_EdM/EwM
-                            asm1 = "mov $forward_%.8x,%%eax;" \
-                                "mov %%eax, 0x%x;"\
-                                "mov $0x%x,%%eax;" % (r2, fp, fp)
-                        else:
-                            #Call_EdR/EwR
-                            asm1 = "mov $forward_%.8x,%%eax;" % r2
-                    else:
-                        #Call_Jd/Jw
-                        #call label also work
-                        asm1 = "mov $forward_%.8x,%%eax;" \
-                            "mov %%eax,%s;" % (r2, args)       
-                    asm2 = "forward_%.8x: jmp forward_%.8x; //call target" % (r2, r1)
-                    asm3 = "forward_%.8x: pushf; " \
-                        "pop 0x%x; " \
-                        "popf;//store and reset flag register" % (r1, faddr)  
-                    g1 = Gadget(asm = asm1, mnemonic = "shellcode")
-                    g2 = Gadget(asm = asm2, mnemonic = "shellcode")
-                    g3 = Gadget(asm = asm3, mnemonic = "shellcode")    
-                    return [grs, g1, gtc, g2, g3]
-                else:
-                    #Normal insns
-                    if n > 1:
-                        dest = dest.split(",")[-1]
-                    print "destination: %s #####################" % dest
-                    addr = random.randint(0x00218008, 0x003fffff)   
-                    faddr = random.randint(0x00218008, 0x003fffff)     
-                    asm1 = "mov %s,%%eax; " \
-                        "mov %%eax,0x%x; " \
-                        "xor %%eax,%%eax; " \
-                        "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
-                    asm2 = "pushf; " \
-                        "pop 0x%x; " \
-                        "popf;//store and reset flag register" % (faddr)
-                    g1 = Gadget(asm = asm1, mnemonic = "shellcode")
-                    g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
-                    return [grs, gtc, g1, g2]
-
-
-    @staticmethod
-    def gen_prologue(snapshot, aggreg = 0):
-        asm = ""
-        if int(aggreg) != 0:
-            asm += "pushf; " 
-        asm += "invlpg 0x0;" 
-        mnemonic = "prologue"
+        asm = "pushf; movl $0x%.8x, 0x%.8x; invlpg 0x0; // rebase page 0" % \
+            (newpte0, deref4(pde0) & 0xfffff000)
+        mnemonic = "rebase page 0"
         return [Gadget(asm = asm, mnemonic = mnemonic)]
 
 # ===-----------------------------------------------------------------------===
@@ -926,7 +789,7 @@ def load_fuzzball_testcase(tc, snapshot):
 # Transform a test-case generated by symbolic execution and into a bootable
 # floppy image
 # ===-----------------------------------------------------------------------===
-def gen_floppy_with_testcase(testcase, aggreg = 0, kernel = None, floppy = None):
+def gen_floppy_with_testcase(testcase, kernel = None, floppy = None):
     if kernel:
         print "gen kernel"
     if floppy:
@@ -1016,11 +879,10 @@ def gen_floppy_with_testcase(testcase, aggreg = 0, kernel = None, floppy = None)
                 body += rm.gen_gadget(snapshot)
     
     
-        prologue = Gadget.gen_prologue(snapshot, aggreg)
-        epilogue = Gadget.gen_shellcode(snapshot, shellcode, aggreg);
+        prologue = Gadget.gen_prologue(snapshot)
+        epilogue = Gadget.gen_shellcode(shellcode);
         if count == num:
             epilogue = epilogue + Gadget.gen_end_testcase()
-            
         gadget.append((prologue, body, epilogue))
     
         if DEBUG >= 1:
@@ -1050,7 +912,7 @@ def gen_floppy_with_testcase(testcase, aggreg = 0, kernel = None, floppy = None)
 if __name__ == "__main__":
     t0 = time.time()
 
-    opts = {"testcase" : None, "aggreg" : 0, "kernel" : None, "floppy" : None}
+    opts = {"testcase" : None, "kernel" : None, "floppy" : None}
     extraopts = {"debug" : 0}
 
     for arg in sys.argv[1:]:
