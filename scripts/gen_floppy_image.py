@@ -215,7 +215,7 @@ class Memory:
 # Snippets of code for setting the state of the CPU
 # ===-----------------------------------------------------------------------===
 class Gadget:
-    def __init__(self, asm, mnemonic, define = None, kill = None, use = None):
+    def __init__(self, asm, mnemonic, define = None, kill = None, use = None, affect = None):
         self.asm = asm
         self.mnemonic = mnemonic
 
@@ -225,6 +225,8 @@ class Gadget:
         self.kill = set(kill)
         if use is None: use = set()
         self.use = set(use)
+        if affect is None: affect = set()
+        self.affect = set(affect)
 
     def __str__(self):
         r = "Gadget '%s'\n" % (self.mnemonic)
@@ -241,11 +243,13 @@ class Gadget:
     # ===-------------------------------------------------------------------===
     # Return true if any of the followings is true:
     # * g1 defines what g0 kills 
-    # * g1 uses what g1 defines
+    # * g0 uses what g1 defines
+    # * g0 use what g1 affects
     # ===-------------------------------------------------------------------===
     def depend(g1, g0):
         return (g1.define & g0.kill) or \
-            (g0.use & g1.define or "*" in g1.define)
+            (g0.use & g1.define or "*" in g1.define) or \
+            (g1.affect & g0.use)
 
     # ===-------------------------------------------------------------------===
     # Generate a gadget to set a register
@@ -344,8 +348,10 @@ class Gadget:
         invlpg = ""
         for i in range(len(data)):
             define = [mem]
-            use = ["mem*"]
+            #use = ["mem*"]
+            use = []
             kill = []
+            affect = []
 
             if sym: sym_ = sym
             else: sym_ = hex(addr)
@@ -355,6 +361,12 @@ class Gadget:
                 page = entry << 22
                 invlpg = " mov %cr3,%eax; mov %eax,%cr3;"
                 kill += [Register("EAX")]
+                if sym.startswith("PDE_"):
+                    use += ["pde"]
+                    affect += ["pte", "gdt", "mem*"]
+                else:
+                    use += ["pte"]
+                    affect += ["gdt", "mem*"]
             # elif sym.startswith("PTE_"):
             #     deref4 = lambda x: deref(x, 0, 4)
             #     cr3 = in_snapshot_creg("CR3", snapshot) & 0xfffff000
@@ -363,14 +375,17 @@ class Gadget:
             #     print hex(pte0)
             #     j = ((addr - pte0) / 4) << 12
             #     invlpg = " invlpg 0x%x;" % j
+            
 
             asm = "movb $0x%.2x,0x%.8x;%s // %s + %d" % \
-                (ord(data[i]), addr + i, invlpg, sym_, i);
+                    (ord(data[i]), addr + i, invlpg, sym_, i);
             mnemonic = "%.8x %s" % (addr + i, sym)
 
             # If address belongs to the GDT kill the corresponding segment
             # selector
             if isgdt(sym):
+                use += ["gdt"]
+                affect += ["mem*"]
                 idx = int(sym.split("_")[1])
                 sregs = [SegmentRegister(r) for r in \
                              ["DS", "CS", "SS", "ES", "FS", "GS"]]
@@ -378,9 +393,10 @@ class Gadget:
                     sel = sreg.in_snapshot(snapshot) >> 3
                     if sel == idx:
                         kill += [sreg]
-
+            if use == []:
+                use += ["mem*"]
             gadgets += [Gadget(asm = asm, mnemonic = mnemonic, define = define,
-                               kill = kill, use = use)]
+                               kill = kill, use = use, affect = affect)]
 
         return gadgets
 
