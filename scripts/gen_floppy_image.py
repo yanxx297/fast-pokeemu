@@ -573,8 +573,8 @@ class Gadget:
                 else:
                     print "%s: Unsupported 0-op instruction\n" % op
                     sys.exit(1)
-            else:
-                if op == "call" and n == 1:
+            elif n == 1:
+                if op == "call":
                     r1 = random.randint(0, 0xffffffff)
                     r2 = random.randint(0, 0xffffffff)
                     fp = random.randint(0x00218008, 0x003fffff)
@@ -603,10 +603,16 @@ class Gadget:
                     g2 = Gadget(asm = asm2, mnemonic = "shellcode")
                     g3 = Gadget(asm = asm3, mnemonic = "shellcode")    
                     return [grs, g1, gtc, g2, g3]
+                elif op.startswith("mul"):
+                    #eax, edx
+                    r1 = random.randint(0x00218008, 0x003fffff)
+                    r2 = random.randint(0x00218008, 0x003fffff)                    
+                    asm = "mov %%eax,0x%x;" \
+                        "mov %%edx,0x%x;" % (r1, r2)
+                    g = Gadget(asm = asm, mnemonic = "shellcode")
+                    return [grs, gtc, g]                    
                 else:
-                    #Normal insns
-                    if n > 1:
-                        dest = dest.split(",")[-1]
+                    #Other insns with 1 operand
                     print "destination: %s #####################" % dest
                     addr = random.randint(0x00218008, 0x003fffff)   
                     faddr = random.randint(0x00218008, 0x003fffff)     
@@ -619,7 +625,24 @@ class Gadget:
                         "popf;//store and reset flag register" % (faddr)
                     g1 = Gadget(asm = asm1, mnemonic = "shellcode")
                     g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
-                    return [grs, gtc, g1, g2]
+                    return [grs, gtc, g1, g2]                    
+                    
+            else:
+                #2 or more operands
+                dest = dest.split(",")[-1]
+                print "destination: %s #####################" % dest
+                addr = random.randint(0x00218008, 0x003fffff)   
+                faddr = random.randint(0x00218008, 0x003fffff)     
+                asm1 = "mov %s,%%eax; " \
+                    "mov %%eax,0x%x; " \
+                    "xor %%eax,%%eax; " \
+                    "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
+                asm2 = "pushf; " \
+                    "pop 0x%x; " \
+                    "popf;//store and reset flag register" % (faddr)
+                g1 = Gadget(asm = asm1, mnemonic = "shellcode")
+                g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
+                return [grs, gtc, g1, g2]
 
 
     @staticmethod
