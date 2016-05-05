@@ -73,3 +73,5 @@ stp/ocaml
 stp/ocaml/tests
 trace
 autom4te.cache
+exec_utils/fuzzball-tmp-1
+exec_utils/fuzzball-tmp-2

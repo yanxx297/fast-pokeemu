@@ -81,7 +81,7 @@
 #define HAVE_UNISTD_H 1
 
 /* Name of package */
-#define PACKAGE "vine-fuzzball"
+#define PACKAGE ""
 
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT "bitblaze-users@googlegroups.com"
@@ -108,7 +108,7 @@
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "20130511"
+#define VERSION ""
 
 /* The VEX SVN Version */
 #define VEX_VERSION 2737
