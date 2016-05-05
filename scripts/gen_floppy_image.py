@@ -17,6 +17,9 @@ from common import *
 from numpy.f2py.f2py_testing import cmdline
 from telnetlib import theNULL
 import binascii
+from cups import Dest
+from scipy.special.basic import pbdn_seq
+from statsmodels.regression.tests.test_quantile_regression import idx
 
 ROOT = abspath(joinpath(dirname(abspath(__file__)), ".."))
 KERNEL = joinpath(ROOT, "kernel")
@@ -39,6 +42,13 @@ prefix = ["es",
           "lock",
           "repnz",
           "repz"]
+
+l_hi = "0x%x" % random.randint(0x00218008, 0x003fffff)
+l_hi_backup = "0x%x" % random.randint(0x00218008, 0x003fffff)
+l_lo = "0x%x" % random.randint(0x00218008, 0x003fffff)
+l_lo_backup = "0x%x" % random.randint(0x00218008, 0x003fffff)
+r_hi = "0x%x" % random.randint(0x00218008, 0x003fffff)
+r_lo = "0x%x" % random.randint(0x00218008, 0x003fffff)
 
 # ===-----------------------------------------------------------------------===
 # Return true if the symbolic variable represents a memory location
@@ -132,6 +142,34 @@ def parentheses(str):
         return True
     else:
         return False    
+
+# ===-------------------------------------------------------------------===
+# Generate gadget that mov from addr1 to addr2 via eax, and
+# then clean addr1
+# ===-------------------------------------------------------------------===
+def gen_store_mem(src, dest, clean = False):
+    asm = ""
+    if src != "%eax":
+        asm += "mov %s,%%eax; " % (src)
+    asm += "mov %%eax,%s; "  % (dest)
+    if clean:
+        asm += "xor %%eax,%%eax; " \
+        "mov %%eax,%s;" % (src)
+    if src != "%eax":
+        g = Gadget(asm = asm, mnemonic = "copy mem", kill= [Register("EAX")])    
+        return g
+    else:
+        g = Gadget(asm = asm, mnemonic = "copy mem")    
+        return g        
+
+# ===-------------------------------------------------------------------===
+# Store current flags to memory
+# ===-------------------------------------------------------------------===
+def gen_store_flags(dest):
+    asm = "pushf; " \
+        "pop %s;" % dest
+    g = Gadget(asm = asm, mnemonic = "store flags")      
+    return g 
 
 class Register:
     def __init__(self, name, value = None, size = 32):
@@ -418,7 +456,7 @@ class Gadget:
     # Generate a gadget to run the shellocde (i.e., the real testcase)
     # ===-------------------------------------------------------------------===
     @staticmethod
-    def gen_shellcode(snapshot, shellcode, aggreg = 0):
+    def gen_shellcode(snapshot, shellcode, count, aggreg = 0):
         r = random.randint(0, 0xffffffff)
         x = ",".join("0x%.2x" % ord(b) for b in shellcode)
         insn = disasm(shellcode)[0]
@@ -487,19 +525,24 @@ class Gadget:
         pte1022 = in_snapshot_mem((((deref4(pde0) & 0xfffff000) + 1022*4), 4), 
                                   snapshot)
         newpte0 = (deref4(pte0) & 0xfff) | (deref4(pte1022) & 0xfffff000)
-        rs = "mov $0x%.8x,%%eax; mov %%eax,%%cr0; " \
+        eax_backup = random.randint(0x00218008, 0x003fffff)
+#         rs = "mov $0x%.8x,%%eax; mov %%eax,%%cr0; " \
+#             "movl $0x%s,0x%.8x; " \
+#             "movl $0x%.8x,0x%.8x; // rebase page 0" % \
+#             (cr0, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000)        
+        rs = "mov %%eax,0x%.8x; mov $0x%.8x,%%eax; mov %%eax,%%cr0; mov 0x%.8x,%%eax; " \
             "movl $0x%s,0x%.8x; " \
             "movl $0x%.8x,0x%.8x; // rebase page 0" % \
-            (cr0, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000)
+            (eax_backup, cr0, eax_backup, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000)
         grs = Gadget(asm = rs, mnemonic = "rebase page 0")      
         
         if int(aggreg) == 0:
             #Generate non-aggregate testcase
-            return [grs, gtc]
+            return [gtc, grs]
         else:
             if n == 0:
                 if op in ignore:
-                    return [grs, gtc]
+                    return [gtc, grs]
                 elif op in ["clc", "cli", "rsm"]:
                     #eflags only
                     r1 = random.randint(0x00218008, 0x003fffff)
@@ -507,18 +550,18 @@ class Gadget:
                         "pop 0x%x; " \
                         "popf;//store and reset flag register" % r1
                     g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs. gtc, g]
+                    return [gtc, grs, g]
                 elif op in ["pushf"]:
                     r1 = random.randint(0x00218008, 0x003fffff)
                     asm = "pop 0x%x;" % r1
                     g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs, gtc, g]
+                    return [gtc, grs, g]
                 elif op in ["lahf"]:
                     #eax only
                     r1 = random.randint(0x00218008, 0x003fffff)
                     asm = "mov %%eax,0x%x;//store eax" % r1
                     g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs, gtc, g]
+                    return [gtc, grs, g]
                 elif op in ["xsetbv"]:
                     #CRX, X = {0, 2, 3, 4}
                     r1 = random.randint(0x00218008, 0x003fffff)
@@ -534,7 +577,7 @@ class Gadget:
                         "mov %%cr4,%%eax;" \
                         "mov %%eax,0x%x;//store CRX" % (r1, r2, r3, r4)
                     g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs, gtc, g]
+                    return [gtc, grs, g]
                 elif op in ["xgetbv", "rdmsr", "rdtsc", "cbtw", "cwtl", "cwtd"]:
                     #eax, edx
                     r1 = random.randint(0x00218008, 0x003fffff)
@@ -542,7 +585,7 @@ class Gadget:
                     asm = "mov %%eax,0x%x;" \
                         "mov %%edx,0x%x;" % (r1, r2)
                     g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs, gtc, g]
+                    return [gtc, grs, g]
                 elif op in ["sysexit", "sysenter", "ret", "lret"]:
                     #esp, eip, cs, ss
                     #Currently doesn't work since those instructions change control flow
@@ -558,7 +601,7 @@ class Gadget:
                         "pop 0x%x;//store eip" % (l, l, r4)
                     g1 = Gadget(asm = asm1, mnemonic = "shellcode")
                     g2 = Gadget(asm = asm2, mnemonic = "shellcode")
-                    return [grs, gtc, g1, g2]
+                    return [gtc, grs, g1, g2]
                 elif op in ["daa", "das", "aaa", "aad", "aam", "aas"]:
                     #eax, eflags
                     r1 = random.randint(0x00218008, 0x003fffff)
@@ -569,7 +612,7 @@ class Gadget:
                         "popf;//store and reset flag register" % r2
                     g1 = Gadget(asm = asm1, mnemonic = "shellcode")
                     g2 = Gadget(asm = asm2, mnemonic = "shellcode")   
-                    return [grs, gtc, g1, g2]                 
+                    return [gtc, grs, g1, g2]                 
                 else:
                     print "%s: Unsupported 0-op instruction\n" % op
                     sys.exit(1)
@@ -602,7 +645,8 @@ class Gadget:
                     g1 = Gadget(asm = asm1, mnemonic = "shellcode")
                     g2 = Gadget(asm = asm2, mnemonic = "shellcode")
                     g3 = Gadget(asm = asm3, mnemonic = "shellcode")    
-                    return [grs, g1, gtc, g2, g3]
+                    #TODO: test whether reset code there works correctly
+                    return [g1, gtc, g2, g3, grs]
                 elif op.startswith("mul"):
                     #eax, edx
                     r1 = random.randint(0x00218008, 0x003fffff)
@@ -610,39 +654,62 @@ class Gadget:
                     asm = "mov %%eax,0x%x;" \
                         "mov %%edx,0x%x;" % (r1, r2)
                     g = Gadget(asm = asm, mnemonic = "shellcode")
-                    return [grs, gtc, g]                    
+                    return [gtc, grs, g]                    
                 else:
                     #Other insns with 1 operand
                     print "destination: %s #####################" % dest
                     addr = random.randint(0x00218008, 0x003fffff)   
                     faddr = random.randint(0x00218008, 0x003fffff)     
-                    asm1 = "mov %s,%%eax; " \
-                        "mov %%eax,0x%x; " \
-                        "xor %%eax,%%eax; " \
-                        "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
+                    s_addr = "0x%x" % addr
+                    asm1 = gen_store_mem(dest, s_addr, True)
                     asm2 = "pushf; " \
                         "pop 0x%x; " \
                         "popf;//store and reset flag register" % (faddr)
                     g1 = Gadget(asm = asm1, mnemonic = "shellcode")
                     g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
-                    return [grs, gtc, g1, g2]                    
+                    return [gtc, grs, g1, g2]                    
                     
             else:
                 #2 or more operands
+                src = dest.split(",")[0] 
                 dest = dest.split(",")[-1]
                 print "destination: %s #####################" % dest
-                addr = random.randint(0x00218008, 0x003fffff)   
-                faddr = random.randint(0x00218008, 0x003fffff)     
-                asm1 = "mov %s,%%eax; " \
-                    "mov %%eax,0x%x; " \
-                    "xor %%eax,%%eax; " \
-                    "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
-                asm2 = "pushf; " \
-                    "pop 0x%x; " \
-                    "popf;//store and reset flag register" % (faddr)
-                g1 = Gadget(asm = asm1, mnemonic = "shellcode")
-                g2 = Gadget(asm = asm2, mnemonic = "shellcode")    
-                return [grs, gtc, g1, g2]
+#                 addr = random.randint(0x00218008, 0x003fffff)   
+#                 faddr = random.randint(0x00218008, 0x003fffff)     
+#                 asm1 = "mov %s,%%eax; " \
+#                     "mov %%eax,0x%x; " \
+#                     "xor %%eax,%%eax; " \
+#                     "mov %%eax,%s;//store and reset destination" % (dest, addr, dest)
+#                 asm2 = "pushf; " \
+#                     "pop 0x%x; " \
+#                     "popf;//store and reset flag register" % (faddr)
+                if count == 1:
+                    g_l_hi = gen_store_mem(src, l_hi)
+                    g_l_lo = gen_store_mem(dest, l_lo)
+                    g_r_hi = gen_store_mem(dest, r_hi)
+                    a_r_lo = "pushf; " \
+                        "pop %s; " \
+                        "mov %s,%%eax; " \
+                        "xor %%eax,%s" % (r_lo, dest, r_lo)
+                    g_r_lo = Gadget(asm = a_r_lo, mnemonic = "shellcode")
+                    return [g_l_hi, g_l_lo], [gtc, grs, g_r_hi, g_r_lo]
+                else:
+                    g_l_hi_backup = gen_store_mem(l_hi, l_hi_backup)
+                    g_l_lo_backup = gen_store_mem(l_lo, l_lo_backup)
+                    g_l_hi = gen_store_mem(r_hi, l_hi)
+                    g_l_lo = gen_store_mem(r_lo, l_lo)
+                    g_init_r_hi = gen_store_mem(r_hi, src)
+                    g_init_r_lo = gen_store_mem(r_lo, dest)
+                    g_reset_hi = gen_store_mem(l_hi_backup, r_hi)
+                    g_reset_lo = gen_store_mem(l_lo_backup, r_lo)
+                    a_r_hi = "mov %s,%%eax; " \
+                        "xor %%eax,%s;" % (dest, r_hi)
+                    g_r_hi = Gadget(asm = a_r_hi, mnemonic = "shellcode")
+                    a_r_lo = "pushf; "\
+                        "pop %%eax; "\
+                        "xor %%eax,%s;" % (r_lo)
+                    g_r_lo = Gadget(asm = a_r_lo, mnemonic = "shellcode")
+                    return [g_l_hi_backup, g_l_lo_backup, g_l_hi, g_l_lo], [gtc, grs, g_init_r_hi, g_init_r_lo, g_reset_hi, g_reset_lo, g_r_hi, g_r_lo]
 
 
     @staticmethod
@@ -746,12 +813,21 @@ def compile_gadgets(gadget, directive = ""):
     # gadgets to make sure all dependencies are satisfied
     code = "";
     for tuple in gadget:
-        (prologue, body, epilogue) = tuple;
-        depgraph = build_dependency_graph(body)
-        if DEBUG >= 2:
-            open("/tmp/depgraph.dot", "w").write(dot_dependency_graph(depgraph))
-    
-        body = topological_sort(depgraph)
+        body = []
+        (prologue, prebody, epilogue) = tuple;
+        for idx, val in enumerate(prebody):
+            depgraph = build_dependency_graph(val)
+            if DEBUG >= 2:
+                path = "/tmp/depgraph_body_%d.dot" % idx
+                open(path, "w").write(dot_dependency_graph(depgraph))
+        
+            pbd = topological_sort(depgraph)
+            #remove duplicated state setting gadgets 
+            if idx > 0:
+                src = val[0]
+                des = networkx.dag.descendants(depgraph, src)
+                pbd = [x for x in pbd if (x in des or x == src)]
+            body += pbd
     
         # Generate the assembly code
         i = 0
@@ -1016,12 +1092,21 @@ def gen_floppy_with_testcase(testcase, aggreg = 0, kernel = None, floppy = None)
     
     
         prologue = Gadget.gen_prologue(snapshot, aggreg)
-        epilogue = Gadget.gen_shellcode(snapshot, shellcode, aggreg);
+        (preshellcode, epilogue) = Gadget.gen_shellcode(snapshot, shellcode, count, aggreg)
+        
+        #combine preshellcode with body
+        prebody = [body]        
+        for ps in preshellcode:
+            print "body size: %d\n" % len(body) 
+            pbd = body[:]
+            pbd.insert(0, ps)
+            prebody.append(pbd)                  
         if count == num:
             epilogue = epilogue + Gadget.gen_end_testcase()
             
-        gadget.append((prologue, body, epilogue))
+        gadget.append((prologue, prebody, epilogue))
     
+        #TODO: replace body with prebody and modify debugging code correspondingly
         if DEBUG >= 1:
             for g in prologue + body + epilogue:
                 print

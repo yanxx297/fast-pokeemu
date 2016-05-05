@@ -1,0 +1,189 @@
+2016-04-01 huku <huku@grhack.net>
+
+    * Removed unused `*args' argument in `M_NOARG' methods.
+    * Fixed `NULL' pointer dereference in `new_rflags()' when trying to read
+      EFLAGS/RFLAGS of an instruction that doesn't use it.
+    * Various code clean-ups, especially in "instruction.c".
+    * Renamed "written_regs.py" to "dump_written_regs.py" in "examples/".
+
+
+2016-03-26 huku <huku@grhack.net>
+
+    * Implemented `get_isa_set()' in class `Instruction'.
+
+
+2016-03-25 huku <huku@grhack.net>
+
+    * Tested latest version of Intel's XED, which now comes as a standalone
+      library.
+    * Updated "README.md".
+
+
+2015-12-04 huku <huku@grhack.net>
+
+    * Fixed typo in "decoder.h".
+    * Replaced calls to `Py*_Check()' with `Py*_CheckExact()'.
+    * Modified "Makefile" to use "python2.7-config".
+    * Added link to precompiled binaries for Microsoft Windows and updated
+      "README.md" accordingly.
+
+
+2015-10-07 huku <huku@grhack.net>
+
+    * Fixed memory leak in method `decode()' of class `Decoder'.
+    * Switched type of member attributes in `Decoder' and `Instruction' from
+      `T_OBJECT' to `T_ULONGLONG'; results in faster and more efficient code
+      with less memory allocations.
+
+
+2015-09-22 huku <huku@grhack.net>
+
+    * Renamed `get_immediate_is_signed()' to `is_immediate_signed()'.
+    * `XED_OPVIS_XXX' constants are now visible to Python.
+
+
+2015-09-21 huku <huku@grhack.net>
+
+    * Fixed bug (invalid return type) in `get_scale()'.
+
+
+2015-08-17 huku <huku@grhack.net>
+
+    * Renamed `InvalidOffsetException' to `InvalidOffsetError'.
+    * One year of `pyxed' development; it's not WIP any more.
+
+
+2015-06-26 huku <huku@grhack.net>
+
+    * Fixed invalid typecast in "pyxed.c".
+    * Implemented `get_operand_length()', `get_operand_length_bits()' and
+      `get_memory_operand_length()' in class `Instruction'.
+    * Updated "README.md".
+    * Added "encoder.c" and "encoder.h".
+
+
+2015-03-10 huku <huku@grhack.net>
+
+    * Added "Makefile.nmake"; makefile for Microsoft's `nmake' utility.
+    * Modified source to make it compile on Microsoft Windows (see "Makefile.nmake").
+    * Tested on latest PIN (pin-2.14-71313).
+    * Fixed compiler warning in "instruction.c".
+    * Fixed comment typo in "decoder.c".
+    * Implemented `get_scale()' in class `Instruction'.
+    * `XED_OPERAND_XXX' constants are now visible to Python.
+
+
+2014-12-23 huku <huku@grhack.net>
+
+    * Class `XED' was renamed to `Decoder'.
+    * Fixed typo in "README.md" and "NOTES.md".
+
+
+2014-12-10 huku <huku@grhack.net>
+
+    * Introduced new class `Rflags' that represents the CPU flags register
+      contents.
+    * Implemented new methods in class `Instruction'.
+    * Added "dump_rflags.py" in "examples/".
+
+
+2014-11-25 huku <huku@grhack.net>
+
+    * Implemented new methods in class `Instruction'.
+
+
+2014-10-20 huku <huku@grhack.net>
+
+    * Implemented new methods in class `Instruction' and class `Operand'.
+    * Cleaned up and reordered function definitions in "operand.c".
+    * Fixed several compiler warnings on LLVM (Mac OS X).
+    * Functions `is_register()' and `is_memory_addressing_register()' of class
+      `Operand' were modified to return a boolean.
+    * `XED_OPERAND_WIDTH_XXX' and `XED_OPERAND_XTYPE_XXX' constants are now
+      visible to Python.
+    * Added "NOTES.md".
+    * Removed "test.py" and added a couple of examples in "examples/".
+
+
+2014-10-01 huku <huku@grhack.net>
+
+    * Implemented several new methods in class `Instruction'.
+    * Cleaned up and reordered function definitions in "instruction.c".
+    * `XED_REG_XXX' constants are now visible to Python.
+    * Added `M_VARARGS()' and `M_NOARGS()' macros; `PyMethodDef[]' definitions
+      are now much more readable.
+    * Modified all `PyCFunction' definitions to receive specific data types as
+      `self' instead of `PyObject *' (this is how they do it in the official
+      Python sources).
+
+
+2014-09-16 huku <huku@grhack.net>
+
+    * Fixed `snprintf()' related compiler warning on 64-bit systems.
+    * Replaced `PyLong_AsSize_t()' with `PyLong_AsLong()'; the first may return
+      -1 even though it shouldn't.
+    * From now on, we only support Pin >= 2.14.
+
+
+2014-09-15 huku <huku@grhack.net>
+
+    * Instantiating `Instruction' and `Operand' objects by hand is not possible
+      any more.
+
+
+2014-09-11 huku <huku@grhack.net>
+
+    * Added `InvalidOffsetException' exception class.
+    * Method `decode()' of class `XED' was modified to raise the aforementioned
+      exception when `itext_offset' doesn't fall within `itext' bounds.
+
+
+2014-09-10 huku <huku@grhack.net>
+
+    * Fixed bug in `decode()' of class `XED' (`xed_decode()' may fail when the
+      third parameter exceeds `XED_MAX_INSTRUCTION_BYTES').
+
+
+2014-09-09 huku <huku@grhack.net>
+
+    * Added `InvalidExceptionError' exception class.
+    * Added "pyxed.h"; includes external definitions that should be visible to
+      all source files.
+    * Method `decode()' of class `XED' was modified to raise an exception when
+      the decoded instruction is invalid.
+
+
+2014-09-04 huku <huku@grhack.net>
+
+    * Added "check.c" and "check.h" which contain functions for checking the
+      underlying type of `PyObject' variables.
+    * Member `itext_offset' of class `XED' is now exported and may be modified.
+    * Implemented the following methods in class `Instruction': `get_length()',
+      `get_attribute()' and `get_branch_displacement()'.
+    * Member `runtime_address' of class `Instruction' is now exported and may be
+      modified.
+    * Removed sucky `m_xxx()' macros.
+    * Renamed C structures `XED', `Instruction' and `Operand' to `xed_t',
+      `instruction_t' and `operand_t' respectively. The class names visible to
+      Python have remained the same.
+    * `XED_ATTRIBUTE_XXX' constants are now visible to Python.
+
+
+2014-08-14 huku <huku@grhack.net>
+
+    * Implemented `is_register()' and `is_memory_addressing_register()' in
+      "operand.c".
+
+
+2014-08-07 huku <huku@grhack.net>
+
+    * Added `Operand' Python class implemented in "operand.c".
+    * Implemented more methods in "instruction.c".
+    * Added BSD 2-clause license.
+
+
+2014-08-06 huku <huku@grhack.net>
+
+    * First release of `pyxed'. Doesn't do anything useful yet; it can only
+      print decoded instructions in Intel format.
+
