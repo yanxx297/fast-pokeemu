@@ -20,6 +20,10 @@ import binascii
 from cups import Dest
 from scipy.special.basic import pbdn_seq
 from statsmodels.regression.tests.test_quantile_regression import idx
+import code
+
+sys.path.append("../tools/pyxed")
+import pyxed
 
 ROOT = abspath(joinpath(dirname(abspath(__file__)), ".."))
 KERNEL = joinpath(ROOT, "kernel")
@@ -30,6 +34,348 @@ TESTCASE = ".testcase"
 NULL = open("/dev/null", "w")
 FLOPPY_TEMPLATE = "/tmp/gen-floppy-image.template"
 DEBUG = 0
+
+#Container for feistel R & l blocks
+init_r = []         #gadgets that copy input of first instruction to R block
+feistel_r = []      #R block container
+feistel_r_bak = []  #backup of R block
+feistel_l = []      #L block container
+count_r = 0
+count_l = 0
+
+reg_map = [
+  "",
+  "bndcfgu",
+  "bndstatus",
+  "bnd0",
+  "bnd1",
+  "bnd2",
+  "bnd3",
+  "cr0",
+  "cr1",
+  "cr2",
+  "cr3",
+  "cr4",
+  "cr5",
+  "cr6",
+  "cr7",
+  "cr8",
+  "cr9",
+  "cr10",
+  "cr11",
+  "cr12",
+  "cr13",
+  "cr14",
+  "cr15",
+  "dr0",
+  "dr1",
+  "dr2",
+  "dr3",
+  "dr4",
+  "dr5",
+  "dr6",
+  "dr7",
+  "dr8",
+  "dr9",
+  "dr10",
+  "dr11",
+  "dr12",
+  "dr13",
+  "dr14",
+  "dr15",
+  "flags",
+  "eflags",
+  "rflags",
+  "ax",
+  "cx",
+  "dx",
+  "bx",
+  "sp",
+  "bp",
+  "si",
+  "di",
+  "r8w",
+  "r9w",
+  "r10w",
+  "r11w",
+  "r12w",
+  "r13w",
+  "r14w",
+  "r15w",
+  "eax",
+  "ecx",
+  "edx",
+  "ebx",
+  "esp",
+  "ebp",
+  "esi",
+  "edi",
+  "r8d",
+  "r9d",
+  "r10d",
+  "r11d",
+  "r12d",
+  "r13d",
+  "r14d",
+  "r15d",
+  "rax",
+  "rcx",
+  "rdx",
+  "rbx",
+  "rsp",
+  "rbp",
+  "rsi",
+  "rdi",
+  "r8",
+  "r9",
+  "r10",
+  "r11",
+  "r12",
+  "r13",
+  "r14",
+  "r15",
+  "al",
+  "cl",
+  "dl",
+  "bl",
+  "spl",
+  "bpl",
+  "sil",
+  "dil",
+  "r8b",
+  "r9b",
+  "r10b",
+  "r11b",
+  "r12b",
+  "r13b",
+  "r14b",
+  "r15b",
+  "ah",
+  "ch",
+  "dh",
+  "bh",
+  "error",
+  "rip",
+  "eip",
+  "ip",
+  "k0",
+  "k1",
+  "k2",
+  "k3",
+  "k4",
+  "k5",
+  "k6",
+  "k7",
+  "mmx0",
+  "mmx1",
+  "mmx2",
+  "mmx3",
+  "mmx4",
+  "mmx5",
+  "mmx6",
+  "mmx7",
+  "mxcsr",
+  "stackpush",
+  "stackpop",
+  "gdtr",
+  "ldtr",
+  "idtr",
+  "tr",
+  "tsc",
+  "tscaux",
+  "msrs",
+  "fsbase",
+  "gsbase",
+  "x87control",
+  "x87status",
+  "x87tag",
+  "x87push",
+  "x87pop",
+  "x87pop2",
+  "x87opcode",
+  "x87lastcs",
+  "x87lastip",
+  "x87lastds",
+  "x87lastdp",
+  "cs",
+  "ds",
+  "es",
+  "ss",
+  "fs",
+  "gs",
+  "tmp0",
+  "tmp1",
+  "tmp2",
+  "tmp3",
+  "tmp4",
+  "tmp5",
+  "tmp6",
+  "tmp7",
+  "tmp8",
+  "tmp9",
+  "tmp10",
+  "tmp11",
+  "tmp12",
+  "tmp13",
+  "tmp14",
+  "tmp15",
+  "st0",
+  "st1",
+  "st2",
+  "st3",
+  "st4",
+  "st5",
+  "st6",
+  "st7",
+  "xcr0",
+  "xmm0",
+  "xmm1",
+  "xmm2",
+  "xmm3",
+  "xmm4",
+  "xmm5",
+  "xmm6",
+  "xmm7",
+  "xmm8",
+  "xmm9",
+  "xmm10",
+  "xmm11",
+  "xmm12",
+  "xmm13",
+  "xmm14",
+  "xmm15",
+  "xmm16",
+  "xmm17",
+  "xmm18",
+  "xmm19",
+  "xmm20",
+  "xmm21",
+  "xmm22",
+  "xmm23",
+  "xmm24",
+  "xmm25",
+  "xmm26",
+  "xmm27",
+  "xmm28",
+  "xmm29",
+  "xmm30",
+  "xmm31",
+  "ymm0",
+  "ymm1",
+  "ymm2",
+  "ymm3",
+  "ymm4",
+  "ymm5",
+  "ymm6",
+  "ymm7",
+  "ymm8",
+  "ymm9",
+  "ymm10",
+  "ymm11",
+  "ymm12",
+  "ymm13",
+  "ymm14",
+  "ymm15",
+  "ymm16",
+  "ymm17",
+  "ymm18",
+  "ymm19",
+  "ymm20",
+  "ymm21",
+  "ymm22",
+  "ymm23",
+  "ymm24",
+  "ymm25",
+  "ymm26",
+  "ymm27",
+  "ymm28",
+  "ymm29",
+  "ymm30",
+  "ymm31",
+  "zmm0",
+  "zmm1",
+  "zmm2",
+  "zmm3",
+  "zmm4",
+  "zmm5",
+  "zmm6",
+  "zmm7",
+  "zmm8",
+  "zmm9",
+  "zmm10",
+  "zmm11",
+  "zmm12",
+  "zmm13",
+  "zmm14",
+  "zmm15",
+  "zmm16",
+  "zmm17",
+  "zmm18",
+  "zmm19",
+  "zmm20",
+  "zmm21",
+  "zmm22",
+  "zmm23",
+  "zmm24",
+  "zmm25",
+  "zmm26",
+  "zmm27",
+  "zmm28",
+  "zmm29",
+  "zmm30",
+  "zmm31",
+  "",
+  "bndcfgu", 
+  "bndcfgu", 
+  "bndstatus", 
+  "bndstatus", 
+  "bnd0", 
+  "bnd3", 
+  "cr0", 
+  "cr15", 
+  "dr0", 
+  "dr15", 
+  "flags", 
+  "rflags", 
+  "ax", 
+  "r15w", 
+  "eax", 
+  "r15d", 
+  "rax", 
+  "r15", 
+  "al", 
+  "r15b", 
+  "ah", 
+  "bh", 
+  "invalid", 
+  "error", 
+  "rip", 
+  "ip", 
+  "k0", 
+  "k7", 
+  "mmx0", 
+  "mmx7", 
+  "mxcsr", 
+  "mxcsr", 
+  "stackpush", 
+  "gsbase", 
+  "x87control", 
+  "x87lastdp", 
+  "cs", 
+  "gs", 
+  "tmp0", 
+  "tmp15", 
+  "st0", 
+  "st7", 
+  "xcr0", 
+  "xcr0", 
+  "xmm0", 
+  "xmm31", 
+  "ymm0", 
+  "ymm31", 
+  "zmm0", 
+  "zmm31" 
+]
 
 prefix = ["es",
           "ss",
@@ -43,6 +389,7 @@ prefix = ["es",
           "repnz",
           "repz"]
 
+# Obsoleted container for feistel R & l blocks
 l_hi = "0x%x" % random.randint(0x00218008, 0x003fffff)
 l_hi_backup = "0x%x" % random.randint(0x00218008, 0x003fffff)
 l_lo = "0x%x" % random.randint(0x00218008, 0x003fffff)
@@ -143,33 +490,257 @@ def parentheses(str):
     else:
         return False    
 
+
+def is_valid(op):
+    if op.endswith('_INVALID') or op.endswith('_LAST'):
+        return False
+    return True
+
+
+def get_reg_name(reg):
+    reg_name = '?'
+    for name in dir(pyxed):
+        if name.startswith('XED_REG_') and getattr(pyxed, name) == reg:
+#         if getattr(pyxed, name) == reg:
+            reg_name = name
+            break
+    return reg_name
+
+
+def get_operand_name(op):
+    op_name = '?'
+    for name in dir(pyxed):
+        if name.startswith('XED_OPERAND_') and getattr(pyxed, name) == op:
+            op_name = name
+            break
+    return op_name
+
 # ===-------------------------------------------------------------------===
-# Generate gadget that mov from addr1 to addr2 via eax, and
-# then clean addr1
+# Generate code in text format that mov from mem addr1 to mem addr2 via eax
+# then *clean addr1
 # ===-------------------------------------------------------------------===
-def gen_store_mem(src, dest, clean = False):
+def gen_store_mem_asm(src, dest, clean = False):
     asm = ""
     if src != "%eax":
         asm += "mov %s,%%eax; " % (src)
     asm += "mov %%eax,%s; "  % (dest)
-    if clean:
-        asm += "xor %%eax,%%eax; " \
+    if clean:   #clean src after copying
+        asm += "xor %%eax,%%eax; " 
         "mov %%eax,%s;" % (src)
+    return asm
+
+
+# ===-------------------------------------------------------------------===
+# Generate code in text format to copy from src reg to mem dest
+# ===-------------------------------------------------------------------===
+def gen_reg2mem_asm(reg, mem):
+    asm = "mov %%%s,%s;" % (reg, mem) 
+    return asm
+
+
+# ===-------------------------------------------------------------------===
+# Generate code in text format to copy from mem src to dest reg
+# ===-------------------------------------------------------------------===
+def gen_mem2reg_asm(mem, reg):
+    asm = "mov %s,%%%s;" % (mem, reg) 
+    return asm
+
+
+# ===-------------------------------------------------------------------===
+# Generate code in text format to store current flags to memory
+# ===-------------------------------------------------------------------===
+def gen_store_eflags_asm(dest):
+    asm = "pushf; " \
+        "pop %s;" % dest
+    return asm
+
+
+# ===-------------------------------------------------------------------===
+# Generate gadget that mov from mem addr1 to mme addr2 via eax
+# then *clean addr1
+# ===-------------------------------------------------------------------===
+def gen_store_mem(src, dest, clean = False):
+    asm = gen_store_mem_asm(src, dest, clean)
     if src != "%eax":
         g = Gadget(asm = asm, mnemonic = "copy mem", kill= [Register("EAX")])    
         return g
     else:
         g = Gadget(asm = asm, mnemonic = "copy mem")    
-        return g        
+        return g
+
 
 # ===-------------------------------------------------------------------===
-# Store current flags to memory
+# Generate gadget to store current flags to memory
 # ===-------------------------------------------------------------------===
-def gen_store_flags(dest):
-    asm = "pushf; " \
-        "pop %s;" % dest
+def gen_store_eflags(dest):
+    asm = gen_store_eflags_asm(dest)
     g = Gadget(asm = asm, mnemonic = "store flags")      
     return g 
+
+
+# ===-------------------------------------------------------------------===
+# Generate gadget to copy from src reg to mem dest
+# ===-------------------------------------------------------------------===
+def gen_reg2mem(src, dest):
+    asm = gen_reg2mem_asm(src, dest)
+    g = Gadget(asm = asm, mnemonic = "store flags")      
+    return g 
+
+
+# ===-------------------------------------------------------------------===
+# Generate gadget to copy from mem src to dest reg
+# ===-------------------------------------------------------------------===
+def gen_mem2reg(src, dest):
+    asm = gen_mem2reg_asm(src, dest)
+    g = Gadget(asm = asm, mnemonic = "store flags", kill = [Register(dest.upper())])      
+    return g 
+
+# ===-------------------------------------------------------------------===
+# Generate gadget that xor src1 to src2, and copy the result(in src2) to dest
+# ===-------------------------------------------------------------------===
+def gen_feistel_cipher(src1, src2, dest, clean = False):
+    asm1 = gen_mem2reg_asm(src1, "eax")
+    asm2 = ""
+    if src2 == "eflags":
+        r = "0x%x" % random.randint(0x00218008, 0x003fffff)
+        asm2 += gen_store_eflags_asm(r)
+        src2 = r
+    asm2 += "xor %s,%%eax;" % src2
+    asm3 = gen_store_mem_asm("%eax", dest, clean)
+    asm = asm1 + asm2 + asm3
+    g = Gadget(asm = asm, mnemonic = "copy mem", kill= [Register("EAX")])    
+    return g
+
+
+# ===-------------------------------------------------------------------===
+# Handle an memory accessing operand for feistel aggregated PokeEMU
+# ===-------------------------------------------------------------------===
+def handle_memop_fesitel(inst, op, i, isInit = False):  
+    global init_r
+    global feistel_l
+    global feistel_r
+    global feistel_r_bak
+    global count_l
+    global count_r    
+    setinput = []
+    feistel = []   
+    
+    seg = inst.get_seg_reg(0)                
+    offset = 0
+    if inst.get_memory_displacement_width(i):
+        offset = inst.get_memory_displacement(i)
+    base = inst.get_base_reg(i)        
+    indx = inst.get_index_reg(i)
+    scale = inst.get_scale(i)
+    op_str = ""
+    if reg_map[seg] != "" and reg_map[seg] != "ds":
+        op_str += "%%%s:" % reg_map[seg]
+    if offset != 0:
+        op_str += "0x%x" % offset
+    if base != 0:
+        op_str += "(%%%s" % reg_map[base]
+        if reg_map[indx] != "":
+            op_str += ",%%%s" % reg_map[indx]
+        if scale != 0:
+            op_str += ",%d" % scale
+        op_str += ")"    
+    print "mem op: %s" % (op_str)
+    if inst.is_mem_read(i):
+        if isInit:
+            feistel_r += [random.randint(0x00218008, 0x003fffff)]
+            feistel_r_bak += [random.randint(0x00218008, 0x003fffff)]                
+            r = "0x%x" % feistel_r[count_r]
+            init_r += [gen_store_mem(op_str, r)]
+        print "R[%d]" % count_r
+        src = "0x%x" % feistel_r[count_r]
+        setinput += [gen_store_mem(src, op_str)]
+        count_r += 1
+    if inst.is_mem_written(i):
+        if isInit:
+            feistel_l += [random.randint(0x00218008, 0x003fffff)]
+        src1 = "0x%x" % feistel_l[count_l]
+        src2 = op_str
+        dest = "0x%x" % feistel_r[count_l]
+        feistel += [gen_feistel_cipher(src1, src2, dest)]
+        count_l += 1    
+                
+#     print "memop: L[%d], R[%d]" % (len(feistel_l), len(feistel_r))
+    return (setinput, feistel)
+
+
+# ===-------------------------------------------------------------------===
+# Handle an register operand for feistel aggregated PokeEMU
+# ===-------------------------------------------------------------------===
+def handle_regop_fesitel(inst, op, i, isInit = False):  
+    global init_r
+    global feistel_l
+    global feistel_r
+    global feistel_r_bak
+    global count_l
+    global count_r    
+    setinput = []
+    feistel = []    
+            
+    reg = inst.get_reg(op.get_name())
+    reg_str = reg_map[reg]
+    if op.is_read_only() or op.is_read_and_written():
+        if isInit:
+            feistel_r += [random.randint(0x00218008, 0x003fffff)]
+            feistel_r_bak += [random.randint(0x00218008, 0x003fffff)]
+            r = "0x%x" % feistel_r[count_r]
+            init_r += [gen_reg2mem(reg_str, r)]
+        src = "0x%x" % feistel_r[count_r]
+        setinput += [gen_mem2reg(src, reg_str)]
+        count_r += 1                                 
+    elif op.is_written_only() or op.is_read_and_written():
+        if isInit:
+            feistel_l += [random.randint(0x00218008, 0x003fffff)]            
+        src1 = "0x%x" % feistel_l[count_l]
+        src2 = reg_str
+        dest = "0x%x" % feistel_r[count_l]
+        feistel += [gen_feistel_cipher(src1, src2, dest)]
+        count_l += 1                                     
+                
+#     print "regop:L[%d], R[%d]" % (len(feistel_l), len(feistel_r))
+    return (setinput, feistel)
+
+
+# ===-------------------------------------------------------------------===
+# Handle operands other then reg and mem for feistel aggregated PokeEMU
+# ===-------------------------------------------------------------------===
+def handle_op_fesitel(inst, op, i, isInit = False):  
+    global init_r
+    global feistel_l
+    global feistel_r
+    global feistel_r_bak
+    global count_l
+    global count_r    
+    setinput = []
+    feistel = []    
+    
+    #TODO: finish adding support to those situations
+    name = op.get_name()
+    print "op name: %s(%d)" % (get_operand_name(name), name)                
+    print "%s" % op.get_name()
+    if get_operand_name(name) == "XED_OPERAND_IMM0":
+        imm = None
+        if inst.is_immediate_signed():
+            imm = inst.get_signed_immediate()
+        else:
+            imm = inst.get_unsigned_immediate()                    
+        print "imm: 0x%x" % imm
+    elif get_operand_name(name) == "XED_OPERAND_IMM1":
+        imm = inst.get_second_immediate()
+        print "imm: 0x%x" % imm
+    elif get_operand_name(name) =="XED_OPERAND_RELBR" or get_operand_name(name) =="XED_OPERAND_PTR":
+        disp = None
+        disp_bits = inst.get_branch_displacement_width()
+        if disp_bits:
+            disp = inst.get_branch_displacement()
+            print "disp: 0x%x" % disp   
+                
+    return (setinput, feistel)
+
 
 class Register:
     def __init__(self, name, value = None, size = 32):
@@ -453,10 +1024,10 @@ class Gadget:
 
 
     # ===-------------------------------------------------------------------===
-    # Generate a gadget to run the shellocde (i.e., the real testcase)
+    # Obsoleted: Generate a gadget to run the shellocde (i.e., the real testcase)
     # ===-------------------------------------------------------------------===
     @staticmethod
-    def gen_shellcode(snapshot, shellcode, count, aggreg = 0):
+    def _gen_shellcode(snapshot, shellcode, count, aggreg = 0):
         r = random.randint(0, 0xffffffff)
         x = ",".join("0x%.2x" % ord(b) for b in shellcode)
         insn = disasm(shellcode)[0]
@@ -710,16 +1281,122 @@ class Gadget:
                         "xor %%eax,%s;" % (r_lo)
                     g_r_lo = Gadget(asm = a_r_lo, mnemonic = "shellcode")
                     return [g_l_hi_backup, g_l_lo_backup, g_l_hi, g_l_lo], [gtc, grs, g_init_r_hi, g_init_r_lo, g_reset_hi, g_reset_lo, g_r_hi, g_r_lo]
-
-
+    
+    
+    # ===-------------------------------------------------------------------===
+    # Generate a gadget to run the shellocde (i.e., the real testcase)
+    # ===-------------------------------------------------------------------===
     @staticmethod
-    def gen_prologue(snapshot, aggreg = 0):
-        asm = ""
-        if int(aggreg) != 0:
-            asm += "pushf; " 
+    def gen_root(snapshot, shellcode, count):
+        global count_l
+        global count_r        
+        f = Tempfile()
+        f.write(shellcode)
+        p = subprocess.Popen(["xxd", "-p", "%s" % f], 
+                             stdin=subprocess.PIPE, 
+                             stdout=subprocess.PIPE)
+        s = p.communicate()[0].rstrip()     
+           
+        print "%s (%d)" % (s, len(s))
+        xed = pyxed.Decoder()
+        xed.set_mode(pyxed.XED_MACHINE_MODE_LEGACY_32, pyxed.XED_ADDRESS_WIDTH_32b)
+        xed.itext = binascii.unhexlify(s)
+    #     xed.runtime_address = 0x10001000
+        xed.runtime_address = 0x0
+    
+        inst = xed.decode()    
+        inst_str = inst.dump_att_format()
+        print "%s" % inst_str 
+        
+        isInit = False
+        if count == 1:
+            isInit = True                     
+        
+        #TODO: reret resetting code using Xed
+        #5 groups of root Gadgets that gen_root will generate from an instruction
+        # * = Need Xed         
+        setinput = []   #copy from R block to input*
+        backup = []     #backup R block
+        code = []  #instruction to run and corresponding reset*         
+        feistel = []    #compute XOR and copy it to L block*
+        restore = []    #restore R block
+        
+        #code
+        x = ",".join("0x%.2x" % ord(b) for b in shellcode)
+        r = random.randint(0, 0xffffffff)
+        tc = "jmp forward_%.8x;forward_%.8x: " \
+            ".byte %s;// shellcode: %s" % (r, r, x, inst_str) 
+        gtc = Gadget(asm = tc, mnemonic = "shellcode")
+                
+        deref4 = lambda x: deref(x, 0, 4)
+        cr0 = in_snapshot_creg("CR0", snapshot)
+        cr3 = in_snapshot_creg("CR3", snapshot) & 0xfffff000
+        pde0 = in_snapshot_mem((cr3, 4), snapshot)
+        print "gen_prologue: pde0 = #%s#\n" % pde0
+        pte0 = in_snapshot_mem((deref4(pde0) & 0xfffff000, 4), snapshot)
+        pte1022 = in_snapshot_mem((((deref4(pde0) & 0xfffff000) + 1022*4), 4), 
+                                  snapshot)
+        newpte0 = (deref4(pte0) & 0xfff) | (deref4(pte1022) & 0xfffff000)
+        eax_backup = random.randint(0x00218008, 0x003fffff)        
+        rs = "mov %%eax,0x%.8x; mov $0x%.8x,%%eax; mov %%eax,%%cr0; mov 0x%.8x,%%eax; " \
+            "movl $0x%s,0x%.8x; " \
+            "movl $0x%.8x,0x%.8x; // rebase page 0" % \
+            (eax_backup, cr0, eax_backup, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000)
+        grs = Gadget(asm = rs, mnemonic = "rebase page 0") 
+        
+        code += [gtc, grs]    
+                
+        #Hanlde memory operations
+        for i in range(inst.get_number_of_memory_operands()):
+            op = inst.get_operand(i) 
+            (s, f) = handle_memop_fesitel(inst, op, i, isInit)
+            setinput += s
+            feistel += f
+     
+        for i in range(inst.get_noperands()):
+            op = inst.get_operand(i)
+            if op.is_register():    
+                #register
+                (s, f) = handle_regop_fesitel(inst, op, i, isInit)
+                setinput += s
+                feistel += f
+            else:      
+                (s, f) = handle_op_fesitel(inst, op, i, isInit)
+                setinput += s
+                feistel += f                         
+            
+        if isInit:
+#             print "L[%d], R[%d]" % (len(feistel_l), len(feistel_r))
+            assert(len(feistel_l) == len(feistel_r))
+        
+        #backup
+        for i in range(len(feistel_r)):
+            src = "0x%x" % feistel_r[i]
+            dest = "0x%x" % feistel_r_bak[i]
+            backup += [gen_store_mem(src, dest)]
+        if isInit:
+            #If 1st iter, mov init state input to R
+            backup = init_r + backup
+        
+        #restore
+        for i in range(len(feistel_r_bak)):
+            src = "0x%x" % feistel_r_bak[i]
+            dest = "0x%x" % feistel_l[i]
+            restore += [gen_store_mem(src, dest)]        
+        
+        count_l = 0
+        count_r = 0
+        return (backup, setinput, code, feistel, restore)     
+    
+        
+    @staticmethod
+    def gen_prologue(snapshot):
+        asm = ""        
+#         asm += "pushf; " 
         asm += "invlpg 0x0;" 
         mnemonic = "prologue"
         return [Gadget(asm = asm, mnemonic = mnemonic)]
+
 
 # ===-----------------------------------------------------------------------===
 # Build a graph describing dependencies between gadgets
@@ -735,9 +1412,9 @@ def build_dependency_graph(gadgets):
             if g1 != g0 and g1.depend(g0):
                 dg.add_edge(g0, g1)
 
-    return dg
-
-
+    return dg 
+        
+        
 # ===-----------------------------------------------------------------------===
 # Return the dependency graph in Graphviz format
 # ===-----------------------------------------------------------------------===
@@ -806,38 +1483,56 @@ def topological_sort(graph):
 
 
 # ===-----------------------------------------------------------------------===
+# Given a list of Gadgets, sort it in topological order and 
+# remove irrelavant Gadgets 
+# ===-----------------------------------------------------------------------===
+def sort_gadgets(g, name):
+    sort = []
+    for idx, val in enumerate(g):
+        depgraph = build_dependency_graph(val)
+        if DEBUG >= 2:
+            path = "/tmp/depgraph_%s_%d.dot" % (name, idx)
+            open(path, "w").write(dot_dependency_graph(depgraph))
+    
+        r = topological_sort(depgraph)
+        #remove duplicated state setting gadgets 
+#         if idx > 0:
+        src = val[0]
+        print "%s: Start from %s" % ("depgraph_%s_%d" % (name, idx), src.asm)
+        des = networkx.dag.descendants(depgraph, src)
+        r = [x for x in r if (x in des or x == src)]
+        sort += r
+    return sort
+
+# ===-----------------------------------------------------------------------===
 # Compile a sequence of gadgets into x86 code
 # ===-----------------------------------------------------------------------===
-def compile_gadgets(gadget, directive = ""):
+def compile_gadgets(gadget, epilogue, directive = ""):
     # Build a graph representing dependencies among gadgets and order the
     # gadgets to make sure all dependencies are satisfied
-    code = "";
+    asm = "";
+    i = 0
     for tuple in gadget:
-        body = []
-        (prologue, prebody, epilogue) = tuple;
-        for idx, val in enumerate(prebody):
-            depgraph = build_dependency_graph(val)
-            if DEBUG >= 2:
-                path = "/tmp/depgraph_body_%d.dot" % idx
-                open(path, "w").write(dot_dependency_graph(depgraph))
+        (startup, bak, setinput, code, feistel, restore) = tuple;
+        bak_sort = sort_gadgets(bak, "bak")
         
-            pbd = topological_sort(depgraph)
-            #remove duplicated state setting gadgets 
-            if idx > 0:
-                src = val[0]
-                des = networkx.dag.descendants(depgraph, src)
-                pbd = [x for x in pbd if (x in des or x == src)]
-            body += pbd
     
-        # Generate the assembly code
-        i = 0
-        for g in prologue + body + epilogue:
-            code += "%s\n" % (g.asm)
+        # Generate the assembly code        
+        for g in startup + bak_sort + setinput + code + feistel + restore:
+            asm += "%s\n" % (g.asm)
             if i and i % 8 == 0:
                 r = random.randint(0, 0xffffffff)
-                code += "jmp forward_%.8x; forward_%.8x:\n" % (r, r)
+                asm += "jmp forward_%.8x; forward_%.8x:\n" % (r, r)
             i += 1
 
+    #Add epilogue gadgets
+    for g in epilogue:
+        asm += "%s\n" % (g.asm)
+        if i and i % 8 == 0:
+            r = random.randint(0, 0xffffffff)
+            asm += "jmp forward_%.8x; forward_%.8x:\n" % (r, r)
+        i += 1        
+    
     # Assemble
     tmpobj = Tempfile()
     tmpelf = Tempfile()
@@ -846,10 +1541,10 @@ def compile_gadgets(gadget, directive = ""):
                          stdin = subprocess.PIPE, 
                          stdout = subprocess.PIPE, 
                          stderr = subprocess.PIPE)
-    prog = str("\n.text\n" + directive + "\n" + code + "\n")
+    prog = str("\n.text\n" + directive + "\n" + asm + "\n")
     stdout, stderr = p.communicate(prog)
     if stderr != "":
-        print "[E] Can't compile code:\n%s\n-%s-" % (prog, stderr)
+        print "[E] Can't compile asm:\n%s\n-%s-" % (prog, stderr)
         exit(1)
         
     #For correct direct jump location, use linker
@@ -857,13 +1552,13 @@ def compile_gadgets(gadget, directive = ""):
     cmdline = "ld -m elf_i386 -Ttext 0x214000 -o %s %s" % (tmpelf, tmpobj)
     subprocess.call(cmdline.split())
 
-    # Extract the code of the gadgets (.text section) from the elf object
+    # Extract the asm of the gadgets (.text section) from the elf object
     cmdline = "objcopy -O binary -j .text %s" % str(tmpelf)
     print "cmdlind: %s\n" % cmdline
     subprocess.call(cmdline.split())
     obj = open(str(tmpelf)).read()
 
-    return code, obj
+    return asm, obj
 
 
 # ===-----------------------------------------------------------------------===
@@ -1001,7 +1696,7 @@ def load_fuzzball_testcase(tc, snapshot):
 # Transform a test-case generated by symbolic execution and into a bootable
 # floppy image
 # ===-----------------------------------------------------------------------===
-def gen_floppy_with_testcase(testcase, aggreg = 0, kernel = None, floppy = None):
+def gen_floppy_with_testcase(testcase, kernel = None, floppy = None):
     if kernel:
         print "gen kernel"
     if floppy:
@@ -1091,28 +1786,29 @@ def gen_floppy_with_testcase(testcase, aggreg = 0, kernel = None, floppy = None)
                 body += rm.gen_gadget(snapshot)
     
     
-        prologue = Gadget.gen_prologue(snapshot, aggreg)
-        (preshellcode, epilogue) = Gadget.gen_shellcode(snapshot, shellcode, count, aggreg)
+        startup = Gadget.gen_prologue(snapshot)
+        (backup, setinput, code, feistel, restore) = Gadget.gen_root(snapshot, shellcode, count)
         
-        #combine preshellcode with body
-        prebody = [body]        
-        for ps in preshellcode:
-            print "body size: %d\n" % len(body) 
-            pbd = body[:]
-            pbd.insert(0, ps)
-            prebody.append(pbd)                  
-        if count == num:
-            epilogue = epilogue + Gadget.gen_end_testcase()
+        #combine each gadget in preshellcode with body
+        startup += body
             
-        gadget.append((prologue, prebody, epilogue))
+        bak = []
+        for s in backup:
+            print "body size: %d\n" % len(body) 
+            b = body[:]
+            b.insert(0, s)
+            bak.append(b)
+                                
+        gadget.append((startup, bak, setinput, code, feistel, restore))
     
-        #TODO: replace body with prebody and modify debugging code correspondingly
-        if DEBUG >= 1:
-            for g in prologue + body + epilogue:
-                print
-                print g
+        #TODO: Rewrite DEBUG
+#         if DEBUG >= 1:
+#             for g in prologue + body + epilogue:
+#                 print
+#                 print g
 
-    code, obj = compile_gadgets(gadget)
+    epilogue = Gadget.gen_end_testcase()
+    code, obj = compile_gadgets(gadget, epilogue)
 
     if DEBUG >= 2:
         print "="*columns()
@@ -1134,7 +1830,7 @@ def gen_floppy_with_testcase(testcase, aggreg = 0, kernel = None, floppy = None)
 if __name__ == "__main__":
     t0 = time.time()
 
-    opts = {"testcase" : None, "aggreg" : 0, "kernel" : None, "floppy" : None}
+    opts = {"testcase" : None, "kernel" : None, "floppy" : None}
     extraopts = {"debug" : 0}
 
     for arg in sys.argv[1:]:
