@@ -11,5 +11,5 @@ for dir in $TCPATH*/ ;
 do
 	dir=$dir"testcase" 
 	echo $dir
-	python run_test_case.py testcase:$dir timeout:$TIMEOUT outdir:$OUTDIR script:$EMU aggreg:$3
+	python run_test_case.py testcase:$dir timeout:$TIMEOUT outdir:$OUTDIR script:$EMU
 done

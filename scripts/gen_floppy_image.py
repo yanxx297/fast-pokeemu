@@ -5,6 +5,7 @@ from os.path import dirname, basename, abspath, join as joinpath, isfile
 import sys
 import struct
 import random
+from random import choice
 import subprocess
 import time
 import tempfile as tempfile_
@@ -21,6 +22,7 @@ from cups import Dest
 from scipy.special.basic import pbdn_seq
 from statsmodels.regression.tests.test_quantile_regression import idx
 import code
+from sympy.galgebra.printing import prog_str
 
 sys.path.append("../tools/pyxed")
 import pyxed
@@ -175,8 +177,8 @@ reg_map = [
   "mmx6",
   "mmx7",
   "mxcsr",
-  "stackpush",
-  "stackpop",
+  "", #"stackpush",
+  "", #"stackpop",
   "gdtr",
   "ldtr",
   "idtr",
@@ -357,7 +359,7 @@ reg_map = [
   "mmx7", 
   "mxcsr", 
   "mxcsr", 
-  "stackpush", 
+  "", #"stackpush", 
   "gsbase", 
   "x87control", 
   "x87lastdp", 
@@ -388,6 +390,7 @@ prefix = ["es",
           "lock",
           "repnz",
           "repz"]
+
 
 # Obsoleted container for feistel R & l blocks
 l_hi = "0x%x" % random.randint(0x00218008, 0x003fffff)
@@ -490,6 +493,19 @@ def parentheses(str):
     else:
         return False    
 
+# ===-------------------------------------------------------------------===
+# Generate a new memory address either randomly or in order
+# ===-------------------------------------------------------------------===
+next_addr = 0x00218008
+def get_addr(is_rand = False):
+    global next_addr
+    if is_rand:
+        return choice(range(0x00218008, 0x003fffff,4))
+    else:
+        next_addr += 4
+        assert(next_addr <= 0x003fffff)
+        print "get_addr: 0x%x" % next_addr
+        return next_addr
 
 def is_valid(op):
     if op.endswith('_INVALID') or op.endswith('_LAST'):
@@ -525,8 +541,7 @@ def gen_store_mem_asm(src, dest, clean = False):
         asm += "mov %s,%%eax; " % (src)
     asm += "mov %%eax,%s; "  % (dest)
     if clean:   #clean src after copying
-        asm += "xor %%eax,%%eax; " 
-        "mov %%eax,%s;" % (src)
+        asm += "movl $0x0,%s;" % (src)        
     return asm
 
 
@@ -534,7 +549,12 @@ def gen_store_mem_asm(src, dest, clean = False):
 # Generate code in text format to copy from src reg to mem dest
 # ===-------------------------------------------------------------------===
 def gen_reg2mem_asm(reg, mem):
-    asm = "mov %%%s,%s;" % (reg, mem) 
+    asm = ""
+    if reg == "eflags":
+        asm += "pushf;" \
+            "pop %s;" % mem
+    else:
+        asm += "mov %%%s,%s;" % (reg, mem) 
     return asm
 
 
@@ -542,7 +562,12 @@ def gen_reg2mem_asm(reg, mem):
 # Generate code in text format to copy from mem src to dest reg
 # ===-------------------------------------------------------------------===
 def gen_mem2reg_asm(mem, reg):
-    asm = "mov %s,%%%s;" % (mem, reg) 
+    asm = ""
+    if reg == "eflags":
+        asm += "push %s;" \
+            "popf;" % mem
+    else:
+        asm = "mov %s,%%%s;" % (mem, reg)         
     return asm
 
 
@@ -601,12 +626,17 @@ def gen_mem2reg(src, dest):
 def gen_feistel_cipher(src1, src2, dest, clean = False):
     asm1 = gen_mem2reg_asm(src1, "eax")
     asm2 = ""
+    asm3 = gen_reg2mem_asm("eax", dest)
     if src2 == "eflags":
-        r = "0x%x" % random.randint(0x00218008, 0x003fffff)
+        r = "0x%x" % get_addr()
         asm2 += gen_store_eflags_asm(r)
         src2 = r
-    asm2 += "xor %s,%%eax;" % src2
-    asm3 = gen_store_mem_asm("%eax", dest, clean)
+        if clean:
+            asm3 += "movl $0x0,%s;" % src2
+    elif src2 in reg_map:
+        asm2 += "xor %%%s,%%eax;" % src2
+    else:
+        asm2 += "xor %s,%%eax;" % src2
     asm = asm1 + asm2 + asm3
     g = Gadget(asm = asm, mnemonic = "copy mem", kill= [Register("EAX")])    
     return g
@@ -615,16 +645,7 @@ def gen_feistel_cipher(src1, src2, dest, clean = False):
 # ===-------------------------------------------------------------------===
 # Handle an memory accessing operand for feistel aggregated PokeEMU
 # ===-------------------------------------------------------------------===
-def handle_memop_fesitel(inst, op, i, isInit = False):  
-    global init_r
-    global feistel_l
-    global feistel_r
-    global feistel_r_bak
-    global count_l
-    global count_r    
-    setinput = []
-    feistel = []   
-    
+def get_mem_op(inst, op, i):      
     seg = inst.get_seg_reg(0)                
     offset = 0
     if inst.get_memory_displacement_width(i):
@@ -645,33 +666,71 @@ def handle_memop_fesitel(inst, op, i, isInit = False):
             op_str += ",%d" % scale
         op_str += ")"    
     print "mem op: %s" % (op_str)
+    return op_str    
+
+
+def handle_mem_read(inst, op, i, isInit = False):
+    global init_r
+    global feistel_l
+    global feistel_r
+    global feistel_r_bak
+    global count_l
+    global count_r    
+    setinput = []
+    feistel = []      
+    
+    op_str = get_mem_op(inst, op, i)
     if inst.is_mem_read(i):
         if isInit:
-            feistel_r += [random.randint(0x00218008, 0x003fffff)]
-            feistel_r_bak += [random.randint(0x00218008, 0x003fffff)]                
+            feistel_r += [get_addr()]
+            feistel_r_bak += [get_addr()]                
             r = "0x%x" % feistel_r[count_r]
             init_r += [gen_store_mem(op_str, r)]
         print "R[%d]" % count_r
         src = "0x%x" % feistel_r[count_r]
         setinput += [gen_store_mem(src, op_str)]
-        count_r += 1
+        count_r += 1  
+        
+    return (setinput, feistel)
+    
+    
+def handle_mem_write(inst, op, i, isInit = False):
+    global init_r
+    global feistel_l
+    global feistel_r
+    global feistel_r_bak
+    global count_l
+    global count_r    
+    setinput = []
+    feistel = []      
+    
+    op_str = get_mem_op(inst, op, i)
     if inst.is_mem_written(i):
         if isInit:
-            feistel_l += [random.randint(0x00218008, 0x003fffff)]
+            feistel_l += [get_addr()]
         src1 = "0x%x" % feistel_l[count_l]
         src2 = op_str
+        while count_l >= len(feistel_r):
+            feistel_r += [get_addr()]
+            feistel_r_bak += [get_addr()]
+        print "feistel_r: %d, count_l = %d" % (len(feistel_r), count_l)        
         dest = "0x%x" % feistel_r[count_l]
-        feistel += [gen_feistel_cipher(src1, src2, dest)]
+        feistel += [gen_feistel_cipher(src1, src2, dest, True)]
         count_l += 1    
-                
-#     print "memop: L[%d], R[%d]" % (len(feistel_l), len(feistel_r))
+        
     return (setinput, feistel)
 
 
 # ===-------------------------------------------------------------------===
 # Handle an register operand for feistel aggregated PokeEMU
 # ===-------------------------------------------------------------------===
-def handle_regop_fesitel(inst, op, i, isInit = False):  
+def get_reg_op(inst, op, i):  
+    reg = inst.get_reg(op.get_name())
+    reg_str = reg_map[reg]
+    return reg_str
+
+
+def handle_reg_read(inst, op, i, isInit = False):
     global init_r
     global feistel_l
     global feistel_r
@@ -679,36 +738,26 @@ def handle_regop_fesitel(inst, op, i, isInit = False):
     global count_l
     global count_r    
     setinput = []
-    feistel = []    
-            
-    reg = inst.get_reg(op.get_name())
-    reg_str = reg_map[reg]
+    feistel = []  
+    
+    reg_str = get_reg_op(inst, op, i)
+    print "reg_str: %s" % reg_str
+    if reg_str == "":
+        return ([], [])
+    
     if op.is_read_only() or op.is_read_and_written():
         if isInit:
-            feistel_r += [random.randint(0x00218008, 0x003fffff)]
-            feistel_r_bak += [random.randint(0x00218008, 0x003fffff)]
+            feistel_r += [get_addr()]
+            feistel_r_bak += [get_addr()]
             r = "0x%x" % feistel_r[count_r]
             init_r += [gen_reg2mem(reg_str, r)]
         src = "0x%x" % feistel_r[count_r]
         setinput += [gen_mem2reg(src, reg_str)]
-        count_r += 1                                 
-    elif op.is_written_only() or op.is_read_and_written():
-        if isInit:
-            feistel_l += [random.randint(0x00218008, 0x003fffff)]            
-        src1 = "0x%x" % feistel_l[count_l]
-        src2 = reg_str
-        dest = "0x%x" % feistel_r[count_l]
-        feistel += [gen_feistel_cipher(src1, src2, dest)]
-        count_l += 1                                     
-                
-#     print "regop:L[%d], R[%d]" % (len(feistel_l), len(feistel_r))
-    return (setinput, feistel)
-
-
-# ===-------------------------------------------------------------------===
-# Handle operands other then reg and mem for feistel aggregated PokeEMU
-# ===-------------------------------------------------------------------===
-def handle_op_fesitel(inst, op, i, isInit = False):  
+        count_r += 1          
+    return (setinput, feistel)                               
+         
+         
+def handle_reg_write(inst, op, i, isInit = False):
     global init_r
     global feistel_l
     global feistel_r
@@ -716,30 +765,42 @@ def handle_op_fesitel(inst, op, i, isInit = False):
     global count_l
     global count_r    
     setinput = []
-    feistel = []    
+    feistel = []  
     
-    #TODO: finish adding support to those situations
-    name = op.get_name()
-    print "op name: %s(%d)" % (get_operand_name(name), name)                
-    print "%s" % op.get_name()
-    if get_operand_name(name) == "XED_OPERAND_IMM0":
-        imm = None
-        if inst.is_immediate_signed():
-            imm = inst.get_signed_immediate()
-        else:
-            imm = inst.get_unsigned_immediate()                    
-        print "imm: 0x%x" % imm
-    elif get_operand_name(name) == "XED_OPERAND_IMM1":
-        imm = inst.get_second_immediate()
-        print "imm: 0x%x" % imm
-    elif get_operand_name(name) =="XED_OPERAND_RELBR" or get_operand_name(name) =="XED_OPERAND_PTR":
-        disp = None
-        disp_bits = inst.get_branch_displacement_width()
-        if disp_bits:
-            disp = inst.get_branch_displacement()
-            print "disp: 0x%x" % disp   
-                
-    return (setinput, feistel)
+    reg_str = get_reg_op(inst, op, i)
+    if reg_str == "":
+        return ([], [])
+        
+    if op.is_written_only() or op.is_read_and_written():
+        if isInit:
+            feistel_l += [get_addr()]            
+        src1 = "0x%x" % feistel_l[count_l]
+        src2 = reg_str        
+        while count_l >= len(feistel_r):
+            feistel_r += [get_addr()]
+            feistel_r_bak += [get_addr()]
+        print "reg: %s, feistel_r: %d, count_l = %d" % (reg_str, len(feistel_r), count_l)
+        dest = "0x%x" % feistel_r[count_l]
+        feistel += [gen_feistel_cipher(src1, src2, dest, True)]
+        count_l += 1               
+    return (setinput, feistel)         
+
+# ===-------------------------------------------------------------------===
+# For each mem/reg operand, run function <hanlde> to handle it 
+# ===-------------------------------------------------------------------===
+def handle_op(inst, setinput, feistel, handle_mem, handle_reg, isInit):    
+    for i in range(inst.get_number_of_memory_operands()):
+        op = inst.get_operand(i) 
+        (s, f) = handle_mem(inst, op, i, isInit)
+        setinput += s
+        feistel += f
+ 
+    for i in range(inst.get_noperands()):
+        op = inst.get_operand(i)
+        if op.is_register() or op.is_memory_addressing_register():  
+            (s, f) = handle_reg(inst, op, i, isInit)
+            setinput += s
+            feistel += f
 
 
 class Register:
@@ -765,6 +826,10 @@ class Register:
         
     def in_snapshot(self, snapshot):
         return in_snapshot_reg(self.name, snapshot)
+    
+    def gen_revert_gadget(self, snapshot):
+        self.value = self.in_snapshot(snapshot)
+        return self.gen_gadget(snapshot)    
 
 
 class SegmentRegister(Register):
@@ -773,10 +838,13 @@ class SegmentRegister(Register):
 
     def gen_gadget(self, snapshot):
         return Gadget.gen_set_sreg(self, snapshot)
-        
+            
     def in_snapshot(self, snapshot):
         return in_snapshot_sreg(self.name, snapshot)
-
+    
+    def gen_revert_gadget(self, snapshot):
+        self.value = self.in_snapshot(snapshot)
+        return self.gen_gadget(snapshot)
 
 class ControlRegister(Register):
     def __init__(self, name, value = None):
@@ -787,7 +855,11 @@ class ControlRegister(Register):
 
     def gen_gadget(self, snapshot):
         return Gadget.gen_set_creg(self, snapshot)
-        
+    
+    def gen_revert_gadget(self, snapshot):
+        self.value = self.in_snapshot(snapshot)
+        return self.gen_gadget(snapshot)        
+
 
 class DebugRegister(Register):
     def __init__(self, name, value = None):
@@ -818,6 +890,10 @@ class Memory:
 
     def in_snapshot(self, snapshot):
         return in_snapshot_mem((self.address, 1), snapshot)
+
+    def gen_revert_gadget(self, snapshot):
+        self.value = self.in_snapshot(snapshot)
+        return self.gen_gadget(snapshot)    
 
 
 # ===-----------------------------------------------------------------------===
@@ -1319,7 +1395,7 @@ class Gadget:
         backup = []     #backup R block
         code = []  #instruction to run and corresponding reset*         
         feistel = []    #compute XOR and copy it to L block*
-        restore = []    #restore R block
+        restore = []    #copy backup R to L
         
         #code
         x = ",".join("0x%.2x" % ord(b) for b in shellcode)
@@ -1337,36 +1413,26 @@ class Gadget:
         pte1022 = in_snapshot_mem((((deref4(pde0) & 0xfffff000) + 1022*4), 4), 
                                   snapshot)
         newpte0 = (deref4(pte0) & 0xfff) | (deref4(pte1022) & 0xfffff000)
-        eax_backup = random.randint(0x00218008, 0x003fffff)        
+        eax_backup = get_addr()        
         rs = "mov %%eax,0x%.8x; mov $0x%.8x,%%eax; mov %%eax,%%cr0; mov 0x%.8x,%%eax; " \
             "movl $0x%s,0x%.8x; " \
-            "movl $0x%.8x,0x%.8x; // rebase page 0" % \
-            (eax_backup, cr0, eax_backup, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000)
+            "movl $0x%.8x,0x%.8x; " \
+            "movl $0x0,0x%.8x; // rebase page 0" % \
+            (eax_backup, cr0, eax_backup, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000, eax_backup)
         grs = Gadget(asm = rs, mnemonic = "rebase page 0") 
         
         code += [gtc, grs]    
                 
-        #Hanlde memory operations
-        for i in range(inst.get_number_of_memory_operands()):
-            op = inst.get_operand(i) 
-            (s, f) = handle_memop_fesitel(inst, op, i, isInit)
-            setinput += s
-            feistel += f
-     
-        for i in range(inst.get_noperands()):
-            op = inst.get_operand(i)
-            if op.is_register():    
-                #register
-                (s, f) = handle_regop_fesitel(inst, op, i, isInit)
-                setinput += s
-                feistel += f
-            else:      
-                (s, f) = handle_op_fesitel(inst, op, i, isInit)
-                setinput += s
-                feistel += f                         
+        #Handle all read operations in 1st round, and then handle write operations
+        print "handle read"
+        handle_op(inst, setinput, feistel, handle_mem_read, handle_reg_read, isInit)
+        print "count_R = %d, count_L = %d" % (count_r, count_l)
+        print "R = %d, L = %d" % (len(feistel_r), len(feistel_l))
+        print "handle write"
+        handle_op(inst, setinput, feistel, handle_mem_write, handle_reg_write, isInit)                       
             
         if isInit:
-#             print "L[%d], R[%d]" % (len(feistel_l), len(feistel_r))
+            print "L[%d], R[%d]" % (len(feistel_l), len(feistel_r))
             assert(len(feistel_l) == len(feistel_r))
         
         #backup
@@ -1382,7 +1448,7 @@ class Gadget:
         for i in range(len(feistel_r_bak)):
             src = "0x%x" % feistel_r_bak[i]
             dest = "0x%x" % feistel_l[i]
-            restore += [gen_store_mem(src, dest)]        
+            restore += [gen_store_mem(src, dest, True)]        
         
         count_l = 0
         count_r = 0
@@ -1483,20 +1549,25 @@ def topological_sort(graph):
 
 
 # ===-----------------------------------------------------------------------===
-# Given a list of Gadgets, sort it in topological order and 
-# remove irrelavant Gadgets 
+# Given a dependency graph, sort it in topological order
 # ===-----------------------------------------------------------------------===
-def sort_gadgets(g, name):
-    sort = []
-    for idx, val in enumerate(g):
-        depgraph = build_dependency_graph(val)
+def sort_gadget(depgraph, idx, name):
         if DEBUG >= 2:
             path = "/tmp/depgraph_%s_%d.dot" % (name, idx)
             open(path, "w").write(dot_dependency_graph(depgraph))
     
-        r = topological_sort(depgraph)
+        return topological_sort(depgraph)    
+
+# ===-----------------------------------------------------------------------===
+# Given a list of Gadgets, sort it in topological order and 
+# remove irrelavant Gadgets 
+# ===-----------------------------------------------------------------------===
+def get_subtree(g, name):
+    sort = []
+    for idx, val in enumerate(g):
+        depgraph = build_dependency_graph(val)
+        r = sort_gadget(depgraph, idx, name)
         #remove duplicated state setting gadgets 
-#         if idx > 0:
         src = val[0]
         print "%s: Start from %s" % ("depgraph_%s_%d" % (name, idx), src.asm)
         des = networkx.dag.descendants(depgraph, src)
@@ -1513,12 +1584,15 @@ def compile_gadgets(gadget, epilogue, directive = ""):
     asm = "";
     i = 0
     for tuple in gadget:
-        (startup, bak, setinput, code, feistel, restore) = tuple;
-        bak_sort = sort_gadgets(bak, "bak")
+        (startup, init, bak, setinput, code, feistel, restore, revert) = tuple;
+        bak_sort = get_subtree(bak, "bak")
         
-    
+        depgraph = build_dependency_graph(init)
+        init = sort_gadget(depgraph, 0, init)
+        depgraph = build_dependency_graph(revert)
+        revert = sort_gadget(depgraph, 0, revert)
         # Generate the assembly code        
-        for g in startup + bak_sort + setinput + code + feistel + restore:
+        for g in startup + init + bak_sort + setinput + code + feistel + restore + revert:
             asm += "%s\n" % (g.asm)
             if i and i % 8 == 0:
                 r = random.randint(0, 0xffffffff)
@@ -1541,7 +1615,7 @@ def compile_gadgets(gadget, epilogue, directive = ""):
                          stdin = subprocess.PIPE, 
                          stdout = subprocess.PIPE, 
                          stderr = subprocess.PIPE)
-    prog = str("\n.text\n" + directive + "\n" + asm + "\n")
+    prog = str("\n.text\n" + directive + "\n" + asm + "\n")    
     stdout, stderr = p.communicate(prog)
     if stderr != "":
         print "[E] Can't compile asm:\n%s\n-%s-" % (prog, stderr)
@@ -1753,14 +1827,16 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None):
                 
         print "="*columns()
     
-        body = []
+        init = []   # initiate state according to FuzzBALL-generated test case
+        revert = [] # Undo init state
         done = set()
         
         # Generate code for initializing registers and memory locations
         for rm in regs + memlocs:
             orig_value = rm.in_snapshot(snapshot)
             if orig_value != rm.value:
-                body += rm.gen_gadget(snapshot)
+                init += rm.gen_gadget(snapshot)
+                revert += rm.gen_revert_gadget(snapshot)
                 done.add(rm)
             
         # Need one or more extra passes to define what has been killed but not
@@ -1771,7 +1847,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None):
     
             killed = set()
             defined = set()
-            for g in body:
+            for g in init:
                 killed |= g.kill
                 defined |= g.define
     
@@ -1783,23 +1859,22 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None):
                 assert rm not in done
                 stable = False
                 rm.value = rm.in_snapshot(snapshot)
-                body += rm.gen_gadget(snapshot)
+                init += rm.gen_gadget(snapshot)
     
+        for idx, g in enumerate(revert):
+            print "revert[%d]: %s" % (idx, g.asm)
     
         startup = Gadget.gen_prologue(snapshot)
-        (backup, setinput, code, feistel, restore) = Gadget.gen_root(snapshot, shellcode, count)
-        
-        #combine each gadget in preshellcode with body
-        startup += body
+        (backup, setinput, code, feistel, restore) = Gadget.gen_root(snapshot, shellcode, count)        
             
         bak = []
         for s in backup:
-            print "body size: %d\n" % len(body) 
-            b = body[:]
+            print "init size: %d\n" % len(init) 
+            b = init[:]
             b.insert(0, s)
             bak.append(b)
                                 
-        gadget.append((startup, bak, setinput, code, feistel, restore))
+        gadget.append((startup, init, bak, setinput, code, feistel, restore, revert))
     
         #TODO: Rewrite DEBUG
 #         if DEBUG >= 1:
