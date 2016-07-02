@@ -44,6 +44,7 @@ feistel_r_bak = []  #backup of R block
 feistel_l = []      #L block container
 count_r = 0
 count_l = 0
+repeat = 98          #repeat testing each test case for a number of times
 
 reg_map = [
   "",
@@ -627,16 +628,20 @@ def gen_feistel_cipher(src1, src2, dest, clean = False):
     asm1 = gen_mem2reg_asm(src1, "eax")
     asm2 = ""
     asm3 = gen_reg2mem_asm("eax", dest)
+    
     if src2 == "eflags":
         r = "0x%x" % get_addr()
         asm2 += gen_store_eflags_asm(r)
+        asm2 += "xor %s,%%eax;" % r
         src2 = r
-        if clean:
-            asm3 += "movl $0x0,%s;" % src2
     elif src2 in reg_map:
         asm2 += "xor %%%s,%%eax;" % src2
     else:
         asm2 += "xor %s,%%eax;" % src2
+    
+    if clean:
+        asm3 += "movl $0x0,%s;" % src2        
+    
     asm = asm1 + asm2 + asm3
     g = Gadget(asm = asm, mnemonic = "copy mem", kill= [Register("EAX")])    
     return g
@@ -1359,13 +1364,17 @@ class Gadget:
                     return [g_l_hi_backup, g_l_lo_backup, g_l_hi, g_l_lo], [gtc, grs, g_init_r_hi, g_init_r_lo, g_reset_hi, g_reset_lo, g_r_hi, g_r_lo]
     
     
+    # TODO: gen_root doesn't only gen root. 
+    # e.g. setinput, backup and restore are not root gadgets
+    # Perhaps we need another name for this function
     # ===-------------------------------------------------------------------===
     # Generate a gadget to run the shellocde (i.e., the real testcase)
     # ===-------------------------------------------------------------------===
     @staticmethod
     def gen_root(snapshot, shellcode, count):
         global count_l
-        global count_r        
+        global count_r  
+        global init_r      
         f = Tempfile()
         f.write(shellcode)
         p = subprocess.Popen(["xxd", "-p", "%s" % f], 
@@ -1388,12 +1397,12 @@ class Gadget:
         if count == 1:
             isInit = True                     
         
-        #TODO: reret resetting code using Xed
+        #TODO: rewrite resetting code using Xed
         #5 groups of root Gadgets that gen_root will generate from an instruction
         # * = Need Xed         
         setinput = []   #copy from R block to input*
         backup = []     #backup R block
-        code = []  #instruction to run and corresponding reset*         
+        code = []       #instruction to run and corresponding reset*         
         feistel = []    #compute XOR and copy it to L block*
         restore = []    #copy backup R to L
         
@@ -1442,7 +1451,15 @@ class Gadget:
             backup += [gen_store_mem(src, dest)]
         if isInit:
             #If 1st iter, mov init state input to R
-            backup = init_r + backup
+            label = random.randint(0, 0xffffffff)
+            asm1 = "cmp $0x%x,(%%esp);" \
+                "jne forward_%.8x; // Init" % (repeat, label)
+            asm2 = "forward_%.8x: " % label
+            g1 = Gadget(asm = asm1, mnemonic = "Init R")
+            g2 = Gadget(asm = asm2, mnemonic = "Init R")
+            init_r = [g1] + init_r + [g2]
+            backup = init_r + backup     
+                   
         
         #restore
         for i in range(len(feistel_r_bak)):
@@ -1456,10 +1473,11 @@ class Gadget:
     
         
     @staticmethod
-    def gen_prologue(snapshot):
-        asm = ""        
-#         asm += "pushf; " 
-        asm += "invlpg 0x0;" 
+    def gen_prologue(label, snapshot):
+        asm = "mov $0x%.8x,%%eax; " \
+            "forward_%.8x: " \
+            "invlpg 0x0;" \
+            "push %%eax; " % (repeat, label) 
         mnemonic = "prologue"
         return [Gadget(asm = asm, mnemonic = mnemonic)]
 
@@ -1584,7 +1602,7 @@ def compile_gadgets(gadget, epilogue, directive = ""):
     asm = "";
     i = 0
     for tuple in gadget:
-        (startup, init, bak, setinput, code, feistel, restore, revert) = tuple;
+        (startup, init, bak, setinput, code, feistel, restore, revert, loop) = tuple;
         bak_sort = get_subtree(bak, "bak")
         
         depgraph = build_dependency_graph(init)
@@ -1592,7 +1610,7 @@ def compile_gadgets(gadget, epilogue, directive = ""):
         depgraph = build_dependency_graph(revert)
         revert = sort_gadget(depgraph, 0, revert)
         # Generate the assembly code        
-        for g in startup + init + bak_sort + setinput + code + feistel + restore + revert:
+        for g in startup + init + bak_sort + setinput + code + feistel + restore + revert + loop:
             asm += "%s\n" % (g.asm)
             if i and i % 8 == 0:
                 r = random.randint(0, 0xffffffff)
@@ -1864,17 +1882,23 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None):
         for idx, g in enumerate(revert):
             print "revert[%d]: %s" % (idx, g.asm)
     
-        startup = Gadget.gen_prologue(snapshot)
+        label = random.randint(0, 0xffffffff)   #label at the beginnign of this test case
+        startup = Gadget.gen_prologue(label, snapshot)
         (backup, setinput, code, feistel, restore) = Gadget.gen_root(snapshot, shellcode, count)        
             
         bak = []
-        for s in backup:
-            print "init size: %d\n" % len(init) 
+        for s in backup: 
             b = init[:]
             b.insert(0, s)
             bak.append(b)
-                                
-        gadget.append((startup, init, bak, setinput, code, feistel, restore, revert))
+        
+        #jump to TC beginning for a fixed # of times                   
+        asm = "pop %%eax; " \
+            "dec %%eax; " \
+            "jnz forward_%.8x; // back to loop entrance" % label
+        loop = [Gadget(asm = asm, mnemonic = "loop")] 
+             
+        gadget.append((startup, init, bak, setinput, code, feistel, restore, revert, loop))
     
         #TODO: Rewrite DEBUG
 #         if DEBUG >= 1:
