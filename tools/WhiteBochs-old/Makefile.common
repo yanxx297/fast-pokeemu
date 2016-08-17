@@ -8,7 +8,7 @@ SRCs = $(OBJs:%.o=%.cc)
 
 CXX = g++
 LINK = g++
-CXXFLAGS = -I./ -I../ -DWHITEBOCHS -DWHITEBOCHS_NO_TLB -g -m32 -fno-jump-tables
+CXXFLAGS = -I./ -I../ -DWHITEBOCHS -DWHITEBOCHS_NO_TLB -Wno-narrowing -g -m32 -fno-jump-tables
 LDFLAGS = -static
 STRIP = strip
 
