@@ -993,10 +993,10 @@ class Gadget:
         return self.mnemonic
 
     # ===-------------------------------------------------------------------===
-    # Return true if any of the followings is true:
+    # Return true (= g1 define g0) if any of the followings is true:
     # * g1 defines what g0 kills 
     # * g0 uses what g1 defines
-    # * g0 use what g1 affects
+    # * (New)g0 use what g1 affects
     # ===-------------------------------------------------------------------===
     def depend(g1, g0):
         return (g1.define & g0.kill) or \
@@ -1048,7 +1048,8 @@ class Gadget:
                 "mov %%ebx, -6(%%ebx); // patch ljmp target" % (r, r, r, r)
 
             g0 = Gadget(asm = asm0, mnemonic = reg.name.lower(), 
-                        define = define + ["patch_ljmp_target", "*"], 
+#                         define = define + ["patch_ljmp_target", "*"],
+                        define = define + ["patch_ljmp_target"], 
                         kill = kill, use = [])
 
             g1 = Gadget(asm = asm1, mnemonic = "patch_ljmp_target", 
