@@ -1,0 +1,32 @@
+#Usage: make -f batchRunTestcase -j 6
+
+#Config
+mode=3
+IN=/export/scratch/tmp/sample
+OUT=/export/scratch/tmp/out/
+TMPDIR=/export/scratch/tmp #dir storing temperary files
+TIMEOUT=100
+EMUPATH=./../emu/qemu-0.12.4+dfsg/run-testcase
+LOG=/log
+
+
+SUBDIRS := $(sort $(dir $(wildcard $(IN)/*/.)))
+
+all:$(addsuffix /00000000.post, $(addprefix $(OUT), $(foreach dir, $(SUBDIRS), $(shell basename $(dir)))))
+
+define run-target
+$(addprefix $(OUT), $(shell basename $1))/00000000.post:: ;
+	$(eval OUTDIR:= $(shell mktemp -d -p $(TMPDIR)))
+	$(eval TMP:= $(shell mktemp -d -p /tmp))
+	$(eval outputs := $(addprefix $(OUT), $(shell basename $1)))
+	@$(foreach tc, $(sort $(dir $(wildcard $1*/.))), \
+	python run_test_case.py \
+	testcase:$(tc)testcase \
+	timeout:$(TIMEOUT) \
+	outdir:$(OUTDIR) \
+	script:$(EMUPATH) mode:$(mode) tmp:$(TMP);)
+	mv $(OUTDIR) $(addprefix $(OUT), $(shell basename $1))
+	./aggreg_tc_from_dump.sh $1 $(outputs)/ > $(addsuffix $(LOG), $(outputs))
+endef
+
+$(foreach dir,$(SUBDIRS),$(eval $(call run-target,$(dir))))

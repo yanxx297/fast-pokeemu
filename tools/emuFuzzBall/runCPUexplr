@@ -1,0 +1,27 @@
+#Usage: make -f batchRunTestcase -j 6
+
+#Config
+FILE:=../../scripts/insn4
+TMP:=/export/scratch/tmp/
+
+slash:=/
+SHELLCODE:= $(shell cut -d '	' -f -1 $(FILE))
+TYP:= $(foreach typ, $(shell cut -d '	' -f 2- $(FILE)), $(addprefix $(slash),$(typ)))
+
+
+all:$(addsuffix /exitstatus,$(addprefix $(TMP),$(shell cut -d '	' -f 2- $(FILE))))
+	echo $(dir $1) $(notdir $1)
+
+define run-target
+$(addprefix $(TMP),$(notdir $1))/exitstatus:: ;
+	$(eval code := $(patsubst %/,%,$(dir $1)))
+	$(eval dir := $(notdir $1))
+	$(eval dst := $(addprefix $(TMP),$(dir)))
+	$(eval src:= $(shell mktemp -d))
+	printf $(code)
+	python run-emu-fuzzball.py ~/Project/pokemu-oras/tools/WhiteBochs-old/fuzzball-whitebochs \
+	 ~/Project/pokemu-oras/base.snap $(code) $(src)
+	mv $(src) $(dst)
+endef
+
+$(foreach insn, $(join $(SHELLCODE), $(TYP)),$(eval $(call run-target,$(insn))))
