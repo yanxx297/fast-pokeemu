@@ -653,6 +653,7 @@ def gen_feistel_cipher(src1, src2, dest, clean = False):
     asm1 = gen_mem2reg_asm(src1, "eax")
     asm2 = ""
     asm3 = gen_reg2mem_asm("eax", dest)
+    kill= [Register("EAX")]
     
     if src2 == "eflags":
         r = "0x%x" % get_addr()
@@ -660,15 +661,22 @@ def gen_feistel_cipher(src1, src2, dest, clean = False):
         asm2 += "xor %s,%%eax;" % r
         src2 = r
     elif src2 in reg_map:
-        asm2 += "xor %%%s,%%eax;" % src2
+        if reg_map.index(src2) >= reg_map.index("cs") and reg_map.index(src2) <= reg_map.index("gs"):
+            asm2 += "mov %%%s,%%ecx; xor %%ecx,%%eax;" % src2
+            if clean:
+                asm3 += "mov $0x0,%%ecx; mov %%ecx,%%%s;" % src2
+            kill += [Register("ECX")]
+        else: 
+            asm2 += "xor %%%s,%%eax;" % src2
+            if clean:
+                asm3 += "movl $0x0,%%%s;" % src2
     else:
         asm2 += "xor %s,%%eax;" % src2
-    
-    if clean:
-        asm3 += "movl $0x0,%s;" % src2        
+        if clean:
+            asm3 += "movl $0x0,%s;" % src2            
     
     asm = asm1 + asm2 + asm3
-    g = Gadget(asm = asm, mnemonic = "copy mem", kill= [Register("EAX")])    
+    g = Gadget(asm = asm, mnemonic = "copy mem", kill= kill)    
     return g
 
 
