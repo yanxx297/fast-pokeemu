@@ -508,6 +508,18 @@ def parentheses(str):
         return False    
 
 # ===-------------------------------------------------------------------===
+# Given a gadget list `l`, append gadget `ext` after each gadget in it
+# and return the appended list
+# ===-------------------------------------------------------------------===
+def append_gadget(l, ext):
+    out = []
+    for s in l:
+        b = ext[:]
+        b.insert(0, s)
+        out.append(b)
+    return out
+
+# ===-------------------------------------------------------------------===
 # Generate a new memory address either randomly or in order
 # ===-------------------------------------------------------------------===
 next_addr = 0x00218008
@@ -1678,15 +1690,16 @@ def compile_gadgets(gadget, epilogue, directive = ""):
     asm = "";
     i = 0
     for tuple in gadget:
-        (startup, init, bak, setinput, code, feistel, restore, revert, loop) = tuple;
+        (startup, init, bak, setin, code, output, restore, revert, loop) = tuple;
         bak_sort = get_subtree(bak, "bak")
+        setin_sort = get_subtree(setin, "set input")
         
         depgraph = build_dependency_graph(init)
         init = sort_gadget(depgraph, 0, init)
         depgraph = build_dependency_graph(revert)
         revert = sort_gadget(depgraph, 0, revert)
         # Generate the assembly code        
-        for g in startup + init + bak_sort + setinput + code + feistel + restore + revert + loop:
+        for g in startup + init + bak_sort + setin_sort + code + output + restore + revert + loop:
             asm += "%s\n" % (g.asm)
             if i and i % 8 == 0:
                 r = random.randint(0, 0xffffffff)
