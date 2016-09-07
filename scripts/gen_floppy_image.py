@@ -1457,7 +1457,7 @@ class Gadget:
         xed.runtime_address = 0x0
     
         inst = xed.decode()    
-        inst_str = inst.dump_att_format()
+        inst_str = inst.dump_intel_format()
         print "%s" % inst_str 
         
         isInit = False

@@ -6,3 +6,5 @@ a.out
 *.o
 *.so
 *.core
+.project
+.paths
