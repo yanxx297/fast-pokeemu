@@ -16,10 +16,10 @@ import cpustate_x86
 from common import *
 
 ROOT = abspath(joinpath(dirname(abspath(__file__)), ".."))
-KERNEL = joinpath(ROOT, "Kernel/kernel")
-GRUB = joinpath(ROOT, "Kernel/grub_stuff")
-GRUB_EXE = joinpath(ROOT, "TCGen/grub")
-SNAPSHOT = joinpath(ROOT, "Snapshots/base.snap")
+KERNEL = joinpath(ROOT, "kernel")
+GRUB = joinpath(ROOT, "grub_stuff")
+GRUB_EXE = joinpath(ROOT, "scripts/grub")
+SNAPSHOT = joinpath(ROOT, "base.snap")
 TESTCASE = ".testcase"
 NULL = open("/dev/null", "w")
 FLOPPY_TEMPLATE = "/tmp/gen-floppy-image.template"

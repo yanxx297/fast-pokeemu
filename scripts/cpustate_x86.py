@@ -666,7 +666,10 @@ class X86Dump():
         return s
 
 def disasm(s, base = 0):
-    p = subprocess.Popen(["ndisasm", "-u", "-"], 
+#     p = subprocess.Popen(["ndisasm", "-u", "-"], 
+#                          stdin=subprocess.PIPE, 
+#                          stdout=subprocess.PIPE)
+    p = subprocess.Popen(["objdump86"], 
                          stdin=subprocess.PIPE, 
                          stdout=subprocess.PIPE)
     out = p.communicate(s)[0]

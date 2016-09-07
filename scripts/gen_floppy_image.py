@@ -14,18 +14,24 @@ import elf
 import StringIO
 import hashlib
 import cpustate_x86
+
+localpath = os.path.expanduser("~/.local/lib/python2.7/site-packages") 
+sys.path.append(localpath)
+
 from common import *
-from numpy.f2py.f2py_testing import cmdline
-from telnetlib import theNULL
+# from numpy.f2py.f2py_testing import cmdline
+# from telnetlib import theNULL
 import binascii
-from cups import Dest
-from scipy.special.basic import pbdn_seq
+# from cups import Dest
+# from scipy.special.basic import pbdn_seq
 from statsmodels.regression.tests.test_quantile_regression import idx
 import code
-from sympy.galgebra.printing import prog_str
+# from sympy.galgebra.printing import prog_str
 
 sys.path.append("../tools/pyxed")
 import pyxed
+
+
 
 ROOT = abspath(joinpath(dirname(abspath(__file__)), ".."))
 KERNEL = joinpath(ROOT, "kernel")
@@ -1782,8 +1788,9 @@ def gen_floppy(kernel, floppy, cksum, testcase):
 
     open(str(floppy), "w").write(gen_floppy_template())
 
-    cmd = """mcopy -i %s %s ::kernel && mcopy -i %s %s ::kernel.md5 && mcopy -i %s %s ::testcase.md5""" % \
+    cmd = """mcopy -o -i %s %s ::kernel && mcopy -o -i %s %s ::kernel.md5 && mcopy -o -i %s %s ::testcase.md5""" % \
         (floppy, kernel, floppy, cksum, floppy, testcase)
+    print cmd
     subprocess.check_call(cmd, shell = True, stdout = NULL, stderr = NULL)
 
     return floppy

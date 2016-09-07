@@ -21,23 +21,24 @@ else:
 
 #GDB = os.path.join(HERE, "gdb")
 GDB = "gdb"
-OUTDIR = os.getenv("FUZZBALL_OUTDIR", "/tmp/fuzzball-output")
+# OUTDIR = os.getenv("FUZZBALL_OUTDIR", "/export/scratch/tmp/fuzzball-output")
+OUTDIR = sys.argv[4]
 print OUTDIR
 FUZZBALL_ENV_ARGS = os.getenv("FUZZBALL_ARGS", "")
 FUZZBALL_MAX_ITERS = os.getenv("FUZZBALL_MAX_ITERATIONS", "4096")
 FUZZBALL_ARGS = "-solver z3vc -linux-syscalls -trace-iterations -zero-memory " \
-    "-paths-limit %s -output-dir %s %s" % \
+    "-paths-limit %s -output-dir %s %s -total-timeout 7200" % \
     (FUZZBALL_MAX_ITERS, OUTDIR, FUZZBALL_ENV_ARGS)
     #-implied-value-conc 
 EXTRA_DESC_COND = os.path.join(HERE, "extra-desc-conds.txt")
 
 
-usrcmdline = sys.argv[1:]
+usrcmdline = sys.argv[1:4]
 
 # To disable use of GDB core file generation, set the "corefile" variable
 # to empty, as in the second line
-corefile = Tempfile(suffix = ".core")
-# corefile = ""
+# corefile = Tempfile(suffix = ".core")
+corefile = ""
 
 symbolic_regs = True
 symbolic_sregs = True

@@ -79,10 +79,11 @@ def gen_testcase_name(testcase):
 # run a given testcase and the result somewhere (assume the script for running
 # the emulator accepts the floppy image as first argument and an output prefix
 # as second argument)
-def run_testcase(outdir, code, path, script, floppy, timeout):
+def run_testcase(outdir, code, path, script, floppy, timeout, tmp):
     mkdir(outdir)
     outprefix = os.path.join(outdir, path)
-    cmdline = [script, str(floppy), outprefix]
+    cmdline = [script, str(floppy), outprefix, tmp]
+    print cmdline
     
     try:
         exec_with_timeout(cmdline = cmdline, timeout = timeout)
@@ -122,9 +123,14 @@ if __name__ == "__main__":
     print "outdir valid\n"
     assert os.path.isfile(opts["script"]), opts["script"]
 
-    floppy = gen_floppy(opts["testcase"])
+    floppy = gen_floppy(opts["testcase"], opts["mode"])
     code, path = gen_testcase_name(opts["testcase"])
     t0 = time.time()
     run_testcase(opts["outdir"], code, path, opts["script"], floppy, 
-                 int(opts["timeout"]))
-    print >> sys.stderr, "Done in %.3fs" % (time.time() - t0)
+                 int(opts["timeout"]), opts["tmp"])
+    exectime = time.time() - t0
+    print >> sys.stderr, "Done in %.3fs" % (exectime)
+    filename = opts["outdir"] + "/time"
+    f = open(filename, 'a')
+    f.write("%f\n" % exectime)
+    f.close()
