@@ -10,6 +10,40 @@ my $last_dir;
 # particular WhiteBochs binary of SMcC's laptop
 my %addr_desc =
   (
+   # Stephen's fuzzball-whitebochs-gcc6.1.1, used in 0x00 0x00
+   "0x0804ce58" => "seg->cache.valid & SegAccessWOK",
+   "0x08079b20" => "seg->cache.valid==0",
+   "0x08079b34" => "seg->cache.p == 0",
+   "0x08079b4d" => "seg->cache.type <= 5",
+   "0x08079b52" => "seg->cache.type < 4",
+   "0x08079b66" => "seg->cache.type <= 7",
+   "0x08079b6b" => "seg->cache.type <= 15",
+   "0x08079b5f" => "seq->cache.type <= 1",
+   "0x08079b8a" => "offset > (limit-len+1)",
+   "0x08079bc9" => "seg->cache.u.segment.d_b == 0",
+   "0x08079be4" => "offset <= 'limit'",
+   "0x08079bec" => "offset > upper_limit",
+   "0x08079b9a" => "length-1 <= seg->...limit_scaled",
+   "0x08079bfc" => "upper_limit - offset >= length - 1",
+   "0x08079bac" => "limit_scaled <= 14",
+   "0x0804cebf" => "tlbEntry->lpf != lpf",
+   "0x804ceba" => "tlbIndex_1",
+   "0x804cec4" => "tlbIndex_2",
+   "0x804ced9" => "tlbIndex_3",
+   "0x804cef6" => "tlbIndex_4",
+   "0x804cf0d" => "tlbIndex_5",
+
+   # Stephen's fuzzball-whitebochs-gcc4.6.3d, used in 0x00 0x00 IVC only
+   "0x0807944b" => "seg->cache.valid==0",
+   "0x0807945f" => "seg->cache.p == 0",
+   "0x08079478" => "seg->cache.type > 15",
+   "0x08079487" => "1 << seg->cache.type flag",
+   "0x08079495" => "seg->cache.type mask check 0xff33",
+   "0x080794a1" => "seg->cache.type mask check 0x00c0",
+   "0x080794c8" => "offset > (limit-len+1)",
+   "0x08079507" => "seg->cache.u.segment.d_b == 0",
+   "0x08079522" => "offset <= 'limit'",
+
    "0x0804c65c" => "seg->cache.valid & SegAccessWOK",
    "0x08079700" => "seg->cache.valid==0",
    "0x08079714" => "seg->cache.p == 0",
