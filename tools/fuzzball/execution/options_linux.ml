@@ -49,6 +49,9 @@ let linux_cmdline_opts =
     ("-tls-base", Arg.String
        (fun s -> opt_tls_base := Some (Int64.of_string s)),
      "addr Use a Linux TLS (%gs) segment at the given address");
+    ("-hwcap", Arg.String
+       (fun s-> Linux_loader.opt_hwcap := Some (Int64.of_string s)),
+     "bits Specify CPU features to use in auxv (default: minimal)");
     ("-linux-syscalls", Arg.Set(opt_linux_syscalls),
      " Simulate Linux system calls on the real system");
     ("-trace-syscalls", Arg.Set(opt_trace_syscalls),
