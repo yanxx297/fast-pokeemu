@@ -767,15 +767,18 @@ def inc_offset(inst, op, i, d):
 def get_mem_op(inst, op, i):      
     seg = inst.get_seg_reg(0)                
     offset = 0
-    if inst.get_memory_displacement_width(i):
+    disp_len = inst.get_memory_displacement_width(i)
+    if disp_len:        
         offset = inst.get_memory_displacement(i)
+        print "disp: %d (%d)" % (offset, disp_len)
     base = inst.get_base_reg(i)        
     indx = inst.get_index_reg(i)
     scale = inst.get_scale(i)
     op_str = ""
     if reg_map[seg] != "" and reg_map[seg] != "ds":
         op_str += "%%%s:" % reg_map[seg]
-    if offset != 0:
+    if disp_len != 0 or \
+    not (reg_map[seg] != "" and reg_map[seg] != "ds"):  #displacement bits
         op_str += "0x%x" % offset
     if base != 0:
         op_str += "(%%%s" % reg_map[base]
@@ -785,7 +788,8 @@ def get_mem_op(inst, op, i):
             op_str += ",%d" % scale
         op_str += ")"    
     print "mem op: %s" % (op_str)
-    return op_str    
+    op_len = inst.get_operand_length_bits(i)
+    return (op_str, op_len)    
 
 
 def handle_mem_read(inst, op, i, isInit = False):
