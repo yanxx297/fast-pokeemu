@@ -182,14 +182,14 @@ reg_map = [
   "k5",
   "k6",
   "k7",
-  "mmx0",
-  "mmx1",
-  "mmx2",
-  "mmx3",
-  "mmx4",
-  "mmx5",
-  "mmx6",
-  "mmx7",
+  "mm0",
+  "mm1",
+  "mm2",
+  "mm3",
+  "mm4",
+  "mm5",
+  "mm6",
+  "mm7",
   "mxcsr",
   "", #"stackpush",
   "", #"stackpop",
@@ -513,6 +513,7 @@ def parentheses(str):
 # ===-------------------------------------------------------------------===
 def append_gadget(l, ext):
     out = []
+    print "append_gadget    l[%d]" % len(l)
     for s in l:
         b = ext[:]
         b.insert(0, s)
@@ -523,12 +524,13 @@ def append_gadget(l, ext):
 # Generate a new memory address either randomly or in order
 # ===-------------------------------------------------------------------===
 next_addr = 0x00218008
-def get_addr(is_rand = False):
+def get_addr(size = 4, is_rand = False):
     global next_addr
     if is_rand:
-        return choice(range(0x00218008, 0x003fffff,4))
+        # TODO: Would it be better if using `size` instead of 4?
+        return choice(range(0x00218008, 0x003fffff,4))  
     else:
-        next_addr += 4
+        next_addr += size
         assert(next_addr <= 0x003fffff)
         print "get_addr: 0x%x" % next_addr
         return next_addr
@@ -579,6 +581,10 @@ def gen_reg2mem_asm(reg, mem):
     if reg == "eflags":
         asm += "pushf;" \
             "pop %s;" % mem
+    elif reg_map.index(reg) in range(reg_map.index("mm0"), reg_map.index("mm7")) or \
+        reg_map.index(reg) in range(reg_map.index("xmm0"), reg_map.index("xmm31")):
+        asm += "movd %%%s,%s;" \
+            "psrld $0x20,%%%s;" % (reg, mem, reg)
     else:
         asm += "mov %%%s,%s;" % (reg, mem) 
     return asm
@@ -592,6 +598,10 @@ def gen_mem2reg_asm(mem, reg):
     if reg == "eflags":
         asm += "push %s;" \
             "popf;" % mem
+    elif reg_map.index(reg) in range(reg_map.index("mm0"), reg_map.index("mm7")):
+        asm += "movd %s,%%%s;" % (mem, reg)
+    elif reg_map.index(reg) in range(reg_map.index("xmm0"), reg_map.index("xmm31")):
+        asm += "movdqu %s,%%%s;" % (mem, reg)
     else:
         asm = "mov %s,%%%s;" % (mem, reg)         
     return asm
@@ -648,8 +658,10 @@ def gen_mem2reg(src, dest):
 
 # ===-------------------------------------------------------------------===
 # Generate gadget that xor src1 to src2, and copy the result(in src2) to dest
+# NOTE: Xed info is not enough for this funcion, since it cannot tell registers
+# that cannot be XORed directly.
 # ===-------------------------------------------------------------------===
-def gen_feistel_cipher(src1, src2, dest, clean = False):
+def gen_feistel_cipher(src1, src2, dest, clean = False, shft = False):
     asm1 = gen_mem2reg_asm(src1, "eax")
     asm2 = ""
     asm3 = gen_reg2mem_asm("eax", dest)
@@ -661,23 +673,92 @@ def gen_feistel_cipher(src1, src2, dest, clean = False):
         asm2 += "xor %s,%%eax;" % r
         src2 = r
     elif src2 in reg_map:
-        if reg_map.index(src2) >= reg_map.index("cs") and reg_map.index(src2) <= reg_map.index("gs"):
+        if reg_map.index(src2) in range(reg_map.index("cs"), reg_map.index("gs")):
             asm2 += "mov %%%s,%%ecx; xor %%ecx,%%eax;" % src2
             if clean:
                 asm3 += "mov $0x0,%%ecx; mov %%ecx,%%%s;" % src2
             kill += [Register("ECX")]
+        elif reg_map.index(src2) in range(reg_map.index("ax"), reg_map.index("bx")):
+            asm2 += "mov %%%s,%%cx; xor %%ecx,%%eax;" % src2
+            if clean:
+                asm3 += "mov $0x0,%%ecx; mov %%cx,%%%s;" % src2
+            kill += [Register("ECX")]            
+        elif reg_map.index(src2) in range(reg_map.index("al"), reg_map.index("bl")):
+            asm2 += "mov %%%s,%%cl; xor %%ecx,%%eax;" % src2
+            if clean:
+                asm3 += "mov $0x0,%%ecx; mov %%cl,%%%s;" % src2
+            kill += [Register("ECX")]            
+        elif reg_map.index(src2) in range(reg_map.index("ah"), reg_map.index("bh")):
+            asm2 += "mov %%%s,%%ch; xor %%ecx,%%eax;" % src2
+            if clean:
+                asm3 += "mov $0x0,%%ecx; mov %%ch,%%%s;" % src2
+            kill += [Register("ECX")]    
+        elif reg_map.index(src2) == reg_map.index("eip"):
+            l1 = random.randint(0, 0xffffffff)
+            l2 = random.randint(0, 0xffffffff)
+            asm2 += "jmp forward_%.8x; " \
+                "forward_%.8x: pop %%ecx; ret;" \
+                "forward_%.8x: call forward_%.8x;" \
+                "xor %%ecx,%%eax; // copy eip to ecx" % (l2, l1, l2, l1)
+        elif reg_map.index(src2) in range(reg_map.index("mm0"), reg_map.index("mm7")) or \
+        reg_map.index(src2) in range(reg_map.index("xmm0"), reg_map.index("xmm31")):
+            asm2 += "movd %%%s,%%ecx;" \
+                "xor %%ecx,%%eax;" % src2
+            if shft:
+                asm2 = "psrld $0x20,%%%s;" % src2 + asm2           
+# TODO: movd/movq doesn't work; Use another way to clean xmm\mm registers                 
+#             if clean:
+#                 asm3 += "movd $0x0,%%%s;" \
+#                     "pslld $0x20,%%%s;" \
+#                     "movd $0x0,%%%s" % (src2, src2, src2)        
         else: 
             asm2 += "xor %%%s,%%eax;" % src2
+            if shft:
+                asm2 = "psrld $0x20,%%%s;" % src2 + asm2            
             if clean:
                 asm3 += "movl $0x0,%%%s;" % src2
     else:
         asm2 += "xor %s,%%eax;" % src2
+        if shft:
+            asm2 = "psrld $0x20,%s;" % src2 + asm2        
         if clean:
             asm3 += "movl $0x0,%s;" % src2            
     
     asm = asm1 + asm2 + asm3
     g = Gadget(asm = asm, mnemonic = "copy mem", kill= kill)    
     return g
+
+
+# ===-------------------------------------------------------------------===
+# For a memory accessing operand, increase its offset by d (Bytes)
+# NOTE: Most lines of this function are copied from get_mem_op()
+# ===-------------------------------------------------------------------===
+def inc_offset(inst, op, i, d):
+    seg = inst.get_seg_reg(0)                
+    offset = 0
+    disp_len = inst.get_memory_displacement_width(i)
+    if disp_len:        
+        offset = inst.get_memory_displacement(i)
+        print "disp: %d (%d)" % (offset, disp_len)
+    base = inst.get_base_reg(i)        
+    indx = inst.get_index_reg(i)
+    scale = inst.get_scale(i)
+    op_str = ""
+    if reg_map[seg] != "" and reg_map[seg] != "ds":
+        op_str += "%%%s:" % reg_map[seg]
+    if disp_len != 0 or \
+    not (reg_map[seg] != "" and reg_map[seg] != "ds"):  #displacement bits
+        # Increase offset by `d`
+        op_str += "0x%x" % (offset + d)
+    if base != 0:
+        op_str += "(%%%s" % reg_map[base]
+        if reg_map[indx] != "":
+            op_str += ",%%%s" % reg_map[indx]
+        if scale != 0:
+            op_str += ",%d" % scale
+        op_str += ")"    
+    print "mem op: %s" % (op_str)
+    return op_str   
 
 
 # ===-------------------------------------------------------------------===
@@ -717,17 +798,21 @@ def handle_mem_read(inst, op, i, isInit = False):
     setinput = []
     feistel = []      
     
-    op_str = get_mem_op(inst, op, i)
+    (op_str, op_len) = get_mem_op(inst, op, i)
     if inst.is_mem_read(i):
-        if isInit:
-            feistel_r += [get_addr()]
-            feistel_r_bak += [get_addr()]                
-            r = "0x%x" % feistel_r[count_r]
-            init_r += [gen_store_mem(op_str, r)]
-        print "R[%d]" % count_r
-        src = "0x%x" % feistel_r[count_r]
-        setinput += [gen_store_mem(src, op_str)]
-        count_r += 1  
+        b = (op_len + 16) / 32
+        print "b = %d" % b
+        for offset in range(0, b): 
+            if isInit:               
+                feistel_r += [get_addr()]
+                feistel_r_bak += [get_addr()]                
+                r = "0x%x" % feistel_r[count_r]
+                op_str = inc_offset(inst, op, i, (offset * 4))
+                init_r += [gen_store_mem(op_str, r)]
+            print "handle_mem_read    R[%d]" % count_r
+            src = "0x%x" % feistel_r[count_r]
+            setinput += [gen_store_mem(src, op_str)]
+            count_r += 1  
         
     return (setinput, feistel)
     
@@ -742,7 +827,7 @@ def handle_mem_write(inst, op, i, isInit = False):
     setinput = []
     feistel = []      
     
-    op_str = get_mem_op(inst, op, i)
+    (op_str, op_len) = get_mem_op(inst, op, i)
     if inst.is_mem_written(i):
         if isInit:
             feistel_l += [get_addr()]
@@ -765,7 +850,9 @@ def handle_mem_write(inst, op, i, isInit = False):
 def get_reg_op(inst, op, i):  
     reg = inst.get_reg(op.get_name())
     reg_str = reg_map[reg]
-    return reg_str
+    reg_len = inst.get_operand_length_bits(i)
+    print "REGISTER %s (%d)" %(reg_str, reg_len)
+    return (reg_str, reg_len)
 
 
 def handle_reg_read(inst, op, i, isInit = False):
@@ -778,20 +865,22 @@ def handle_reg_read(inst, op, i, isInit = False):
     setinput = []
     feistel = []  
     
-    reg_str = get_reg_op(inst, op, i)
+    (reg_str, reg_len) = get_reg_op(inst, op, i)
     print "reg_str: %s" % reg_str
     if reg_str == "":
         return ([], [])
     
     if op.is_read_only() or op.is_read_and_written():
-        if isInit:
-            feistel_r += [get_addr()]
-            feistel_r_bak += [get_addr()]
-            r = "0x%x" % feistel_r[count_r]
-            init_r += [gen_reg2mem(reg_str, r)]
-        src = "0x%x" % feistel_r[count_r]
-        setinput += [gen_mem2reg(src, reg_str)]
-        count_r += 1          
+        b = (reg_len + 16) / 32
+        for offset in range(0, b):
+            if isInit:
+                feistel_r += [get_addr()]
+                feistel_r_bak += [get_addr()]
+                r = "0x%x" % feistel_r[count_r]
+                init_r += [gen_reg2mem(reg_str, r)]
+            src = "0x%x" % feistel_r[count_r]            
+            count_r += 1
+        setinput += [gen_mem2reg(src, reg_str)]         
     return (setinput, feistel)                               
          
          
@@ -805,27 +894,29 @@ def handle_reg_write(inst, op, i, isInit = False):
     setinput = []
     feistel = []  
     
-    reg_str = get_reg_op(inst, op, i)
+    (reg_str, reg_len) = get_reg_op(inst, op, i)
     if reg_str == "":
         return ([], [])
         
     if op.is_written_only() or op.is_read_and_written():
-        if isInit:
-            feistel_l += [get_addr()]            
-        src1 = "0x%x" % feistel_l[count_l]
-        src2 = reg_str        
-        while count_l >= len(feistel_r):
-            feistel_r += [get_addr()]
-            feistel_r_bak += [get_addr()]
-        print "reg: %s, feistel_r: %d, count_l = %d" % (reg_str, len(feistel_r), count_l)
-        dest = "0x%x" % feistel_r[count_l]
-        feistel += [gen_feistel_cipher(src1, src2, dest, True)]
-        count_l += 1               
+        b = (reg_len + 16) / 32
+        for offset in range(0, b):
+            if isInit:
+                feistel_l += [get_addr()]            
+            src1 = "0x%x" % feistel_l[count_l]
+            src2 = reg_str        
+            while count_l >= len(feistel_r):
+                feistel_r += [get_addr()]
+                feistel_r_bak += [get_addr()]
+            print "reg: %s, feistel_r: %d, count_l = %d" % (reg_str, len(feistel_r), count_l)
+            dest = "0x%x" % feistel_r[count_l]
+            feistel += [gen_feistel_cipher(src1, src2, dest, True, not (offset == 0))]
+            count_l += 1               
     return (setinput, feistel)         
 
 
 # ===-------------------------------------------------------------------===
-# Handle ouputs of an insn for simple aggregating  
+# For simple aggregating mode only. copy ouputs of an insn to somewhere else   
 # ===-------------------------------------------------------------------===
 def copy_mem_write(inst, op, i, isInit = False):
     out = []      
@@ -850,7 +941,7 @@ def copy_reg_write(inst, op, i, isInit = False):
     return ([], out)     
 
 # ===-------------------------------------------------------------------===
-# For each mem/reg operand, run function <hanlde> to handle it 
+# For each mem/reg operand, run function <hanlde_XXX> to handle it 
 # ===-------------------------------------------------------------------===
 def handle_op(inst, handle_mem, handle_reg, isInit):    
     setinput = []
@@ -1509,7 +1600,7 @@ class Gadget:
             setinput += s
             feistel += f
                         
-	    print "handle write"
+            print "handle write"
             (s, f) = handle_op(inst, handle_mem_write, handle_reg_write, isInit)
             setinput += s
             feistel += f
@@ -1520,8 +1611,8 @@ class Gadget:
    
             if isInit:
                 while len(feistel_l) < len(feistel_r):
-			feistel_l += [get_addr()]
-		print "L[%d], R[%d]" % (len(feistel_l), len(feistel_r))
+                    feistel_l += [get_addr()]
+                print "L[%d], R[%d]" % (len(feistel_l), len(feistel_r))
                 assert(len(feistel_l) == len(feistel_r))
             
             #backup
