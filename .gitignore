@@ -8,3 +8,5 @@ a.out
 *.core
 .project
 .paths
+emu
+instructions.tsv
