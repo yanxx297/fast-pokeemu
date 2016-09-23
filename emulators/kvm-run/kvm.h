@@ -28,6 +28,9 @@
 #error "Wrong API version"
 #endif
 
+#undef EXPECTED_KVM_API_VERSION
+#define EXPECTED_KVM_API_VERSION 2411
+
 #include "x86_cpustate.h"
 
 class KVM;

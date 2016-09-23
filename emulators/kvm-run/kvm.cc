@@ -41,7 +41,7 @@ char testcase_checksum[64];
 
 #define set_kvm_segment(dst, src) {  \
     dst.base = src.base;	     \
-    dst.limit = src.limit;	     \
+    dst.limit = src.limit;           \
     dst.selector = src.selector;     \
     dst.type = src.type;	     \
     dst.present = src.present;	     \
@@ -61,7 +61,7 @@ char testcase_checksum[64];
 
 #define get_kvm_segment(dst, src) {  \
     dst.base = src.base;	     \
-    dst.limit = src.limit;	     \
+    dst.limit = src.limit;           \
     dst.selector = src.selector;     \
     dst.type = src.type;	     \
     dst.present = src.present;	     \
@@ -91,7 +91,8 @@ VCPU::VCPU(KVM *k, int s) {
   r = ioctl(kvm->fd, KVM_GET_VCPU_MMAP_SIZE, 0);
   assert(r != -1);
 
-  run = (struct kvm_run *) mmap(NULL, r, PROT_READ|PROT_WRITE, MAP_SHARED, cpu_fd, 0);
+  run = (struct kvm_run *) mmap(NULL, r, PROT_READ|PROT_WRITE, MAP_SHARED, 
+				cpu_fd, 0);
   assert(run);
 
   exception = EXCEPTION_NONE;
@@ -166,7 +167,8 @@ void VCPU::GetMSRs(struct kvm_msr_entry *msrs, int *n) {
   struct kvm_msr_list *kmsrslist;
 
   // Get the list of available MSRS
-  kmsrslist = (struct kvm_msr_list*) malloc(sizeof(*kmsrslist) + MAX_MSRS*sizeof(__u32));
+  kmsrslist = (struct kvm_msr_list*) malloc(sizeof(*kmsrslist) + 
+					    MAX_MSRS*sizeof(__u32));
   assert(kmsrslist);
   kmsrslist->nmsrs = MAX_MSRS;
   i = ioctl(kvm->fd, KVM_GET_MSR_INDEX_LIST, kmsrslist);
@@ -373,7 +375,8 @@ void KVM::Init(int c, unsigned int len) {
   // XXX: what about the IO/APIC?
 
   // Allocate physical mem
-  ptr = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
+  ptr = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1,
+	     0);
   assert(ptr != MAP_FAILED);
 
   memset(ptr, 0, len);
@@ -561,19 +564,23 @@ void KVM::Save(const char *fname) {
   h.version = EXPECTED_VERSION;
   h.emulator = EMULATOR_KVM;
   if (getenv("KEMUFUZZER_KERNEL_VERSION")) {
-    strncpy(h.kernel_version, getenv("KEMUFUZZER_KERNEL_VERSION"), sizeof(h.kernel_version));
+    strncpy(h.kernel_version, getenv("KEMUFUZZER_KERNEL_VERSION"), 
+	    sizeof(h.kernel_version));
   } else {
     strncpy(h.kernel_version, kernel_version, sizeof(h.kernel_version));
   }
   if (getenv("KEMUFUZZER_KERNEL_CHECKSUM")) {
-    strncpy(h.kernel_checksum, getenv("KEMUFUZZER_KERNEL_CHECKSUM"), sizeof(h.kernel_checksum));
+    strncpy(h.kernel_checksum, getenv("KEMUFUZZER_KERNEL_CHECKSUM"), 
+	    sizeof(h.kernel_checksum));
   } else {
     strncpy(h.kernel_checksum, kernel_checksum, sizeof(h.kernel_checksum));
   }
   if (getenv("KEMUFUZZER_TESTCASE_CHECKSUM")) {
-    strncpy(h.testcase_checksum, getenv("KEMUFUZZER_TESTCASE_CHECKSUM"), sizeof(h.testcase_checksum));
+    strncpy(h.testcase_checksum, getenv("KEMUFUZZER_TESTCASE_CHECKSUM"), 
+	    sizeof(h.testcase_checksum));
   } else {
-    strncpy(h.testcase_checksum, testcase_checksum, sizeof(h.testcase_checksum));
+    strncpy(h.testcase_checksum, testcase_checksum, 
+	    sizeof(h.testcase_checksum));
   }
   h.type = state_type;
   h.mem_size = vm_mem_size;
@@ -678,7 +685,7 @@ void KVM::Print(FILE *f) {
 
     fprintf(f, "%s========================= CPU%d STATE =========================\n", i > 0 ? "\n" : "", i);
     fprintf(f, "RIP: %.16lx ", PAD64(kregs.rip));
-    vcpus[i]->Disasm((void *) (kregs.rip + ksregs.cs.base), f);
+    // vcpus[i]->Disasm((void *) (kregs.rip + ksregs.cs.base), f);
     fprintf(f, "\n");
     fprintf(f, "RSP: %.16lx RBP: %.16lx\n", PAD64(kregs.rsp), PAD64(kregs.rbp));
     fprintf(f, "RAX: %.16lx RBX: %.16lx\n", PAD64(kregs.rax), PAD64(kregs.rbx));
@@ -692,9 +699,7 @@ void KVM::Print(FILE *f) {
 	    PAD64(ksregs.ds.base + ksregs.ds.limit));
     fprintf(f, "========================== CONTROLS ==========================\n");
     fprintf(f, "CR0: %.16lx CR2: %.16lx\n", PAD64(ksregs.cr0), PAD64(ksregs.cr2));
-    fprintf(f, "CR3: %.16lx CR4: %.16lx\n", PAD64(ksregs.cr3), PAD64(ksregs.cr4));
-    fprintf(f, "==============================================================\n");
-    
+    fprintf(f, "CR3: %.16lx CR4: %.16lx\n", PAD64(ksregs.cr3), PAD64(ksregs.cr4));    
     fprintf(f, "============================ MSRS ============================\n");
     int n = sizeof(MSRs_to_save)/sizeof(int);
     for (int j = 0; j < n; j++) {
@@ -713,7 +718,7 @@ void KVM::Print(FILE *f) {
 #define GET32H(x) ((unsigned int) (((__u64) (x) >> 32) & 0xffffffff))
 #define GET32L(x) ((unsigned int) ((__u64) (x) & 0xffffffff))
 
-void dump_dummy_state(char *fname) {
+void dump_dummy_state(char *fname, int type = 0x41) {
   file f;
   cpu_state_t s;
   header_t h;
@@ -730,21 +735,25 @@ void dump_dummy_state(char *fname) {
   h.version = EXPECTED_VERSION;
   h.emulator = EMULATOR_KVM;
   if (getenv("KEMUFUZZER_KERNEL_VERSION")) {
-    strncpy(h.kernel_version, getenv("KEMUFUZZER_KERNEL_VERSION"), sizeof(h.kernel_version));
+    strncpy(h.kernel_version, getenv("KEMUFUZZER_KERNEL_VERSION"), 
+	    sizeof(h.kernel_version));
   } else {
     strncpy(h.kernel_version, kernel_version, sizeof(h.kernel_version));
   }
   if (getenv("KEMUFUZZER_KERNEL_CHECKSUM")) {
-    strncpy(h.kernel_checksum, getenv("KEMUFUZZER_KERNEL_CHECKSUM"), sizeof(h.kernel_checksum));
+    strncpy(h.kernel_checksum, getenv("KEMUFUZZER_KERNEL_CHECKSUM"), 
+	    sizeof(h.kernel_checksum));
   } else {
     strncpy(h.kernel_checksum, kernel_checksum, sizeof(h.kernel_checksum));
   }
   if (getenv("KEMUFUZZER_TESTCASE_CHECKSUM")) {
-    strncpy(h.testcase_checksum, getenv("KEMUFUZZER_TESTCASE_CHECKSUM"), sizeof(h.testcase_checksum));
+    strncpy(h.testcase_checksum, getenv("KEMUFUZZER_TESTCASE_CHECKSUM"), 
+	    sizeof(h.testcase_checksum));
   } else {
-    strncpy(h.testcase_checksum, testcase_checksum, sizeof(h.testcase_checksum));
+    strncpy(h.testcase_checksum, testcase_checksum, 
+	    sizeof(h.testcase_checksum));
   }
-  h.type = (type_t) (POST_TESTCASE | IO_TESTCASE);
+  h.type = (type_t) type;
   h.mem_size = 0;
   h.cpusno = 0;
   h.ioports[0] = 0;
@@ -760,7 +769,6 @@ int main(int argc, char **argv) {
   struct kvm_sregs sregs;
   struct kvm_run *run;
   int r;
-  uint8_t e[8];
   char tempfile[PATH_MAX];
 
   if (argc != 3 && argc != 2) {
@@ -769,32 +777,16 @@ int main(int argc, char **argv) {
   }
 
   vm = new KVM(argv[1]);
-
   vm->Print(stdout);
   printf("\n\n");
 
   do {
     run = vm->Cpu()->Run();
 
-    if (run->exit_reason == KVM_EXIT_IO && 
-	run->io.direction == KVM_EXIT_IO_OUT && 
-	(run->io.port == vm->GetIoPort(1))) {
-      vm->Cpu()->GetRegs(&regs);
-      vm->Cpu()->GetSregs(&sregs);
-      vm->Cpu()->GetMem((void *) (sregs.cs.base + regs.rip - 2), 8, e);
+    if (run->exit_reason == KVM_EXIT_HLT) {
+      printf("## CPU halted\n");
 
-      // Sanity check (out %al,$0xef or out %al,$0xee) 
-      assert(e[0] == 0xe6 && e[1] == vm->GetIoPort(1));
-
-      // Adjust the instruction pointer to point before the out
-      regs.rip -= 2;
-      vm->Cpu()->SetRegs(&regs);
-
-      // The exception number is located 2 bytes after the out (a jump is used to
-      // skip the code)
-      vm->Cpu()->SetException(*((uint16_t *) (e + 4)));
-      printf("Execution terminated: %x (exception %x)\n", run->io.port, 
-	     *((uint16_t *) (e + 4)));
+      vm->Cpu()->SetException(EXCEPTION_NONE);
 
       if (argc == 3) {
 	vm->SetStateType(POST_TESTCASE);
@@ -803,7 +795,30 @@ int main(int argc, char **argv) {
 	vm->Save(tempfile);
 	rename(tempfile, argv[2]);
       }
+
       r = 0;
+      break;
+    } else if (run->exit_reason == KVM_EXIT_EXCEPTION) {
+      printf("## Exception (no:%x code:%x)\n", run->ex.exception, 
+	     run->ex.error_code);
+
+      vm->Cpu()->SetException(run->ex.exception);
+
+
+      if (argc == 3) {
+	vm->SetStateType(POST_TESTCASE);
+	strncpy(tempfile, "/tmp/kemufuzzer-kvm-XXXXXX", PATH_MAX - 1);
+	mkstemp(tempfile);
+	vm->Save(tempfile);
+	rename(tempfile, argv[2]);
+      }
+
+      r = 0; 
+      break;
+    } else if (run->exit_reason == KVM_EXIT_SHUTDOWN) {
+      printf("## Triple fault!\n");
+
+      exit(1);
     } else if (run->exit_reason == KVM_EXIT_UNKNOWN) {
       uint32_t hw_exit;
       hw_exit = (uint32_t) (run->hw.hardware_exit_reason & 0xFFFF);
@@ -822,26 +837,47 @@ int main(int argc, char **argv) {
 	break;
       default:
 	// VMentry error
-	printf("Failed to launch/resume VM -- error:%d "
+	printf("## Failed to launch/resume VM -- error:%d "
 	       "(see intel manual 3b - appendix i)\n", hw_exit);
-	r = 0;
-	break;
+
+	exit(1);
       }
     } else if (run->exit_reason == KVM_EXIT_IO ||
 	       run->exit_reason == KVM_EXIT_MMIO) {
-      printf("I/O, terminating execution\n");
+
+      printf("## I/O, terminating execution\n");
+
       if (argc == 3) {
 	strncpy(tempfile, "/tmp/kemufuzzer-kvm-XXXXXX", PATH_MAX - 1);
 	mkstemp(tempfile);
 	dump_dummy_state(tempfile);
 	rename(tempfile, argv[2]);
       }
+
+      r = 0;
+      break;
+    } else if (run->exit_reason == KVM_EXIT_FAIL_ENTRY) {
+      uint32_t hw_exit;
+      hw_exit = (uint32_t) (run->hw.hardware_exit_reason & 0xFFFF);
+      printf("## Unable to enter (reason:0x%x)\n", hw_exit);
+
       r = 0;
       break;
     } else {
-      printf("Unexpected exit (%d %d)\n", run->exit_reason, run->hw.hardware_exit_reason);
+      printf("## Unexpected exit (%d %d)\n", run->exit_reason, 
+	     run->hw.hardware_exit_reason);
+
+      if (argc == 3) {
+	strncpy(tempfile, "/tmp/kemufuzzer-kvm-XXXXXX", PATH_MAX - 1);
+	mkstemp(tempfile);
+	dump_dummy_state(tempfile, (POST_TESTCASE | CRASH_TESTCASE));
+	rename(tempfile, argv[2]);
+      }
+
       r = 0;
+      break;
     }
+
   } while (r);
 
   printf("\n\n");
