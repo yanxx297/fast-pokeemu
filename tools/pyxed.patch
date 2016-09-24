@@ -1,0 +1,23 @@
+diff --git a/Makefile b/Makefile
+index 1873d23..4e03eaa 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,8 @@
+ PYTHON27_HEADERS=$(shell python2.7-config --includes)
+ PYTHON27_LIBS=$(shell python2.7-config --libs)
+ 
+-XED_PREFIX=pin-2.14/extras/xed-ia32
++XED_PREFIX=$(shell pwd)/kits/xed-install-base-2015-09-10-lin-x86-64
++# XED_PREFIX=pin-2.14/extras/xed-ia32
+ # XED_PREFIX=pin-2.14-71313-clang.5.1-mac/extras/xed-ia32
+ # XED_PREFIX=pin-2.14-71313-clang.5.1-mac/extras/xed-intel64
+ # XED_PREFIX=pin-2.14-71313-gcc.4.4.7-linux/extras/xed-ia32
+@@ -17,7 +18,7 @@ W=-Wall -Wextra \
+     -Wno-strict-aliasing
+ 
+ CFLAGS=-fPIC -O2 $(PYTHON27_HEADERS) -I$(XED_HEADERS) $(W) -ggdb
+-LDFLAGS=$(PYTHON27_LIBS) -lpython2.7 -L$(XED_LIBS) -lxed -shared
++LDFLAGS=$(PYTHON27_LIBS) -lpython2.7 -L$(XED_LIBS) -Wl,-rpath=$(XED_LIBS) -lxed -shared
+ 
+ OBJS=check.o rflags.o operand.o instruction.o decoder.o encoder.o pyxed.o
+ BIN=pyxed.so

@@ -1,11 +1,16 @@
 COMPILE 
 -------
-1 Compile tools/fuzzball
-2 Download z3-2.15 from http://research.microsoft.com/en-us/um/redmond/projects/z3/z3-x64-2.15.tar.gz and build it according to z3/ocaml/README. 
-3 Add "Z3_OP_FD_LE," to z3/include/z3_api.h, one line after "Z3_OP_FD_LT,"
-4 Compile tools/emuFuzzBall
-
-
+1 Compile tools/fuzzball (c.f. its "INSTALL")
+2 Download z3-2.15 from http://research.microsoft.com/en-us/um/redmond/projects/z3/z3-x64-2.15.tar.gz
+  add "Z3_OP_FD_LE," to z3/include/z3_api.h, one line after "Z3_OP_FD_LT,"
+  build the OCaml interface according to z3/ocaml/README.
+3 Compile tools/emuFuzzBall with "make"
+4 git clone https://github.com/huku-/pyxed.git to tools/pyxed
+  Download XED from https://software.intel.com/en-us/articles/xed-x86-encoder-decoder-software-library
+    for instance "xed-install-base-2015-09-10-lin-x86-64.zip"
+  apply pyxed.patch to the Makefile, i.e.
+    cd tools/pyxedl patch -p1 <../pyxed.patch
+  compile with "make"
 
 INSTRUCTION EXPLORING
 ---------------------
