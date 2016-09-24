@@ -103,7 +103,7 @@ def run_testcase(outdir, code, path, script, floppy, timeout, tmp):
 
 
 if __name__ == "__main__":
-    opts = {"testcase" : None, "outdir" : None, "script" : None, "timeout" : 10, "mode": 0, "tmp": None}
+    opts = {"testcase" : None, "outdir" : None, "script" : None, "timeout" : 10, "mode": 0, "tmp": ""}
 
     for arg in sys.argv[1:]:
         a = arg.split(":")

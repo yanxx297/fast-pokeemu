@@ -24,11 +24,13 @@ from common import *
 import binascii
 # from cups import Dest
 # from scipy.special.basic import pbdn_seq
-from statsmodels.regression.tests.test_quantile_regression import idx
+#from statsmodels.regression.tests.test_quantile_regression import idx
 import code
 # from sympy.galgebra.printing import prog_str
 
 sys.path.append("../tools/pyxed")
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "..", "tools", "pyxed"))
 import pyxed
 
 
