@@ -1,6 +1,6 @@
-diff -Naur qemu-0.12.4+dfsg/configure qemu-0.12.4+dfsg-kemufuzzer/configure
---- qemu-0.12.4+dfsg/configure	2010-07-07 12:02:44.317616421 +0200
-+++ qemu-0.12.4+dfsg-kemufuzzer/configure	2010-07-07 12:02:26.225117406 +0200
+diff -Nur qemu-0.12.4+dfsg/configure qemu-0.12.4+dfsg-kemufuzzer/configure
+--- qemu-0.12.4+dfsg/configure	2010-05-04 10:27:48.000000000 -0500
++++ qemu-0.12.4+dfsg-kemufuzzer/configure	2016-09-28 16:38:41.928758426 -0500
 @@ -257,6 +257,7 @@
  check_utests="no"
  user_pie="no"
@@ -54,9 +54,9 @@ diff -Naur qemu-0.12.4+dfsg/configure qemu-0.12.4+dfsg-kemufuzzer/configure
  # XXX: suppress that
  if [ "$bsd" = "yes" ] ; then
    echo "CONFIG_BSD=y" >> $config_host_mak
-diff -Naur qemu-0.12.4+dfsg/cpu-exec.c qemu-0.12.4+dfsg-kemufuzzer/cpu-exec.c
---- qemu-0.12.4+dfsg/cpu-exec.c	2010-07-07 12:02:44.337616800 +0200
-+++ qemu-0.12.4+dfsg-kemufuzzer/cpu-exec.c	2010-07-07 12:02:26.245153719 +0200
+diff -Nur qemu-0.12.4+dfsg/cpu-exec.c qemu-0.12.4+dfsg-kemufuzzer/cpu-exec.c
+--- qemu-0.12.4+dfsg/cpu-exec.c	2010-05-04 10:27:48.000000000 -0500
++++ qemu-0.12.4+dfsg-kemufuzzer/cpu-exec.c	2016-09-28 16:38:42.568768506 -0500
 @@ -44,6 +44,10 @@
  #define env cpu_single_env
  #endif
@@ -79,10 +79,55 @@ diff -Naur qemu-0.12.4+dfsg/cpu-exec.c qemu-0.12.4+dfsg-kemufuzzer/cpu-exec.c
      if (cpu_halted(env1) == EXCP_HALTED)
          return EXCP_HALTED;
  
-diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.c
---- qemu-0.12.4+dfsg/kemufuzzer.c	1970-01-01 01:00:00.000000000 +0100
-+++ qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.c	2010-07-07 12:02:26.252617662 +0200
-@@ -0,0 +1,694 @@
+@@ -266,6 +274,10 @@
+                     env = cpu_single_env;
+ #define env cpu_single_env
+ #endif
++           if (env->exception_index == EXCP_HLT) {
++                    kemufuzzer_hlt();
++            }
++
+             env->current_tb = NULL;
+             /* if an exception is pending, we execute it here */
+             if (env->exception_index >= 0) {
+@@ -292,13 +304,17 @@
+                     break;
+ #else
+ #if defined(TARGET_I386)
+-                    /* simulate a real cpu exception. On i386, it can
+-                       trigger new exceptions, but we do not handle
+-                       double or triple faults yet. */
+-                    do_interrupt(env->exception_index,
+-                                 env->exception_is_int,
+-                                 env->error_code,
+-                                 env->exception_next_eip, 0);
++		    kemufuzzer_exception(env->exception_index, 
++					 env->exception_next_eip);
++		      
++		      /* simulate a real cpu exception. On i386, it can
++			 trigger new exceptions, but we do not handle
++			 double or triple faults yet. */
++		      do_interrupt(env->exception_index,
++				   env->exception_is_int,
++				   env->error_code,
++				   env->exception_next_eip, 0);
++
+                     /* successfully delivered */
+                     env->old_exception = -1;
+ #elif defined(TARGET_PPC)
+@@ -333,7 +349,7 @@
+             next_tb = 0; /* force lookup of first TB */
+             for(;;) {
+                 interrupt_request = env->interrupt_request;
+-                if (unlikely(interrupt_request)) {
++                if (unlikely(interrupt_request) && !kemufuzzer_state.signalled) {
+                     if (unlikely(env->singlestep_enabled & SSTEP_NOIRQ)) {
+                         /* Mask out external interrupts for this step. */
+                         interrupt_request &= ~(CPU_INTERRUPT_HARD |
+diff -Nur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.c
+--- qemu-0.12.4+dfsg/kemufuzzer.c	1969-12-31 18:00:00.000000000 -0600
++++ qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.c	2016-09-28 16:38:42.056760442 -0500
+@@ -0,0 +1,568 @@
 +#include <stdlib.h>
 +#include <string.h>
 +#include <assert.h>
@@ -117,12 +162,9 @@ diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.
 +void fxsave_(uint8_t *);
 +void fxrstor_(uint8_t *);
 +void kemufuzzer_save(int, unsigned int, int);
-+void kemufuzzer_load(void);
 +void kemufuzzer_sigusr2_handler(int);
 +void kemufuzzer_init(CPUState*);
-+void kemufuzzer_ioport_start(void *opaque, uint32_t addr, uint32_t val);
-+void kemufuzzer_ioport_stop(void *opaque, uint32_t addr, uint32_t val);
-+void kemufuzzer_ioport_interrupt(void *opaque, uint32_t addr, uint32_t val);
++void kemufuzzer_exception(int, target_ulong, int);
 +uint64_t kemufuzzer_rdmsr(uint32_t index);
 +void kemufuzzer_wrmsr(uint32_t index, uint64_t val);
 +
@@ -134,13 +176,14 @@ diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.
 +
 +#define kenv (kemufuzzer_state.env)
 +
++
 +#define get_qemu_segment(dst, src) {			\
 +    dst.base = src.base;				\
 +    dst.limit = src.limit;				\
 +    dst.selector = src.selector;			\
 +    dst.type = (src.flags >> DESC_TYPE_SHIFT) & 15;	\
 +    dst.present = (src.flags & DESC_P_MASK) != 0;	\
-+    dst.dpl = src.selector & 3;				\
++    dst.dpl = (src.flags >> DESC_DPL_SHIFT) & 3;	\
 +    dst.db = (src.flags >> DESC_B_SHIFT) & 1;		\
 +    dst.s = (src.flags & DESC_S_MASK) != 0;		\
 +    dst.l = (src.flags >> DESC_L_SHIFT) & 1;		\
@@ -302,6 +345,7 @@ diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.
 +  }
 +}
 +
++
 +void kemufuzzer_save(int t, unsigned int eip, int e) {
 +  header_t h;
 +  cpu_state_t s;
@@ -309,7 +353,6 @@ diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.
 +  file f;
 +  int r, i;
 +  unsigned char tmp[1024];
-+  target_ulong saved_dr7;
 +  CPUX86State *original_env;
 +
 +  /* We have to backup the original 'env' global and replace it with
@@ -329,7 +372,9 @@ diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.
 +  assert(getenv("KEMUFUZZER_TESTCASE_CHECKSUM"));
 +
 +  strncpy(tempfile, "/tmp/kemufuzzer-XXXXXX", PATH_MAX - 1);
-+  strncpy(outfile, !t ? getenv("KEMUFUZZER_PRE_STATE") : getenv("KEMUFUZZER_POST_STATE"), PATH_MAX - 1);
++  strncpy(outfile, !t ?
++	  getenv("KEMUFUZZER_PRE_STATE") : getenv("KEMUFUZZER_POST_STATE"), 
++	  PATH_MAX - 1);
 +
 +  mkstemp(tempfile);
 +  f = fopen(tempfile, "w");
@@ -367,13 +412,15 @@ diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.
 +
 +  s.regs_state.rip = eip;
 +
-+  printf("RIP: %.16lx ", PAD64(eip));
++  printf("RIP: %.16lx\n", PAD64(eip));
++#if 0
 +  r = cpu_memory_rw_debug(kenv, eip, tmp, 8, 0);
 +  assert(r == 0);
 +  for (r = 0; r < 8; r++) {
 +    printf("\\x%.2x", tmp[r]);
 +  }
 +  printf("\n");
++#endif
 +  printf("RSP: %.16lx\n", PAD64(kenv->regs[R_ESP]));
 +  printf("RSI: %.16lx\n", PAD64(kenv->regs[R_ESI]));
 +
@@ -388,12 +435,6 @@ diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.
 +  s.sregs_state.dr3 = kenv->dr[3];
 +  s.sregs_state.dr6 = kenv->dr[6];
 +  s.sregs_state.dr7 = kenv->dr[7];
-+
-+  // The DR7 register should have been pushed on the top of the stack -- verify
-+  // this assumption
-+  cpu_physical_memory_rw(kenv->regs[R_ESP]+kenv->segs[R_SS].base, 
-+			 (uint8_t*) &saved_dr7, sizeof(kenv->dr[7]), 0);
-+  assert(kenv->dr[7] == saved_dr7);
 +
 +  get_qemu_segment(s.sregs_state.cs, kenv->segs[R_CS]);
 +  get_qemu_segment(s.sregs_state.ds, kenv->segs[R_DS]);
@@ -444,105 +485,6 @@ diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.
 +
 +  /* Restore original CPU environment */
 +  env = original_env;
-+}
-+
-+void kemufuzzer_load(void)
-+{
-+  unsigned int r, i;
-+  char *fname;
-+  header_t h;
-+  cpu_state_t s;
-+  file f;
-+  unsigned char tmp[1024];
-+
-+  fname = getenv("KEMUFUZZER_INPUT_STATE");
-+  if (!fname) {
-+    printf("No initial environment state\n");
-+    return;
-+  }
-+
-+  // Load state from disk
-+  f = fopen(fname, "r");
-+  assert(f);
-+
-+  r = fread(f, &h, sizeof(h));
-+  assert(r == sizeof(h));
-+
-+  // Sanity checks
-+  assert(h.magic == EXPECTED_MAGIC);
-+  assert(h.version == EXPECTED_VERSION);
-+  assert(h.cpusno == 1);
-+  assert(h.mem_size == ram_size);
-+
-+  r = fread(f, &s, sizeof(s));
-+  assert(r == sizeof(s));
-+
-+  // Load registers
-+  kenv->regs[R_EAX] = s.regs_state.rax;
-+  kenv->regs[R_EBX] = s.regs_state.rbx;
-+  kenv->regs[R_ECX] = s.regs_state.rcx;
-+  kenv->regs[R_EDX]= s.regs_state.rdx;
-+  kenv->regs[R_ESI]= s.regs_state.rsi;
-+  kenv->regs[R_EDI]= s.regs_state.rdi;
-+  kenv->regs[R_ESP]= s.regs_state.rsp;
-+  kenv->regs[R_EBP]= s.regs_state.rbp;
-+  /* Do not load RIP */
-+
-+  kenv->eflags = s.regs_state.rflags;
-+
-+#if 0
-+  kenv->regs[8]  = s.regs_state.r8;
-+  kenv->regs[9]  = s.regs_state.r9;
-+  kenv->regs[10] = s.regs_state.r10;
-+  kenv->regs[11] = s.regs_state.r11;
-+  kenv->regs[12] = s.regs_state.r12;
-+  kenv->regs[13] = s.regs_state.r13;
-+  kenv->regs[14] = s.regs_state.r14;
-+  kenv->regs[15] = s.regs_state.r15;
-+#endif
-+
-+  // Load Sregisters
-+  set_qemu_segment(kenv->segs[R_CS], s.sregs_state.cs);
-+  set_qemu_segment(kenv->segs[R_DS], s.sregs_state.ds);
-+  set_qemu_segment(kenv->segs[R_ES], s.sregs_state.es);
-+  set_qemu_segment(kenv->segs[R_FS], s.sregs_state.fs);
-+  set_qemu_segment(kenv->segs[R_GS], s.sregs_state.gs);
-+  set_qemu_segment(kenv->segs[R_SS], s.sregs_state.ss);
-+
-+  set_qemu_segment(kenv->tr,  s.sregs_state.tr);
-+  set_qemu_segment(kenv->ldt, s.sregs_state.ldt);
-+
-+  set_qemu_table(kenv->idt, s.sregs_state.idtr);
-+  set_qemu_table(kenv->gdt, s.sregs_state.gdtr);
-+
-+  kenv->cr[0] = s.sregs_state.cr0;
-+  kenv->cr[2] = s.sregs_state.cr2;
-+  kenv->cr[3] = s.sregs_state.cr3;
-+  kenv->cr[4] = s.sregs_state.cr4;
-+
-+  kenv->dr[0] = s.sregs_state.dr0;
-+  kenv->dr[1] = s.sregs_state.dr1;
-+  kenv->dr[2] = s.sregs_state.dr2;
-+  kenv->dr[3] = s.sregs_state.dr3;
-+
-+  kenv->efer  = s.sregs_state.efer;
-+
-+  // Load fpu
-+  fxrstor_((uint8_t *) &s.fpu_state);
-+
-+  // Load msrs
-+  for (r=0; r<s.msrs_state.n; r++) {
-+    kemufuzzer_wrmsr(s.msrs_state.msr_regs[r].idx, s.msrs_state.msr_regs[r].val);
-+  }
-+
-+  // Load mem state
-+  for (i = 0; i < h.mem_size; i += sizeof(tmp)) {
-+    r = fread(f, &tmp, sizeof(tmp));
-+    assert(r == sizeof(tmp));
-+    cpu_physical_memory_rw(i, tmp, sizeof(tmp), 1);
-+  }
-+
-+  fclose(f);
 +}
 +
 +uint64_t kemufuzzer_rdmsr(uint32_t index)
@@ -713,56 +655,37 @@ diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.
 +  }
 +}
 +
-+void kemufuzzer_ioport_start(void *opaque, uint32_t addr, uint32_t val)
-+{
-+  unsigned char e[3];
-+  int r;
 +
-+  assert(kenv);
++void kemufuzzer_exception(int e, target_ulong nexteip, int isint) {
++  if (e == KEMUFUZZER_HYPERCALL_START_TESTCASE || kemufuzzer_state.signalled)
++    printf("Exception %x @ %.8x\n", e, nexteip);
 +
-+  printf("**** TESTCASE STARTED **** addr: %.8x, val: %.8x, eip: %.8x\n", addr, val, kenv->eip + 2);
-+
-+  // eip = eip + cs_base because testcases are executed in separate tasks
-+  r = cpu_memory_rw_debug(kenv, kenv->eip + kenv->segs[R_CS].base, e, 2, 0);
-+  assert(r == 0);
-+  assert(e[0] == 0xe6 && e[1] == KEMUFUZZER_HYPERCALL_START_TESTCASE);
-+
-+  /* Enable tracing */
-+  kemufuzzer_state.signalled = 0;
-+  // cpu_single_step(kenv, 1);
-+
-+  /* Restore initial state */
-+  kemufuzzer_load();
-+
-+  /* Dump current state */
-+  kemufuzzer_save(KEMUFUZZER_PRE_STATE, kenv->eip + 2, EXCEPTION_NONE);
++  if (kemufuzzer_state.signalled == 0 && 
++      e == KEMUFUZZER_HYPERCALL_START_TESTCASE) {
++    // Dump the state
++    kemufuzzer_save(KEMUFUZZER_PRE_STATE, nexteip, EXCEPTION_NONE);
++    kemufuzzer_state.signalled = 1;
++    // Force QEMU to ignore the interrupt
++    kenv->eip = nexteip;
++    kenv->old_exception = -1;
++    kenv->exception_index = -1;
++    longjmp(kenv->jmp_env, 1);
++  } else if (!isint && kemufuzzer_state.signalled >= 1) {
++    kemufuzzer_save(KEMUFUZZER_POST_STATE, kenv->eip, e);
++    exit(0);
++  }
 +}
 +
 +
-+void kemufuzzer_ioport_stop(void *opaque, uint32_t addr, uint32_t val)
-+{
-+  unsigned char e[8];
-+  int r;
-+
-+  if (kemufuzzer_state.signalled)
-+    return;
-+
-+  // eip = eip + cs_base because testcases are executed in separate tasks
-+  r = cpu_memory_rw_debug(kenv, kenv->eip + kenv->segs[R_CS].base, e, 8, 0);
-+  assert(r == 0);
-+  assert(e[0] == 0xe6 && e[1] == KEMUFUZZER_HYPERCALL_STOP_TESTCASE);
-+  printf("**** TESTCASE COMPLETED (INTERRUPT) **** eip: %.8x exc: %x\n", kenv->eip, *((uint16_t *) (e + 4)));
-+
-+  /* Disable tracing */
-+  kemufuzzer_state.signalled = 1;
-+
-+  /* Dump current state */
-+  kemufuzzer_save(KEMUFUZZER_POST_STATE, kenv->eip, *((uint16_t *) (e + 4)));
++void kemufuzzer_hlt() {
++  if (kemufuzzer_state.signalled >= 1) {
++	  printf("CPU HALTED\n");
++	  kemufuzzer_save(KEMUFUZZER_POST_STATE, kenv->eip - 1, EXCEPTION_NONE);
++	  exit(0);
++}
 +}
 +
-+
-+void kemufuzzer_init(CPUState *e)
-+{
++void kemufuzzer_init(CPUState *e) {
 +  if (kemufuzzer_state.initialized) {
 +    /* Already initialized */
 +    return;
@@ -770,21 +693,69 @@ diff -Naur qemu-0.12.4+dfsg/kemufuzzer.c qemu-0.12.4+dfsg-kemufuzzer/kemufuzzer.
 +
 +  kenv = e;
 +  kemufuzzer_state.initialized = 1;
-+
-+  /* Register our fake I/O port */
-+  register_ioport_write(KEMUFUZZER_HYPERCALL_START_TESTCASE, 1, 1, kemufuzzer_ioport_start, NULL);
-+  register_ioport_write(KEMUFUZZER_HYPERCALL_STOP_TESTCASE, 1, 1, kemufuzzer_ioport_stop, NULL);
 +}
 +
 +#undef kenv
-diff -Naur qemu-0.12.4+dfsg/README.KEmuFuzzer qemu-0.12.4+dfsg-kemufuzzer/README.KEmuFuzzer
---- qemu-0.12.4+dfsg/README.KEmuFuzzer	1970-01-01 01:00:00.000000000 +0100
-+++ qemu-0.12.4+dfsg-kemufuzzer/README.KEmuFuzzer	2010-07-07 12:02:26.217117067 +0200
+diff -Nur qemu-0.12.4+dfsg/README.KEmuFuzzer qemu-0.12.4+dfsg-kemufuzzer/README.KEmuFuzzer
+--- qemu-0.12.4+dfsg/README.KEmuFuzzer	1969-12-31 18:00:00.000000000 -0600
++++ qemu-0.12.4+dfsg-kemufuzzer/README.KEmuFuzzer	2016-09-28 16:38:42.540768065 -0500
 @@ -0,0 +1 @@
 +./configure --disable-linux-user --disable-darwin-user --target-list=i386-softmmu --enable-kemufuzzer --disable-kvm
-diff -Naur qemu-0.12.4+dfsg/x86_cpustate.h qemu-0.12.4+dfsg-kemufuzzer/x86_cpustate.h
---- qemu-0.12.4+dfsg/x86_cpustate.h	1970-01-01 01:00:00.000000000 +0100
-+++ qemu-0.12.4+dfsg-kemufuzzer/x86_cpustate.h	2010-07-07 12:02:26.204956982 +0200
+diff -Nur qemu-0.12.4+dfsg/run-testcase qemu-0.12.4+dfsg-kemufuzzer/run-testcase
+--- qemu-0.12.4+dfsg/run-testcase	1969-12-31 18:00:00.000000000 -0600
++++ qemu-0.12.4+dfsg-kemufuzzer/run-testcase	2016-09-28 16:38:42.092761009 -0500
+@@ -0,0 +1,37 @@
++#!/bin/bash
++
++here=$(readlink -f $0)
++here=$(dirname "$0")
++floppy="$1"
++out="$2"
++
++if [ "$floppy" = "" -o "$out" = "" ]
++then
++    echo "Invalid argument(s)"
++    exit 1
++fi
++
++echo "#######################################################################################"
++echo ""
++
++md5=$(mtype -i "$floppy" "::kernel.md5")
++pre="$out.pre"
++post=$(mktemp)
++
++
++export KEMUFUZZER_KERNEL_VERSION="prot + pag"
++export KEMUFUZZER_KERNEL_CHECKSUM="$md5"
++export KEMUFUZZER_PRE_STATE="$pre"
++export KEMUFUZZER_POST_STATE="$post"
++export KEMUFUZZER_TESTCASE_CHECKSUM="no checksum"
++
++$here/i386-softmmu/qemu -m 4 -fda "$floppy" -nographic $3
++ret=$?
++if [ $ret -eq 0 ]
++then
++    # mv "$pre" "$out.pre"
++    mv "$post" "$out.post"
++fi
++
++rm -f "$bochsrc" "$post"
++exit $ret
+diff -Nur qemu-0.12.4+dfsg/target-i386/op_helper.c qemu-0.12.4+dfsg-kemufuzzer/target-i386/op_helper.c
+--- qemu-0.12.4+dfsg/target-i386/op_helper.c	2010-05-04 10:27:48.000000000 -0500
++++ qemu-0.12.4+dfsg-kemufuzzer/target-i386/op_helper.c	2016-09-28 16:38:42.020759875 -0500
+@@ -1325,6 +1325,7 @@
+ static void QEMU_NORETURN raise_interrupt(int intno, int is_int, int error_code,
+                                           int next_eip_addend)
+ {
++
+     if (!is_int) {
+         helper_svm_check_intercept_param(SVM_EXIT_EXCP_BASE + intno, error_code);
+         intno = check_exception(intno, &error_code);
+diff -Nur qemu-0.12.4+dfsg/x86_cpustate.h qemu-0.12.4+dfsg-kemufuzzer/x86_cpustate.h
+--- qemu-0.12.4+dfsg/x86_cpustate.h	1969-12-31 18:00:00.000000000 -0600
++++ qemu-0.12.4+dfsg-kemufuzzer/x86_cpustate.h	2016-09-28 16:38:42.092761009 -0500
 @@ -0,0 +1,183 @@
 +// This file is part of KEmuFuzzer.
 +// 
@@ -807,8 +778,8 @@ diff -Naur qemu-0.12.4+dfsg/x86_cpustate.h qemu-0.12.4+dfsg-kemufuzzer/x86_cpust
 +#include <stdint.h>
 +#include "x86.h"
 +
-+#define KEMUFUZZER_HYPERCALL_START_TESTCASE  0x23
-+#define KEMUFUZZER_HYPERCALL_STOP_TESTCASE   0x45
++#define KEMUFUZZER_HYPERCALL_START_TESTCASE  0x1e
++#define KEMUFUZZER_HYPERCALL_STOP_TESTCASE   0x1f
 +
 +#define EXPECTED_MAGIC    0xEFEF
 +#define EXPECTED_VERSION  0x0001
@@ -969,9 +940,9 @@ diff -Naur qemu-0.12.4+dfsg/x86_cpustate.h qemu-0.12.4+dfsg-kemufuzzer/x86_cpust
 +#endif
 +
 +#endif
-diff -Naur qemu-0.12.4+dfsg/x86.h qemu-0.12.4+dfsg-kemufuzzer/x86.h
---- qemu-0.12.4+dfsg/x86.h	1970-01-01 01:00:00.000000000 +0100
-+++ qemu-0.12.4+dfsg-kemufuzzer/x86.h	2010-07-07 12:02:26.252617662 +0200
+diff -Nur qemu-0.12.4+dfsg/x86.h qemu-0.12.4+dfsg-kemufuzzer/x86.h
+--- qemu-0.12.4+dfsg/x86.h	1969-12-31 18:00:00.000000000 -0600
++++ qemu-0.12.4+dfsg-kemufuzzer/x86.h	2016-09-28 16:38:42.108761260 -0500
 @@ -0,0 +1,93 @@
 +// This file is part of KEmuFuzzer.
 +// 
