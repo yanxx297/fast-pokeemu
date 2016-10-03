@@ -3,6 +3,8 @@
 my $node;
 my $last_dir;
 
+my $vcg = 0;
+
 # Describing what the branch at a given branch is doing is not so easy
 # to automate, of course. Because this indexing is based on a
 # particular binary, it's unfonrtunately not very reusable. This list
@@ -86,12 +88,19 @@ my %addr_desc =
 
 sub describe_node {
     my($addr) = @_;
-    if (exists $addr_desc{$addr}) {
-	return qq/"$addr_desc{$addr}"/;
+    if ($addr eq "start") {
+	return "(start)";
+    } elsif ($addr eq "end") {
+	return "(end)";
+    } elsif (exists $addr_desc{$addr}) {
+	return $addr_desc{$addr};
     } else {
-	return qq/"$addr"/;
+	return $addr;
     }
 }
+
+my %vcg_nodes;
+my %vcg_edges;
 
 my %seen_edges;
 sub maybe_edge {
@@ -102,13 +111,21 @@ sub maybe_edge {
     if ($seen_edges{$s}++ == 0) {
 	my $from_d = describe_node($from);
 	my $to_d = describe_node($to);
-	print qq/    $from_d -> $to_d [label="$last_dir"]\n/;
+	if ($vcg) {
+	    $vcg_nodes{$from} = $from_d;
+	    $vcg_nodes{$to} = $to_d;
+	    $vcg_edges{"$from $to $last_dir"} = 1;
+	} else {
+	    print qq/    "$from_d" -> "$to_d" [label="$last_dir"]\n/;
+	}
     }
 }
 
 my %addr_count;
 
-print "digraph G {\n";
+if (!$vcg) {
+    print "digraph G {\n";
+}
 
 while (<>) {
     if (/^Symbolic branch condition \((0x.*?)\)/ or
@@ -130,11 +147,24 @@ while (<>) {
 	my $val = $1;
 	$last_dir = $1;
     } elsif (/^Iteration (\d+):/) {
-	maybe_edge($node, "(end)") if $1 > 1;
-	$node = "(start)";
+	maybe_edge($node, "end") if $1 > 1;
+	$node = "start";
 	%addr_count = ();
     }
 }
-maybe_edge($node, "(end)");
+maybe_edge($node, "end");
+
+if ($vcg) {
+    print "graph: {\n";
+
+    for my $n (keys %vcg_nodes) {
+	my $l = $vcg_nodes{$n};
+	print qq/node: { title: "n$n" label: "$l" }\n/;
+    }
+    for my $e (keys %vcg_edges) {
+	my($from, $to, $l) = split(/ /, $e);
+	print qq/edge: { sourcename: "n$from" targetname: "n$to" label: "$l" }\n/;
+    }
+}
 
 print "}\n";

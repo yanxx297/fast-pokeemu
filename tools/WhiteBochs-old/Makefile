@@ -1,11 +1,12 @@
 OBJs = symbolic.o \
        concrete-whitebochs.o \
        concrete-whitedisasm.o \
+       whitedisasm-many.o \
        fuzzball-whitebochs.o \
        fuzzball-whitedisasm.o
 
 EXEs = concrete-whitebochs fuzzball-whitebochs \
-	concrete-whitedisasm fuzzball-whitedisasm \
+	concrete-whitedisasm whitedisasm-many fuzzball-whitedisasm \
 	run-on-cpu test-cache # klee-whitebochs klee-whitedisasm
 
 all: $(EXEs)
@@ -35,13 +36,17 @@ disasm/libdisasm.bc::
 
 whitebochs: concrete-whitebochs klee-whitebochs fuzzball-whitebochs
 
-whitedisasm: concrete-whitedisasm klee-whitedisasm fuzzball-whitedisasm
+whitedisasm: concrete-whitedisasm whitedisasm-many \
+             klee-whitedisasm fuzzball-whitedisasm
 
 concrete-%.o: %.cc snapshot.h config.h whitebochs.h 
 	$(CXX) -c -o $@ $(CXXFLAGS) $<
 
 fuzzball-%.o: %.cc snapshot.h config.h whitebochs.h symbolic.h
 	$(CXX) -c -o $@ $(CXXFLAGS) $(FUZZBALL_CFLAGS) $<
+
+whitedisasm-many.o: whitedisasm.cc snapshot.h config.h whitebochs.h
+	$(CXX) -c -o $@ $(CXXFLAGS) -DDISASM_MANY whitedisasm.cc
 
 concrete-whitebochs: concrete-whitebochs.o symbolic.o \
 	memory/libmemory.a cpu/libcpu.a \
@@ -63,6 +68,11 @@ concrete-whitedisasm: concrete-whitedisasm.o symbolic.o \
 	memory/libmemory.a cpu/libcpu.a \
 	disasm/libdisasm.a fpu/libfpu.a
 	${LINK} ${CXXFLAGS} -o $@ $+ ${LDFLAGS} 
+
+whitedisasm-many: whitedisasm-many.o symbolic.o \
+	memory/libmemory.a cpu/libcpu.a \
+	disasm/libdisasm.a fpu/libfpu.a
+	${LINK} ${CXXFLAGS} -o $@ $+ ${LDFLAGS}
 
 # fix deps
 klee-whitedisasm: whitedisasm.bc symbolic.bc memory/libmemory.bc cpu/libcpu.bc \

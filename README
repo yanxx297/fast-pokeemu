@@ -1,24 +1,46 @@
 COMPILE 
 -------
-1 Compile tools/fuzzball
-2 Download z3-2.15 from http://research.microsoft.com/en-us/um/redmond/projects/z3/z3-x64-2.15.tar.gz and build it according to z3/ocaml/README. 
-3 Add "Z3_OP_FD_LE," to z3/include/z3_api.h, one line after "Z3_OP_FD_LT,"
-4 Compile tools/emuFuzzBall
-
-
+1 Compile tools/fuzzball (c.f. its "INSTALL")
+2 Download z3-2.15 from http://research.microsoft.com/en-us/um/redmond/projects/z3/z3-x64-2.15.tar.gz
+  add "Z3_OP_FD_LE," to z3/include/z3_api.h, one line after "Z3_OP_FD_LT,"
+  build the OCaml interface according to z3/ocaml/README.
+3 Compile tools/emuFuzzBall with "make"
+4 git clone https://github.com/huku-/pyxed.git to tools/pyxed
+  Download XED from https://software.intel.com/en-us/articles/xed-x86-encoder-decoder-software-library
+    for instance "xed-install-base-2015-09-10-lin-x86-64.zip"
+  apply pyxed.patch to the Makefile, i.e.
+    cd tools/pyxedl patch -p1 <../pyxed.patch
+  compile with "make"
 
 INSTRUCTION EXPLORING
 ---------------------
 
 Step 1 - symbolic execution
 Run symbolic execution with 3 symbolic instruction bytes as input. 
-This step use fuzzball-whitedisasm.
+This step uses fuzzball-whitedisasm.
 	cd ~/Project/pokemu-oras/tools/emuFuzzBall
 	python run-fuzzball.py ../WhiteBochs-old/fuzzball-whitedisasm
 
+You can set the environment variable FUZZBALL_OUTDIR to control where
+the output goes; the default location is
+  /tmp/fuzzball-fuzzball-whitedisasm-output
+
 Step2 - concrete execution
-Given the testcases generated in step 1, run them with concrete bochs (concrete-whitedisasm) to turn them into instructions.
-Result is stored in /scripts/instructions.csv. 
+Given the testcases generated in step 1, run them with a concrete
+Bochs to collect information like their length, disassembly, and Bochs
+implementation function.
+
+The newer and faster way of doing this uses a Perl script to collect
+all the instruction bytes, and runs them all through a single
+execution of a program named "whitedisasm-many". The results go to the
+standard output so you can name them whatever you want. For instance:
+	perl scripts/collect-p1-shellcode.pl \
+           /tmp/fuzzball-fuzzball-whitedisasm-output | \
+        ./tools/WhiteBochs-old/whitedisasm-many >instructions.tsv
+
+The older approach used shell scripts and a program
+concrete-whitedisasm which ran separately for each instruction, and
+stored its results in .../scripts/instructions.csv:
 	cd ~/Project/pokemu-oras/scripts
 	./run_analyze_shell_code.sh /tmp/fuzzball-fuzzball-whitedisasm-output/
 

@@ -29,7 +29,7 @@ else
     $(error We appear not to have a Z3 binary for your architecture.)
 endif
 
-export PACKS = str ocamlgraph extlib unix sqlite3 zip
+export PACKS = str extlib unix zip
 export LIBS = vine z3
 export YFLAGS = -v
 export INCDIRS += $(VINE_OCAMLDIR) $(Z3_DIR)/ocaml
