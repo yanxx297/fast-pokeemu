@@ -1797,16 +1797,16 @@ class Gadget:
     
         
     @staticmethod
-    def gen_prologue(label, snapshot):
+    def gen_prologue(label, snapshot, addr = None):
         asm = [];
         if MODE <= 2:
             asm = "invlpg 0x0;";
         else:
             # feistel looping mode
-            asm = "mov $0x%.8x,%%eax; " \
+            assert (addr != None)
+            asm = "movl $0x%.8x,0x%x; " \
                 "forward_%.8x: " \
-                "invlpg 0x0;" \
-                "push %%eax; " % (loop, label) 
+                "invlpg 0x0;" % (loop, addr, label) 
         mnemonic = "prologue"
         return [Gadget(asm = asm, mnemonic = mnemonic)]
 
@@ -2218,7 +2218,8 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
 #             print "revert[%d]: %s" % (idx, g.asm)
     
         label = random.randint(0, 0xffffffff)   #label at the beginnign of this test case
-        startup = Gadget.gen_prologue(label, snapshot)
+        count_addr = get_addr()[0]              # A mem location to store loop count         
+        startup = Gadget.gen_prologue(label, snapshot, count_addr)
         (backup, setinput, code, output, restore) = Gadget.gen_root(snapshot, shellcode, count)        
             
         #append extra init code for gadgets before tested insn
@@ -2233,9 +2234,8 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         asm = "";
         if MODE > 2:
             #jump to TC beginning for a fixed # of times                   
-            asm = "pop %%eax; " \
-                "dec %%eax; " \
-                "jnz forward_%.8x; // back to loop entrance" % label
+            asm = "decl 0x%x; " \
+                "jnz forward_%.8x; // back to loop entrance" % (count_addr, label)
         loop = [Gadget(asm = asm, mnemonic = "loop")] 
         
         if MODE <= 0:
