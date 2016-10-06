@@ -724,6 +724,22 @@ def gen_store_mem_asm(src, dest, clean = False):
 
 
 # ===-------------------------------------------------------------------===
+# Generate code that store eip in register `r`
+# Currently not in use, since eip is ignored
+# Note that the eip it stored it the eip of the next instruction after itself
+# ===-------------------------------------------------------------------===
+def gen_get_eip(r):
+    l1 = random.randint(0, 0xffffffff)
+    l2 = random.randint(0, 0xffffffff)
+    asm = "jmp forward_%.8x;" \
+        "forward_%.8x:" \
+        "mov (%%esp),%%%s;" \
+        "ret;" \
+        "forward_%.8x: " \
+        "call forward_%.8x;" % (l2, l1, r, l2, l1)
+    return asm
+
+# ===-------------------------------------------------------------------===
 # Generate code in text format to copy from src reg to mem dest
 # ===-------------------------------------------------------------------===
 def gen_reg2mem_asm(reg, mem, size = 4):
@@ -731,6 +747,8 @@ def gen_reg2mem_asm(reg, mem, size = 4):
     if reg == "eflags":
         asm += "pushf;" \
             "pop %s;" % mem
+    elif reg in ["eip"]:
+        return ""
     else:
         op = size2mov(size)
         r = resize_reg(reg, size)
@@ -746,6 +764,8 @@ def gen_mem2reg_asm(mem, reg, size = 4):
     if reg == "eflags":
         asm += "push %s;" \
             "popf;" % mem
+    elif reg in ["eip"]:
+        return ""
     else:
         op = size2mov(size)
         r = resize_reg(reg, size)
@@ -831,13 +851,8 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
         asm2 += gen_store_eflags_asm(r)
         asm2 += "xor %s,%%eax;" % r
         src2 = r
-    elif src2 == "eip":
-        l1 = random.randint(0, 0xffffffff)
-        l2 = random.randint(0, 0xffffffff)
-        asm2 += "jmp forward_%.8x; " \
-            "forward_%.8x: pop %%ecx; ret;" \
-            "forward_%.8x: call forward_%.8x;" \
-            "xor %%ecx,%%eax; // copy eip to ecx" % (l2, l1, l2, l1)
+    elif src2 in ["eip"]:
+        return Gadget(asm = "", mnemonic = "copy mem", kill= [])
     elif src2 in ["cs", "ds", "es", "ss", "fs", "gs"]:
         asm2 += "mov %%%s,%%ecx; xor %%ecx,%%eax;" % src2
         if clean:
