@@ -70,6 +70,11 @@ loop = 1          #repeat testing each test case for a number of times
 
 
 # ===-----------------------------------------------------------------------===
+# Other global variables
+# ===-----------------------------------------------------------------------===
+l_insn = None       # Label at the tested instruction
+
+# ===-----------------------------------------------------------------------===
 # Print a list of addresses `l` as one row of a table
 # ===-----------------------------------------------------------------------===
 def print_line(title, l):    
@@ -553,6 +558,14 @@ def append_gadget(l, ext):
         out.append(b)
     return out
 
+
+# ===-------------------------------------------------------------------===
+# Remvoe all the Nonetypes of a given list
+# ===-------------------------------------------------------------------===
+def remove_none(l):
+    return [x for x in l if x is not None]
+
+
 # ===-------------------------------------------------------------------===
 # Generate a new memory address either randomly or in order
 # ===-------------------------------------------------------------------===
@@ -607,6 +620,31 @@ def get_unused_reg(l):
     return s[0]
 
 
+def get_visibility(op):
+    vis = '?'
+    for v in dir(pyxed):
+        if v.startswith('XED_OPVIS_') and getattr(pyxed, v) == op:
+            vis = v
+            break    
+    return vis
+
+
+def is_explicit(op):
+    vis = get_visibility(op)
+    if vis == 'XED_OPVIS_EXPLICIT': 
+        return True
+    else:
+        return False
+
+def get_category(op):
+    category = '?'
+    for c in dir(pyxed):
+        if c.startswith('XED_CATEGORY_') and getattr(pyxed, c) == op:
+            category = c
+            break
+    return category
+
+
 def get_reg_name(reg):
     reg_name = '?'
     for name in dir(pyxed):
@@ -624,6 +662,14 @@ def get_operand_name(op):
             op_name = name
             break
     return op_name
+
+def get_tag(t):
+    tag = '?'
+    for name in dir(pyxed):
+        if name.startswith('XED_') and getattr(pyxed, name) == t:
+            tag = name
+            break
+    return tag
 
 
 # ===-------------------------------------------------------------------===
@@ -728,9 +774,9 @@ def gen_store_mem_asm(src, dest, clean = False):
 # Currently not in use, since eip is ignored
 # Note that the eip it stored it the eip of the next instruction after itself
 # ===-------------------------------------------------------------------===
-def gen_get_eip(r):
+def gen_get_eip(r, r2 = None):
     l1 = random.randint(0, 0xffffffff)
-    l2 = random.randint(0, 0xffffffff)
+    l2 = r2 if r2 is not None else random.randint(0, 0xffffffff)
     asm = "jmp forward_%.8x;" \
         "forward_%.8x:" \
         "mov (%%esp),%%%s;" \
@@ -747,8 +793,10 @@ def gen_reg2mem_asm(reg, mem, size = 4):
     if reg == "eflags":
         asm += "pushf;" \
             "pop %s;" % mem
-    elif reg in ["eip"]:
-        return ""
+    elif reg in ["eip", "ip"]:
+#         return ""
+        asm += gen_get_eip("eax")
+        asm += "mov %%eax,%s;" % mem
     else:
         op = size2mov(size)
         r = resize_reg(reg, size)
@@ -764,7 +812,7 @@ def gen_mem2reg_asm(mem, reg, size = 4):
     if reg == "eflags":
         asm += "push %s;" \
             "popf;" % mem
-    elif reg in ["eip"]:
+    elif reg in ["eip", "cs", "ip"]:
         return ""
     else:
         op = size2mov(size)
@@ -810,8 +858,11 @@ def gen_store_eflags(dest):
 # ===-------------------------------------------------------------------===
 def gen_reg2mem(src, dest, size = 4):
     asm = gen_reg2mem_asm(src, dest, size)
-    g = Gadget(asm = asm, mnemonic = "store flags")      
-    return g 
+    if asm == "":
+        return None
+    else:
+        g = Gadget(asm = asm, mnemonic = "store flags")      
+        return g 
 
 
 # ===-------------------------------------------------------------------===
@@ -819,8 +870,11 @@ def gen_reg2mem(src, dest, size = 4):
 # ===-------------------------------------------------------------------===
 def gen_mem2reg(src, dest, size = 4):
     asm = gen_mem2reg_asm(src, dest, size)
-    g = Gadget(asm = asm, mnemonic = "store flags", kill = [Register(dest.upper())])      
-    return g 
+    if asm == "":
+        return None
+    else:
+        g = Gadget(asm = asm, mnemonic = "store flags", kill = [Register(dest.upper())])      
+        return g 
 
 
 # ===-------------------------------------------------------------------===
@@ -831,6 +885,8 @@ def gen_mem2reg(src, dest, size = 4):
 # TODO: No idea why need `clean`. Figure it out and remove it if not necessary
 # ===-------------------------------------------------------------------===
 def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
+    global l_insn
+    
     t = ""
     if size <= 4:
         t = "eax" if not (src2 in ["eax", "ax", "al", "ah"]) else "ecx"
@@ -851,13 +907,20 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
         asm2 += gen_store_eflags_asm(r)
         asm2 += "xor %s,%%eax;" % r
         src2 = r
-    elif src2 in ["eip"]:
-        return Gadget(asm = "", mnemonic = "copy mem", kill= [])
+    elif src2 in ["eip", "ip"]:
+        # Made the following assumptions: 
+        # 1 - we want the eip value immediately after the tested insn
+        # 2 - this gadget locates after that instruction
+        r = random.randint(0, 0xffffffff)
+        asm2 += gen_get_eip("ecx", r)
+        asm2 += "sub $(forward_%.8x - forward_%.8x),%%ecx;" \
+            "xor %%ecx,%%eax;" % (r, l_insn)
     elif src2 in ["cs", "ds", "es", "ss", "fs", "gs"]:
         asm2 += "mov %%%s,%%ecx; xor %%ecx,%%eax;" % src2
         if clean:
             asm3 += "mov $0x0,%%ecx; mov %%ecx,%%%s;" % src2
         kill += [Register("ECX")]                    
+
     else:
         m = size2mov(size)
         x = size2xor(size)
@@ -909,6 +972,57 @@ def inc_offset(inst, op, i, d):
 
 
 # ===-------------------------------------------------------------------===
+# Get the operand string specified by `op` and `i` of instruction `inst`
+# Operand can be either memmory or register
+# The 2nd return value := whether this operand is memory accessing
+# ===-------------------------------------------------------------------===
+def get_op(inst, i):
+    op = inst.get_operand(i)
+    isMem = True
+    # TODO: check i range before get_operand
+    (op_str, _) = get_mem_op(inst, op, i)
+    if op_str == "":
+        (op_str, _) = get_reg_op(inst, op, i)
+        isMem = False
+    return (op_str, isMem)
+
+
+# ===-------------------------------------------------------------------===
+# Get the ith explicit operand. i starts from 0.
+# Can be either mem or reg. First mem than reg.
+# The 2nd return value := whether this operand is memory accessing
+# ===-------------------------------------------------------------------===
+def get_explicit_op(inst, i):
+    count = 0
+    op_str = ""
+    for i in range(inst.get_noperands()):
+        op = inst.get_operand(i)
+        name = get_operand_name(op.get_name())
+        print "operand: %s" % name
+        if is_explicit(op.get_visibility()):
+            if count == i:
+                print "Find explicit!!!"
+                if op.is_register() or op.is_memory_addressing_register():                 
+                    print "    reg"
+                    (op_str, _) = get_reg_op(inst, op, i)
+                    if op_str == "":
+                        return (None, False)
+                    else:
+                        return (op_str, False)
+                elif name in ["XED_OPERAND_AGEN", "XED_OPERAND_MEM0", "XED_OPERAND_MEM1"]:
+                    print "    mem"
+                    (op_str, _) = get_mem_op(inst, op, i)
+                    if op_str == None:
+                        return (None, False)
+                    else:
+                        return (op_str, True)
+            else:
+                count = count + 1
+                
+    return (None, False)            
+        
+
+# ===-------------------------------------------------------------------===
 # Handle an memory accessing operand for feistel aggregated PokeEMU
 # ===-------------------------------------------------------------------===
 def get_mem_op(inst, op, i):      
@@ -934,7 +1048,7 @@ def get_mem_op(inst, op, i):
         if scale != 0:
             op_str += ",%d" % scale
         op_str += ")"    
-#     print "mem op: %s" % (op_str)
+    print "mem op: %s" % (op_str)
 #     op_len = inst.get_operand_length_bits(i)
     op_len = inst.get_operand_length(i)
     return (op_str, op_len)    
@@ -1052,9 +1166,17 @@ def handle_reg_write(inst, op, i, isInit = False):
     feistel = []  
     
     (reg_str, reg_len) = get_reg_op(inst, op, i)
-#     print "%s %d" % (reg_str, reg_len)
     if reg_str == "":
         return ([], [])
+    
+    # Eip will be stored in eax
+#     print "handle_reg_write: reg_str = %s" % reg_str
+#     if reg_str in ["eip", "ip"]:
+#         reg_str = "eax"
+        
+        
+#     opcode = get_category(inst.get_category())
+#     if opcode == "XED_CATEGORY_CALL":
         
     if op.is_written_only() or op.is_read_and_written():
         if isInit:
@@ -1065,7 +1187,10 @@ def handle_reg_write(inst, op, i, isInit = False):
             feistel_r += get_addr()
             feistel_r_bak += get_addr()
         dest = "0x%x" % feistel_r[count_l]
-        feistel += [gen_feistel_cipher(src1, src2, dest, reg_len, True)]
+        if reg_str in ["eax", "ax", "ah", "al"]:
+            feistel = [gen_feistel_cipher(src1, src2, dest, reg_len, True)] + feistel
+        else:
+            feistel += [gen_feistel_cipher(src1, src2, dest, reg_len, True)]
         count_l += reg_len/4
         
     return (setinput, feistel)         
@@ -1103,19 +1228,21 @@ def copy_reg_write(inst, op, i, isInit = False):
 def handle_op(inst, handle_mem, handle_reg, isInit):    
     setinput = []
     output = []
-    for i in range(inst.get_number_of_memory_operands()):
-        op = inst.get_operand(i) 
-        (s, f) = handle_mem(inst, op, i, isInit)
-        setinput += s
-        output += f
- 
+    
     for i in range(inst.get_noperands()):
         op = inst.get_operand(i)
         if op.is_register() or op.is_memory_addressing_register():  
             (s, f) = handle_reg(inst, op, i, isInit)
             setinput += s
             output += f
-    return (setinput, output)
+            
+    for i in range(inst.get_number_of_memory_operands()):
+        op = inst.get_operand(i) 
+        (s, f) = handle_mem(inst, op, i, isInit)
+        setinput += s
+        output += f
+ 
+    return (remove_none(setinput), remove_none(output))
 
 
 class Register:
@@ -1683,6 +1810,7 @@ class Gadget:
     # ===-------------------------------------------------------------------===
     @staticmethod
     def gen_root(snapshot, shellcode, count):
+        global l_insn
         global count_l
         global count_r  
         global init_r      
@@ -1724,6 +1852,7 @@ class Gadget:
         # code
         x = ",".join("0x%.2x" % ord(b) for b in shellcode)
         r = random.randint(0, 0xffffffff)
+        l_insn = r
         tc = "jmp forward_%.8x;forward_%.8x: " \
             ".byte %s;// shellcode: %s" % (r, r, x, inst_str) 
         gtc = Gadget(asm = tc, mnemonic = "shellcode")
@@ -1745,7 +1874,25 @@ class Gadget:
             (eax_backup, cr0, eax_backup, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000, eax_backup)
         grs = Gadget(asm = rs, mnemonic = "rebase page 0") 
         
-        code += [gtc, grs]    
+        code += [gtc, grs]
+        
+        opcode = get_category(inst.get_category())
+        if MODE >= 1 and opcode == "XED_CATEGORY_CALL":
+            # Overwritten call target, so that it will jump back to next insn
+            (trg, isMem) = get_explicit_op(inst, 0)
+            if trg is not None:
+                l1 = random.randint(0, 0xffffffff)
+                l2 = random.randint(0, 0xffffffff)
+                print "call target: %s" % trg
+                callcode = "jmp forward_%.8x;" \
+                    "forward_%.8x:" \
+                    "ret;" \
+                    "forward_%.8x: " % (l1, l2, l1)
+                callcode += ("mov $forward_%.8x,%%eax; mov %%eax,%s;" % (l2, trg)) \
+                    if isMem else ("mov $forward_%.8x,%%%s;" %  (l2, trg))
+                g_call = Gadget(asm = callcode, mnemonic = "handle call", kill = ["EAX"])
+                code = [g_call] + code
+        
                    
         if MODE >= 2:
         # Feistel & Feistel looping mode
@@ -1807,8 +1954,7 @@ class Gadget:
             print "R = %d, L = %d" % (len(feistel_r), len(feistel_l))
         # else :Do nothing, for single test case mode
             
-        
-        return (backup, setinput, code, output, frestore);     
+        return (remove_none(backup), setinput, code, output, frestore);     
     
         
     @staticmethod
@@ -1836,9 +1982,10 @@ def build_dependency_graph(gadgets):
         dg.add_node(g)
 
     for g0 in gadgets:
-        for g1 in gadgets:
-            if g1 != g0 and g1.depend(g0):
-                dg.add_edge(g0, g1)
+        if g0 != None:
+            for g1 in gadgets:
+                if g1 != g0 and g1 != None and g1.depend(g0):
+                    dg.add_edge(g0, g1)
 
     return dg 
         
@@ -1849,11 +1996,13 @@ def build_dependency_graph(gadgets):
 def dot_dependency_graph(graph):
     r = "digraph G {"
     for n in graph:
-        r += "%u [label=\"%s\"];\n" % (id(n), n.mnemonic)
+        if n != None:
+            r += "%u [label=\"%s\"];\n" % (id(n), n.mnemonic)
 
     for n in graph:
-        for s in graph[n]:
-            r += "%u -> %u;\n" % (id(n), id(s))
+        if n != None:
+            for s in graph[n]:
+                r += "%u -> %u;\n" % (id(n), id(s))
 
     return r + "}\n"
 
@@ -1956,19 +2105,21 @@ def compile_gadgets(gadget, epilogue, directive = ""):
         revert = sort_gadget(depgraph, 0, revert)
         # Generate the assembly code        
         for g in startup + init + bak_sort + setin_sort + code + output + restore + revert + loop:
+            if g != None:
+                asm += "%s\n" % (g.asm)
+                if i and i % 8 == 0:
+                    r = random.randint(0, 0xffffffff)
+                    asm += "jmp forward_%.8x; forward_%.8x:\n" % (r, r)
+                i += 1
+
+    #Add epilogue gadgets
+    for g in epilogue:
+        if g != None:
             asm += "%s\n" % (g.asm)
             if i and i % 8 == 0:
                 r = random.randint(0, 0xffffffff)
                 asm += "jmp forward_%.8x; forward_%.8x:\n" % (r, r)
-            i += 1
-
-    #Add epilogue gadgets
-    for g in epilogue:
-        asm += "%s\n" % (g.asm)
-        if i and i % 8 == 0:
-            r = random.randint(0, 0xffffffff)
-            asm += "jmp forward_%.8x; forward_%.8x:\n" % (r, r)
-        i += 1        
+            i += 1        
     
     # Assemble
     tmpobj = Tempfile()
@@ -1982,11 +2133,10 @@ def compile_gadgets(gadget, epilogue, directive = ""):
     stdout, stderr = p.communicate(prog)
     if stderr != "":
         print "[E] Can't compile asm:\n%s\n-%s-" % (prog, stderr)
-        exit(1)
-        
+        exit(1)    
     #For correct direct jump location, use linker
     #.testcase start at 0x00214000 in base state kernel
-    cmdline = "ld -m elf_i386 -Ttext 0x214000 -o %s %s" % (tmpelf, tmpobj)
+    cmdline = "ld -m elf_i386 -Ttext 0x215000 -o %s %s" % (tmpelf, tmpobj)
     subprocess.call(cmdline.split())
 
     # Extract the asm of the gadgets (.text section) from the elf object
@@ -2257,7 +2407,6 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
             revert = [];
              
         gadget.append((startup, init, bak, setin, code, output, restore, revert, loop))
-    
         #TODO: Rewrite DEBUG
 #         if DEBUG >= 1:
 #             for g in prologue + body + epilogue:
@@ -2265,6 +2414,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
 #                 print g
 
     epilogue = Gadget.gen_end_testcase()
+    print_feistel_blocks()
     code, obj = compile_gadgets(gadget, epilogue)
 
     if DEBUG >= 2:
@@ -2305,5 +2455,4 @@ if __name__ == "__main__":
 
     gen_floppy_with_testcase(**opts)
 
-    print_feistel_blocks()
     print >> sys.stderr, "Done in %.3fs" % (time.time() - t0)
