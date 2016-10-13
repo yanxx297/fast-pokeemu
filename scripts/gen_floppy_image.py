@@ -931,8 +931,8 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
             if src2 in reg_map:
                 asm3 += "%s %%%s,%%%s;" % (x, src2, src2)
             else:
-                asm3 += "%s %s,%%%s;" \
-                    "%s %%%s,%s;" % (m, src2, t, x, t, src2)                          
+                asm3 += "%s %%%s,%%%s;"\
+                    "%s %%%s,%s;" % (x, t, t, m, t, src2)                          
     
     asm = asm1 + asm2 + asm3
     g = Gadget(asm = asm, mnemonic = "copy mem", kill= kill)    
