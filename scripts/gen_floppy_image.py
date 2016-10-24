@@ -1059,7 +1059,7 @@ def get_explicit_op(inst, i):
                         return (op_str, op_len, False)
                 elif name in ["XED_OPERAND_AGEN", "XED_OPERAND_MEM0", "XED_OPERAND_MEM1"]:
                     print "    mem"
-                    (op_str, _) = get_mem_op(inst, op, i)
+                    (op_str, op_len) = get_mem_op(inst, op, i)
                     if op_str == None:
                         return (None, 0, False)
                     else:
@@ -1165,9 +1165,8 @@ def handle_mem_write(inst, op, i, isInit = False):
     if inst.is_mem_written(0):
         if isInit:
             feistel_l += get_addr(op_len)            
-        src1 = "0x%x" % feistel_l[count_l]
-        src2 = op_str
         r = int(math.ceil(float(op_len)/4))
+        print "Need %d mem blocks in total" % r
         if DEBUG >= 2:
             d = count_l + r - len(feistel_r)
             if d > 0:
@@ -1175,8 +1174,11 @@ def handle_mem_write(inst, op, i, isInit = False):
         while count_l + r > len(feistel_r):
             feistel_r += get_addr()
             feistel_r_bak += get_addr()        
-        dest = "0x%x" % feistel_r[count_l]
-        feistel += [gen_feistel_cipher(src1, src2, dest, op_len, True)]            
+        for j in range(r):
+            src1 = "0x%x" % feistel_l[count_l + j]
+            (src2, _) = get_mem_op(inst, op, i, j * 4)
+            dest = "0x%x" % feistel_r[count_l + j]        
+            feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]            
         count_l += r
         
     return (setinput, feistel)
@@ -1277,11 +1279,11 @@ def handle_reg_write(inst, op, i, isInit = False):
         elif reg_str.startswith("st"):
             l = get_addr(reg_len)            
             feistel += [gen_reg2mem(reg_str, l[0], reg_len)]
-            for i in range(len(l)):
-                src1 = "0x%x" % feistel_l[count_l + i]
-                dest = "0x%x" % feistel_r[count_l + i]
-                src2 = "0x%x" % l[i]
-                feistel += [gen_feistel_cipher(src1, src2, feistel_r[count_l + i], 4, True)]
+            for j in range(len(l)):
+                src1 = "0x%x" % feistel_l[count_l + j]
+                dest = "0x%x" % feistel_r[count_l + j]
+                src2 = "0x%x" % l[j]
+                feistel += [gen_feistel_cipher(src1, src2, feistel_r[count_l + j], 4, True)]
         else:
             feistel += [gen_feistel_cipher(src1, src2, dest, reg_len, True)]
         count_l += r

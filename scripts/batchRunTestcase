@@ -2,7 +2,7 @@
 
 #Config
 mode=3
-IN=/export/scratch/tmp/sample
+IN=/export/scratch/tmp/state-explr
 OUT=/export/scratch/tmp/out/
 TMPDIR=/export/scratch/tmp #dir storing temperary files
 TIMEOUT=100
