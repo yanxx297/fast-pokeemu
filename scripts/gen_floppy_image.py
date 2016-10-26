@@ -857,6 +857,11 @@ def gen_reg2mem_asm(reg, mem, size = 4):
     elif reg in ["eip", "ip"]:
         asm += gen_get_eip("eax")
         asm += "mov %%eax,%s;" % mem
+    elif reg == "mxcsr":
+        asm += "ldmxcsr %s;" % mem
+    elif reg.startswith("cr") or reg.startswith("dr"):
+        asm += "mov %%%s,%%eax;" \
+            "mov %%eax,%s;" % (reg, mem)
     elif reg.startswith("st"):
         if reg == "st(0)":
             asm += "fst %s;" % mem
@@ -864,6 +869,10 @@ def gen_reg2mem_asm(reg, mem, size = 4):
             asm += "fxch %%%s;" \
                 "fst %s;" \
                 "fxch %%%s;" % (reg, mem, reg)
+    elif reg == "xcr0":
+        asm += "xgetbv;" \
+            "mov %%edx,%s;" \
+            "mov %%eax,%s+0x4;" % (mem, mem)
     else:
         op = size2mov(size, reg)
         r = resize_reg(reg, size)
@@ -881,6 +890,11 @@ def gen_mem2reg_asm(mem, reg, size = 4):
             "popf;" % mem
     elif reg in ["eip", "cs", "ip"]:
         return ""
+    elif reg == "mxcsr":
+        asm += "ldmxcsr %s;" % mem
+    elif reg.startswith("cr") or reg.startswith("dr"):
+        asm += "mov %s,%%eax;" \
+            "mov %%eax,%%%s;" % (mem, reg)
     elif reg.startswith("st"):
         if reg == "st(0)":
             asm += "fld %s;" % mem
@@ -888,6 +902,10 @@ def gen_mem2reg_asm(mem, reg, size = 4):
             asm += "fxch %%%s;" \
                 "fld %s;" \
                 "fxch %%%s;" % (reg, mem, reg)
+    elif reg == "xcr0":
+        asm += "mov %s,%%edx;" \
+            "mov %s+0x4,%%eax;" \
+            "xsetbv;" % (mem, mem)
     else:
         op = size2mov(size, reg)
         r = resize_reg(reg, size)
@@ -996,11 +1014,20 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
         asm2 += gen_get_eip("ecx", r)
         asm2 += "sub $(forward_%.8x - forward_%.8x),%%ecx;" \
             "xor %%ecx,%%eax;" % (r, l_insn)
-    elif src2 in ["cs", "ds", "es", "ss", "fs", "gs"]:
+    elif src2 in ["cs", "ds", "es", "ss", "fs", "gs"] or src2.startswith("cr") \
+        or src2.startswith("dr"):
         asm2 += "mov %%%s,%%ecx; xor %%ecx,%%eax;" % src2
         if clean:
             asm3 += "mov $0x0,%%ecx; mov %%ecx,%%%s;" % src2
-        kill += [Register("ECX")]                    
+        kill += [Register("ECX")]                            
+    elif src2 == "mxcsr":
+        d = "0x%x" % get_addr()[0]
+        asm2 += "stmxcsr %s;" \
+            "xor %s,%%%s;" % (d, d, t)
+    elif src2 == "xcr0":
+        d = "0x%x" % get_addr(8)[0]
+        asm2 += gen_reg2mem_asm(src2, d, 8)
+        asm2 += "pxor %s,%%%s;" % (d, t)
     else:
         m = size2mov(size, src2)
         x = size2xor(size, src2)
