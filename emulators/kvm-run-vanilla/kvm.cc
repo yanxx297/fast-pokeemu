@@ -773,6 +773,26 @@ void dump_dummy_state(char *fname, int type = 0x41) {
   fclose(f);
 }
 
+void write_poststate(KVM *vm, const char *dest_file) {
+  char tempfile[PATH_MAX];
+  int fd, res;
+  vm->SetStateType(POST_TESTCASE);
+  strncpy(tempfile, "/tmp/kemufuzzer-kvm-XXXXXX", PATH_MAX - 1);
+  fd = mkstemp(tempfile);
+  if (fd == -1) {
+    fprintf(stderr, "Failed to create temporary output file: %s\n",
+	    strerror(errno));
+    return;
+  }
+  vm->Save(tempfile);
+  res = rename(tempfile, dest_file);
+  if (res) {
+    fprintf(stderr, "Failed to rename output to %s: %s\n",
+	    dest_file, strerror(errno));
+  }
+  close(fd);
+}
+
 int main(int argc, char **argv) {
   KVM *vm;
   struct kvm_regs regs;
@@ -800,13 +820,8 @@ int main(int argc, char **argv) {
 
       vm->Cpu()->SetException(EXCEPTION_NONE);
 
-      if (argc == 3) {
-	vm->SetStateType(POST_TESTCASE);
-	strncpy(tempfile, "/tmp/kemufuzzer-kvm-XXXXXX", PATH_MAX - 1);
-	mkstemp(tempfile);
-	vm->Save(tempfile);
-	rename(tempfile, argv[2]);
-      }
+      if (argc == 3)
+	write_poststate(vm, argv[2]);
 
       r = 0;
       break;
@@ -817,13 +832,8 @@ int main(int argc, char **argv) {
       vm->Cpu()->SetException(run->ex.exception);
 
 
-      if (argc == 3) {
-	vm->SetStateType(POST_TESTCASE);
-	strncpy(tempfile, "/tmp/kemufuzzer-kvm-XXXXXX", PATH_MAX - 1);
-	mkstemp(tempfile);
-	vm->Save(tempfile);
-	rename(tempfile, argv[2]);
-      }
+      if (argc == 3)
+	write_poststate(vm, argv[2]);
 
       r = 0; 
       break;
@@ -876,10 +886,23 @@ int main(int argc, char **argv) {
       r = 0;
       break;
     } else if (run->exit_reason == KVM_EXIT_DEBUG) {
+      uint8_t opcode;
       vm->Cpu()->GetRegs(&regs);
+      vm->Cpu()->GetMem((void *)regs.rip, 1, &opcode);
       printf("## Debug mode at 0x%08llx\n", regs.rip);
       vm->Cpu()->Disasm((void *)regs.rip, stdout);
       putchar('\n');
+      if (opcode == 0xf4 /* hlt */) {
+	printf("## CPU halted\n");
+
+	vm->Cpu()->SetException(EXCEPTION_NONE);
+
+	if (argc == 3)
+	  write_poststate(vm, argv[2]);
+
+	r = 0;
+	break;
+      }
       r = 1;
     } else {
       printf("## Unexpected exit (%d %lld)\n", run->exit_reason, 
