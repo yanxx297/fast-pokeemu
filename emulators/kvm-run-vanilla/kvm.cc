@@ -904,6 +904,9 @@ int main(int argc, char **argv) {
 	break;
       }
       r = 1;
+      /* We need to re-enable this in case the guest instruction
+	 cleared TF, for instance */
+      vm->Cpu()->SingleStep(true);
     } else {
       printf("## Unexpected exit (%d %lld)\n", run->exit_reason, 
 	     run->hw.hardware_exit_reason);
