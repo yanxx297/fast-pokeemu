@@ -47,6 +47,10 @@ if __name__ == "__main__":
     print "outdir valid\n"
     assert os.path.isfile(opts["script"]), opts["script"]
     t = get_avg(run_test_case, opts, int(extraopts["repeat"]))
+    filename = opts["outdir"] + "/time"
+    f = open(filename, 'a')
+    f.write("%f\n" % t)
+    f.close()
     print "avg time = %.3fs" % t
                  
     

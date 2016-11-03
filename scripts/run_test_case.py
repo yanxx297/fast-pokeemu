@@ -134,3 +134,4 @@ if __name__ == "__main__":
     f = open(filename, 'a')
     f.write("%f\n" % exectime)
     f.close()
+    print "Save time at %s" % filename
