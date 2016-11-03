@@ -16,15 +16,16 @@ all:$(addsuffix /time, $(addprefix $(OUT), $(foreach dir, $(SUBDIRS), $(shell ba
 
 define run-target
 $(addprefix $(OUT), $(shell basename $1))/time:: ;
-	$(eval OUTDIR:= $(shell mktemp -d -p $(TMPDIR)))
-	$(eval TMP:= $(shell mktemp -d -p /tmp))
 	$(eval outputs := $(addprefix $(OUT), $(shell basename $1)))
-	echo python run_test_case_avg.py \
-	testcase:$(shell cat $1/log) \
-	timeout:$(TIMEOUT) \
-	outdir:$(OUTDIR) \
-	script:$(EMUPATH) mode:$(mode) tmp:$(TMP);
-	mv $(OUTDIR) $(addprefix $(OUT), $(shell basename $1))
+	$(eval TMP:= $(shell mktemp -d -p /tmp)) \
+	$(eval OUTDIR:= $(shell mktemp -d -p $(TMPDIR))) \
+	$(foreach val, $(wildcard $1*.log), \
+		python run_test_case_avg.py \
+		testcase:$(shell cat $(val)) \
+		timeout:$(TIMEOUT) \
+		outdir:$(OUTDIR) \
+		script:$(EMUPATH) mode:$(mode) tmp:$(TMP);)
+	mv $(OUTDIR) $(addprefix $(OUT), $(shell basename $1));
 endef
 
 $(foreach dir,$(SUBDIRS),$(eval $(call run-target,$(dir))))
