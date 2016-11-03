@@ -887,8 +887,9 @@ def gen_reg2mem_asm(reg, mem, size = 4):
 def gen_mem2reg_asm(mem, reg, size = 4):
     asm = ""
     if reg == "eflags":
-        asm += "push %s;" \
-            "popf;" % mem
+        asm += "andl $0x8d5,%s;" \
+            "push %s;" \
+            "popf;" % (mem, mem)
     elif reg in ["eip", "cs", "ip"]:
         return ""
     elif reg == "mxcsr":
@@ -1325,7 +1326,7 @@ def handle_reg_write(inst, op, i, isInit = False):
 def copy_mem_write(inst, op, i, isInit = False):
     out = []    
     (op_str, op_len) = get_mem_op(inst, op, i)
-    if inst.is_mem_written(i):
+    if inst.is_mem_written(0):
         for val in get_addr(op_len):
             dest = "0x%x" % val
             out += [gen_store_mem(op_str, dest, isInit)]   
@@ -1533,7 +1534,8 @@ class Gadget:
     def gen_set_sreg(reg, snapshot):
         asm = "nop; // %s" % (reg.name.lower())
         define, kill, use = [reg], [], []
-
+            
+        print "gen_set_sreg: %s" % reg.name
         if reg.name == "CS":
             r = random.randint(0, 0xffffffff)
             # Generate a long jump (we set the address at runtime with another
@@ -2111,6 +2113,8 @@ class Gadget:
             asm = "movl $0x%.8x,0x%x; " \
                 "forward_%.8x: " \
                 "invlpg 0x0;" % (loop, addr, label) 
+#         ds = in_snapshot_sreg("DS", snapshot)
+#         asm += "mov $0x%.4x,%%ax; mov %%ax,%%ds;" % ds 
         mnemonic = "prologue"
         return [Gadget(asm = asm, mnemonic = mnemonic)]
 
@@ -2206,7 +2210,7 @@ def topological_sort(graph):
 # Given a dependency graph, sort it in topological order
 # ===-----------------------------------------------------------------------===
 def sort_gadget(depgraph, idx, name):
-        if DEBUG >= 2:
+        if DEBUG >= 3:
             path = "/tmp/depgraph_%s_%d.dot" % (name, idx)
             open(path, "w").write(dot_dependency_graph(depgraph))
     
