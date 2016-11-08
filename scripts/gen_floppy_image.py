@@ -1157,6 +1157,11 @@ def handle_mem_read(inst, op, i, isInit = False):
     setinput = []
     feistel = []      
     
+    opcode = get_category(inst.get_category())
+    (trg, _, _) = get_explicit_op(inst, 0)
+    if opcode == "XED_CATEGORY_POP":
+        print trg
+        return ([], [])
     (op_str, op_len) = get_mem_op(inst, op, i)
     if DEBUG >= 2:
         print "handle_mem_read    %s, %d" % (op_str, op_len)    
