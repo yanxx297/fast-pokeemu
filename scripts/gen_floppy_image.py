@@ -2011,9 +2011,9 @@ class Gadget:
             (eax_backup, cr0, eax_backup, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000, eax_backup)
         grs = Gadget(asm = rs, mnemonic = "rebase page 0") 
         
-        code += [gtc, grs]
+        code += [gtc]
         
-        opcode = get_category(inst.get_category())
+        opcode = get_category(inst.get_category())        
         if MODE >= 1 and opcode == "XED_CATEGORY_CALL":
             # Overwritten call target, so that it will jump back to next insn
             (trg, trg_len, isMem) = get_explicit_op(inst, 0)
@@ -2029,8 +2029,13 @@ class Gadget:
                     if isMem else ("mov $forward_%.8x,%%%s;" %  (l2, trg))
                 g_call = Gadget(asm = callcode, mnemonic = "handle call", kill = ["EAX"])
                 code = [g_call] + code
-        
-                   
+        if MODE >=1 and opcode == "XED_CATEGORY_COND_BR":
+            nop = ""
+            for i in range(0, 128):
+                nop += "nop;"
+            gnop = Gadget(asm = nop, mnemonic = "nop zone")
+            code = [gnop] + code + [gnop]
+        code += [grs]
         if MODE >= 2:
         # Feistel & Feistel looping mode
             # Handle all read operations in 1st round, and then handle write operations
