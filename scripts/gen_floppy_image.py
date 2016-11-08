@@ -572,7 +572,7 @@ def remove_none(l):
 # For a variable longer than 32 bits, this script will allocate multipe 32-
 # bit memory locations.
 # ===-------------------------------------------------------------------===
-next_addr = 0x00278008
+next_addr = 0xfc278008
 start_addr = next_addr
 def get_addr(s = 4, is_rand = False):
     global next_addr
@@ -580,7 +580,7 @@ def get_addr(s = 4, is_rand = False):
 
     addr = []
     if is_rand:
-        addr = [choice(range(start_addr, 0x003fffff,size))]
+        addr = [choice(range(start_addr, 0xfc3fffff,size))]
         for i in range(1, size/4):
             addr += [addr[i-1] + 4]          
     else:
@@ -588,7 +588,7 @@ def get_addr(s = 4, is_rand = False):
         for i in range(1, size/4):
             addr += [addr[i-1] + 4]
         next_addr += size
-        assert(next_addr <= 0x003fffff)
+        assert(next_addr <= 0xfc3fffff)
     
     if DEBUG >= 3:
         l = ""
