@@ -2584,7 +2584,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
     
         label = random.randint(0, 0xffffffff)   #label at the beginnign of this test case
         count_addr = get_addr()[0]              # A mem location to store loop count         
-        startup = Gadget.gen_prologue(label, snapshot, tc.split("/")[6], count_addr)
+        startup = Gadget.gen_prologue(label, snapshot, tc.split("/")[-2], count_addr)
         (backup, backup_r, setinput, code, output, restore) = Gadget.gen_root(snapshot, shellcode, count)        
         print "%d backup gadgets" % len(backup)
         #append extra init code for gadgets before tested insn
