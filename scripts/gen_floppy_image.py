@@ -1365,7 +1365,7 @@ def copy_reg_write(inst, op, i, isInit = False):
     out = []
     (reg_str, reg_len) = get_reg_op(inst, op, i)
     if reg_str == "":
-        return ([], [])
+        return ([], [], [], [])
         
     if op.is_written_only() or op.is_read_and_written():
         dest = "0x%x" % get_addr(reg_len)[0]
@@ -2149,16 +2149,18 @@ class Gadget:
     
         
     @staticmethod
-    def gen_prologue(label, snapshot, addr = None):
+    def gen_prologue(label, snapshot, tcn, addr = None):
         asm = [];
         if MODE <= 2:
-            asm = "invlpg 0x0;";
+            asm = "invlpg 0x0;" \
+                "prefetch 0x%s;" % tcn;
         else:
             # feistel looping mode
             assert (addr != None)
             asm = "movl $0x%.8x,0x%x; " \
                 "forward_%.8x: " \
-                "invlpg 0x0;" % (loop, addr, label) 
+                "invlpg 0x0;" \
+                "prefetch 0x%s;" % (loop, addr, label, tcn) 
 #         ds = in_snapshot_sreg("DS", snapshot)
 #         asm += "mov $0x%.4x,%%ax; mov %%ax,%%ds;" % ds 
         mnemonic = "prologue"
@@ -2582,7 +2584,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
     
         label = random.randint(0, 0xffffffff)   #label at the beginnign of this test case
         count_addr = get_addr()[0]              # A mem location to store loop count         
-        startup = Gadget.gen_prologue(label, snapshot, count_addr)
+        startup = Gadget.gen_prologue(label, snapshot, tc.split("/")[6], count_addr)
         (backup, backup_r, setinput, code, output, restore) = Gadget.gen_root(snapshot, shellcode, count)        
         print "%d backup gadgets" % len(backup)
         #append extra init code for gadgets before tested insn
