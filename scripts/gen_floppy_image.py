@@ -2137,7 +2137,7 @@ class Gadget:
             output = feistel;
         elif MODE >= 1:
         # simple aggregating mode
-            (_, f) = handle_op(inst, copy_mem_write, copy_reg_write, isInit)
+            (_, _, f, _) = handle_op(inst, copy_mem_write, copy_reg_write, isInit)
             output += f
             if DEBUG >= 2:
                 print "Simple aggreg: handle outputs"            
