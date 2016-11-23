@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import os
 
-splitlen = 1000
-base = '/home/grad01/yan/Project/pokemu-oras/data/3_feistel-looping/single/qemu/out'
+splitlen = 800
+base = '/home/grad01/yan/Project/pokemu-oras/data/3_feistel-looping/single/qemu'
 
 def split_file(file):
     if not os.path.isfile(file):

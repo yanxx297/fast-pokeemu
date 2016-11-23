@@ -68,7 +68,8 @@ feistel_l = []      #L block container
 feistel_bak = []    #Backup original inputs for restoring at the end of each TC
 count_r = 0         # Pointer to the current R/L block
 count_l = 0
-loop = 1          #repeat testing each test case for a number of times
+count_addr = 0      # A mem location to store loop count
+loop = 1            #repeat testing each test case for a number of times
 
 
 # ===-----------------------------------------------------------------------===
@@ -574,7 +575,7 @@ def remove_none(l):
 # For a variable longer than 32 bits, this script will allocate multipe 32-
 # bit memory locations.
 # ===-------------------------------------------------------------------===
-next_addr = 0xfc278008
+next_addr = 0x00278008
 start_addr = next_addr
 def get_addr(s = 4, is_rand = False):
     global next_addr
@@ -582,7 +583,7 @@ def get_addr(s = 4, is_rand = False):
 
     addr = []
     if is_rand:
-        addr = [choice(range(start_addr, 0xfc3fffff,size))]
+        addr = [choice(range(start_addr, 0x003fffff,size))]
         for i in range(1, size/4):
             addr += [addr[i-1] + 4]          
     else:
@@ -590,7 +591,7 @@ def get_addr(s = 4, is_rand = False):
         for i in range(1, size/4):
             addr += [addr[i-1] + 4]
         next_addr += size
-        assert(next_addr <= 0xfc3fffff)
+        assert(next_addr <= 0x003fffff)
     
     if DEBUG >= 3:
         l = ""
@@ -824,10 +825,12 @@ def resize_reg(r, size):
 # via eax, and then *clean addr1
 # ===-------------------------------------------------------------------===
 def gen_store_mem_asm(src, dest, clean = False):
-    asm = ""
-    if src != "%eax":   #TODO: This case should not be necessary, since src must be mem location
-        asm += "mov %s,%%eax; " % (src)
-    asm += "mov %%eax,%s; "  % (dest)
+    r = "eax" if not ("eax" in src or "eax" in dest or \
+                      "ax" in src or "ax" in dest or \
+                      "ah" in src or "ah" in dest or \
+                      "al" in src or "al" in dest ) else "ecx"
+    asm = "mov %s,%%%s;" \
+        "mov %%%s,%s;" % (src, r, r, dest)
     if clean:   #clean src after copying
         asm += "movl $0x0,%s;" % (src)        
     return asm
@@ -892,7 +895,7 @@ def gen_mem2reg_asm(mem, reg, size = 4):
         asm += "andl $0x8d5,%s;" \
             "push %s;" \
             "popf;" % (mem, mem)
-    elif reg in ["eip", "cs", "ip"]:
+    elif reg in ["eip", "ip", "cs", "tr"]:
         return ""
     elif reg == "mxcsr":
         asm += "ldmxcsr %s;" % mem
@@ -954,10 +957,11 @@ def gen_store_eflags(dest):
 # ===-------------------------------------------------------------------===
 def gen_reg2mem(src, dest, size = 4):
     asm = gen_reg2mem_asm(src, dest, size)
+    print asm
     if asm == "":
         return None
     else:
-        g = Gadget(asm = asm, mnemonic = "store flags")      
+        g = Gadget(asm = asm, mnemonic = "reg2mem")      
         return g 
 
 
@@ -969,7 +973,7 @@ def gen_mem2reg(src, dest, size = 4):
     if asm == "":
         return None
     else:
-        g = Gadget(asm = asm, mnemonic = "store flags", kill = [Register(dest.upper())])      
+        g = Gadget(asm = asm, mnemonic = "mem2reg", kill = [Register(dest.upper())])      
         return g 
 
 
@@ -1255,6 +1259,9 @@ def handle_reg_read(inst, op, i, isInit = False):
     restore = []
     backup = []
     
+    iclass = get_iclass(inst.get_iclass())
+    if iclass == "XED_ICLASS_LTR":
+        return ([],[],[],[])
     (reg_str, reg_len) = get_reg_op(inst, op, i)
     print "reg_str: %s" % reg_str
     if reg_str == "" or reg_len == 0:
@@ -1273,9 +1280,12 @@ def handle_reg_read(inst, op, i, isInit = False):
                 feistel_r_bak += [r_bak[idx]]
                 feistel_bak += [bak[idx]]                
             r = "0x%x" % feistel_r[count_r]
-            init_r += [gen_reg2mem(reg_str, r, reg_len)]        
+            print "r = %s" % r
+            init_r += [gen_reg2mem(reg_str, r, reg_len)] 
+            print init_r       
         count_r += len(f)                
         src = "0x%x" % f[0]
+        print "src = %s" % src
         reg_bak = "0x%x" % bak[0]
         backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
         setinput += [gen_mem2reg(src, reg_str, reg_len)]
@@ -1364,7 +1374,7 @@ def copy_mem_write(inst, op, i, isInit = False):
 def copy_reg_write(inst, op, i, isInit = False):
     out = []
     (reg_str, reg_len) = get_reg_op(inst, op, i)
-    if reg_str == "":
+    if reg_str == "" or reg_len == 0:
         return ([], [], [], [])
         
     if op.is_written_only() or op.is_read_and_written():
@@ -1982,6 +1992,7 @@ class Gadget:
         global feistel_l
         global feistel_r
         global feistel_r_bak
+        global count_addr
         
         f = Tempfile()
         f.write(shellcode)
@@ -2115,9 +2126,10 @@ class Gadget:
             if isInit:
                 #If 1st iter, mov init state input to R
                 if MODE > 2:
+                    assert(count_addr != 0)
                     label = random.randint(0, 0xffffffff)
-                    asm1 = "cmpl $0x%x,(%%esp);" \
-                        "jne forward_%.8x; // Init loop iter" % (loop, label)
+                    asm1 = "cmpl $0x%x,0x%x;" \
+                        "jne forward_%.8x; // Init loop iter" % (loop, count_addr, label)
                     asm2 = "forward_%.8x: " % label
                     g1 = Gadget(asm = asm1, mnemonic = "Init R")
                     g2 = Gadget(asm = asm2, mnemonic = "Init R")
@@ -2485,6 +2497,7 @@ def load_fuzzball_testcase(tc, snapshot):
 # floppy image
 # ===-----------------------------------------------------------------------===
 def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
+    global count_addr
     global MODE;
     MODE = int(mode);
     print "MODE = %d" % MODE
@@ -2582,8 +2595,9 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
 #         for idx, g in enumerate(revert):
 #             print "revert[%d]: %s" % (idx, g.asm)
     
-        label = random.randint(0, 0xffffffff)   #label at the beginnign of this test case
-        count_addr = get_addr()[0]              # A mem location to store loop count         
+        if count == 1:
+            count_addr = get_addr()[0]
+        label = random.randint(0, 0xffffffff)   #label at the beginnign of this test case                               
         startup = Gadget.gen_prologue(label, snapshot, tc.split("/")[-2], count_addr)
         (backup, backup_r, setinput, code, output, restore) = Gadget.gen_root(snapshot, shellcode, count)        
         print "%d backup gadgets" % len(backup)
