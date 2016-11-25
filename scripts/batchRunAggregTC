@@ -1,8 +1,8 @@
-#Usage: make -f batchRunTestcase -j 6
+#Usage: make -f batchRunAggregTC -j 6
 
 #Config
-mode=1
-IN=/export/scratch/tmp/sample
+mode=3
+IN=/home/grad01/yan/Project/pokemu-oras/data/3_feistel-looping/single/qemu/out
 OUT=/export/scratch/tmp/out/
 TMPDIR=/export/scratch/tmp #dir storing temperary files
 TIMEOUT=100
@@ -29,3 +29,4 @@ $(addprefix $(OUT), $(shell basename $1))/time:: ;
 endef
 
 $(foreach dir,$(SUBDIRS),$(eval $(call run-target,$(dir))))
+

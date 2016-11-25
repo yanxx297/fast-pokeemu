@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 import os
+import sys
 
 splitlen = 800
-base = '/home/grad01/yan/Project/pokemu-oras/data/3_feistel-looping/single/qemu'
+base = ''
 
 def split_file(file):
     if not os.path.isfile(file):
@@ -18,7 +19,9 @@ def split_file(file):
         output.close()
         idx += 1
 
-for subdir,dirs,files in os.walk(base):
-    file = subdir + '/log'
-#    print file
-    split_file(file)
+if __name__ == "__main__":
+    global base
+    base = sys.argv[1]
+    for subdir,dirs,files in os.walk(base):
+        file = subdir + '/log'
+        split_file(file)

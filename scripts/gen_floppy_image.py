@@ -2569,7 +2569,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
                 init += rm.gen_gadget(snapshot)
                 revert += rm.gen_revert_gadget(snapshot)
                 done.add(rm)
-            
+
         # Need one or more extra passes to define what has been killed but not
         # defined
         stable = False
