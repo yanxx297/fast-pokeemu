@@ -56,13 +56,25 @@ DEBUG = 2
 MODE = 0
 
 # ===-----------------------------------------------------------------------===
+# Whether Paging is on
+# ===-----------------------------------------------------------------------===
+PG = 1
+
+# ===-----------------------------------------------------------------------===
+# Range for additional memory access
+# ===-----------------------------------------------------------------------===
+next_addr = 0x01278008
+start_addr = next_addr
+end_addr = 0x013fffff
+
+# ===-----------------------------------------------------------------------===
 # Container for feistel R & l blocks
 # NOTE: 
 # count_r and count_l increase from 0 during the generating process of each test case
 # The length of feistel_r and feistel_l only updated while generating the 1st test case
 # ===-----------------------------------------------------------------------===  
 init_r = []         #gadgets that copy input of first instruction to R block
-feistel_r = []      #R block container
+feistel_r = []      #R block address container
 feistel_r_bak = []  #backup of R block
 feistel_l = []      #L block container
 feistel_bak = []    #Backup original inputs for restoring at the end of each TC
@@ -76,6 +88,35 @@ loop = 1            #repeat testing each test case for a number of times
 # Other global variables
 # ===-----------------------------------------------------------------------===
 l_insn = None       # Label at the tested instruction
+
+# ===-----------------------------------------------------------------------===
+# Flip random address range and addresses of feistel block from pagin on to off
+# or from off to on (depends on current status)
+# ===-----------------------------------------------------------------------===
+def flip_addrs():
+    global init_r
+    global feistel_r
+    global feistel_r_bak
+    global feistel_l
+    global feistel_bak
+    global count_addr
+    global next_addr
+    global start_addr
+    global end_addr
+    
+    def flip_list(l):
+        for idx, val in enumerate(l):
+            l[idx] = val ^ 0x01000000
+    
+    flip_list(feistel_r)
+    flip_list(feistel_r_bak)
+    flip_list(feistel_l)
+    flip_list(feistel_bak)
+    count_addr = count_addr ^ 0x01000000
+    next_addr = next_addr ^ 0x01000000
+    start_addr = start_addr ^ 0x01000000
+    end_addr = end_addr ^ 0x01000000    
+            
 
 # ===-----------------------------------------------------------------------===
 # Print a list of addresses `l` as one row of a table
@@ -575,15 +616,13 @@ def remove_none(l):
 # For a variable longer than 32 bits, this script will allocate multipe 32-
 # bit memory locations.
 # ===-------------------------------------------------------------------===
-next_addr = 0x00278008
-start_addr = next_addr
 def get_addr(s = 4, is_rand = False):
     global next_addr
     size = int(math.ceil(float(s)/4)*4)
 
     addr = []
     if is_rand:
-        addr = [choice(range(start_addr, 0x003fffff,size))]
+        addr = [choice(range(start_addr, end_addr,size))]
         for i in range(1, size/4):
             addr += [addr[i-1] + 4]          
     else:
@@ -591,7 +630,7 @@ def get_addr(s = 4, is_rand = False):
         for i in range(1, size/4):
             addr += [addr[i-1] + 4]
         next_addr += size
-        assert(next_addr <= 0x003fffff)
+        assert(next_addr <= end_addr)
     
     if DEBUG >= 3:
         l = ""
@@ -1627,7 +1666,16 @@ class Gadget:
 
     @staticmethod
     def gen_set_creg(reg, snapshot):
+        global next_addr
+        global start_addr
+        global end_addr
+        global PG        
         define, kill, use = [reg], [Register("EAX")], []
+        if reg.name.lower() == "cr0":
+            if not reg.value & 0x80000000:
+                print "Paging turned off. Should use unextended range only."
+                PG = 0
+                flip_addrs()                             
         asm = "mov $0x%.8x, %%eax; mov %%eax,%%%s; // %s" % \
             (reg.value, reg.name.lower(), reg.name.lower())
         return [Gadget(asm = asm, mnemonic = reg.name.lower(), define = define,
@@ -2239,6 +2287,11 @@ def load_fuzzball_testcase(tc, snapshot):
 def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
     global count_addr
     global MODE;
+    global next_addr
+    global start_addr
+    global end_addr
+    global PG
+    
     MODE = int(mode);
     print "MODE = %d" % MODE
      
@@ -2366,6 +2419,10 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
 #             for g in prologue + body + epilogue:
 #                 print
 #                 print g
+        if PG == 0:
+            PG = 1
+            print "Turn paging back on"
+            flip_addrs()
 
     epilogue = Gadget.gen_end_testcase()
     print_feistel_blocks()
