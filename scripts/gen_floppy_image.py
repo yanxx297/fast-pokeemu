@@ -1049,7 +1049,7 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     kill= [Register(t.upper())]
     
     if src2 == "eflags":
-        r = "0x%x" % get_addr()[0]
+        r = "0x%x" % get_addr(4, True)[0]
         asm2 += gen_store_eflags_asm(r)
         asm2 += "xor %s,%%eax;" % r
         src2 = r
@@ -1068,11 +1068,11 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
             asm3 += "mov $0x0,%%ecx; mov %%ecx,%%%s;" % src2
         kill += [Register("ECX")]                            
     elif src2 == "mxcsr":
-        d = "0x%x" % get_addr()[0]
+        d = "0x%x" % get_addr(4, True)[0]
         asm2 += "stmxcsr %s;" \
             "xor %s,%%%s;" % (d, d, t)
     elif src2 == "xcr0":
-        d = "0x%x" % get_addr(8)[0]
+        d = "0x%x" % get_addr(8, True)[0]
         asm2 += gen_reg2mem_asm(src2, d, 8)
         asm2 += "pxor %s,%%%s;" % (d, t)
     else:
@@ -1382,7 +1382,7 @@ def handle_reg_write(inst, op, i, isInit = False):
         if reg_str in ["eax", "ax", "ah", "al"]:
             feistel = [gen_feistel_cipher(src1, src2, dest, reg_len, True)] + feistel
         elif reg_str.startswith("st"):
-            l = get_addr(reg_len)            
+            l = get_addr(reg_len, True)            
             feistel += [gen_reg2mem(reg_str, l[0], reg_len)]
             for j in range(len(l)):
                 src1 = "0x%x" % feistel_l[count_l + j]
@@ -1403,7 +1403,7 @@ def copy_mem_write(inst, op, i, isInit = False):
     out = []    
     (op_str, op_len) = get_mem_op(inst, op, i)
     if inst.is_mem_written(0):
-        for val in get_addr(op_len):
+        for val in get_addr(op_len, True):
             dest = "0x%x" % val
             out += [gen_store_mem(op_str, dest, isInit)]   
         
@@ -1417,7 +1417,7 @@ def copy_reg_write(inst, op, i, isInit = False):
         return ([], [], [], [])
         
     if op.is_written_only() or op.is_read_and_written():
-        dest = "0x%x" % get_addr(reg_len)[0]
+        dest = "0x%x" % get_addr(reg_len, True)[0]
         out += [gen_reg2mem(reg_str, dest, reg_len)]
     
     return ([], [], out, [])     
@@ -1831,7 +1831,7 @@ class Gadget:
         pte1022 = in_snapshot_mem((((deref4(pde0) & 0xfffff000) + 1022*4), 4), 
                                   snapshot)
         newpte0 = (deref4(pte0) & 0xfff) | (deref4(pte1022) & 0xfffff000)
-        eax_backup = get_addr()[0]        
+        eax_backup = get_addr(4, True)[0]        
         rs = "mov %%eax,0x%.8x; mov $0x%.8x,%%eax; mov %%eax,%%cr0; mov 0x%.8x,%%eax; " \
             "movl $0x%s,0x%.8x; " \
             "movl $0x%.8x,0x%.8x; " \
