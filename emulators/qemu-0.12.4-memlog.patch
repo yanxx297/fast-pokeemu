@@ -1,0 +1,113 @@
+diff --git a/cpu-all.h b/cpu-all.h
+index 57b69f8..9470498 100644
+--- a/cpu-all.h
++++ b/cpu-all.h
+@@ -826,6 +826,7 @@ target_phys_addr_t cpu_get_phys_page_debug(CPUState *env, target_ulong addr);
+ #define CPU_LOG_IOPORT     (1 << 7)
+ #define CPU_LOG_TB_CPU     (1 << 8)
+ #define CPU_LOG_RESET      (1 << 9)
++#define CPU_LOG_MEMOPS     (1 << 10)
+ 
+ /* define log items */
+ typedef struct CPULogItem {
+diff --git a/exec.c b/exec.c
+index 5969eb2..aa397da 100644
+--- a/exec.c
++++ b/exec.c
+@@ -1618,6 +1618,8 @@ const CPULogItem cpu_log_items[] = {
+     { CPU_LOG_IOPORT, "ioport",
+       "show all i/o ports accesses" },
+ #endif
++    { CPU_LOG_MEMOPS, "memops",
++      "show memory read and write operations" },
+     { 0, NULL, NULL },
+ };
+ 
+diff --git a/softmmu_template.h b/softmmu_template.h
+index 0e13153..4627ef0 100644
+--- a/softmmu_template.h
++++ b/softmmu_template.h
+@@ -131,6 +131,9 @@ DATA_TYPE REGPARM glue(glue(__ld, SUFFIX), MMUSUFFIX)(target_ulong addr,
+         tlb_fill(addr, READ_ACCESS_TYPE, mmu_idx, retaddr);
+         goto redo;
+     }
++    qemu_log_mask(CPU_LOG_MEMOPS, " Load from %08llx (%db) gives %08llx\n",
++		  (unsigned long long)addr, DATA_SIZE,
++		  (unsigned long long)res);
+     return res;
+ }
+ 
+@@ -268,6 +271,9 @@ void REGPARM glue(glue(__st, SUFFIX), MMUSUFFIX)(target_ulong addr,
+         tlb_fill(addr, 1, mmu_idx, retaddr);
+         goto redo;
+     }
++    qemu_log_mask(CPU_LOG_MEMOPS, "Store to   %08llx (%db) of    %08llx\n",
++		  (unsigned long long)addr, DATA_SIZE,
++		  (unsigned long long)val);
+ }
+ 
+ /* handles all unaligned cases */
+diff --git a/tcg/x86_64/tcg-target.c b/tcg/x86_64/tcg-target.c
+index 2339091..bb30ca4 100644
+--- a/tcg/x86_64/tcg-target.c
++++ b/tcg/x86_64/tcg-target.c
+@@ -578,10 +578,15 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args,
+     /* mov */
+     tcg_out_modrm(s, 0x8b | rexw, r0, addr_reg);
+     
+-    /* je label1 */
+-    tcg_out8(s, 0x70 + JCC_JE);
+-    label1_ptr = s->code_ptr;
+-    s->code_ptr++;
++    if (qemu_loglevel_mask(CPU_LOG_MEMOPS)) {
++	/* Always use slow path */
++	label1_ptr = 0;
++    } else {
++	/* je label1 */
++	tcg_out8(s, 0x70 + JCC_JE);
++	label1_ptr = s->code_ptr;
++	s->code_ptr++;
++    }
+ 
+     /* XXX: move that code at the end of the TB */
+     tcg_out_movi(s, TCG_TYPE_I32, TCG_REG_RSI, mem_index);
+@@ -624,7 +629,8 @@ static void tcg_out_qemu_ld(TCGContext *s, const TCGArg *args,
+     s->code_ptr++;
+     
+     /* label1: */
+-    *label1_ptr = s->code_ptr - label1_ptr - 1;
++    if (label1_ptr)
++	*label1_ptr = s->code_ptr - label1_ptr - 1;
+ 
+     /* add x(r1), r0 */
+     tcg_out_modrm_offset(s, 0x03 | P_REXW, r0, r1, offsetof(CPUTLBEntry, addend) - 
+@@ -773,10 +779,15 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args,
+     /* mov */
+     tcg_out_modrm(s, 0x8b | rexw, r0, addr_reg);
+     
+-    /* je label1 */
+-    tcg_out8(s, 0x70 + JCC_JE);
+-    label1_ptr = s->code_ptr;
+-    s->code_ptr++;
++    if (qemu_loglevel_mask(CPU_LOG_MEMOPS)) {
++	/* Always use slow path */
++	label1_ptr = 0;
++    } else {
++	/* je label1 */
++	tcg_out8(s, 0x70 + JCC_JE);
++	label1_ptr = s->code_ptr;
++	s->code_ptr++;
++    }
+ 
+     /* XXX: move that code at the end of the TB */
+     switch(opc) {
+@@ -806,7 +817,8 @@ static void tcg_out_qemu_st(TCGContext *s, const TCGArg *args,
+     s->code_ptr++;
+     
+     /* label1: */
+-    *label1_ptr = s->code_ptr - label1_ptr - 1;
++    if (label1_ptr)
++	*label1_ptr = s->code_ptr - label1_ptr - 1;
+ 
+     /* add x(r1), r0 */
+     tcg_out_modrm_offset(s, 0x03 | P_REXW, r0, r1, offsetof(CPUTLBEntry, addend) - 
