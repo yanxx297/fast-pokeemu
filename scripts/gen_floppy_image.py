@@ -74,6 +74,7 @@ end_addr = 0x013fffff
 # The length of feistel_r and feistel_l only updated while generating the 1st test case
 # ===-----------------------------------------------------------------------===  
 init_r = []         #gadgets that copy input of first instruction to R block
+init_l = []         #gadgets that copy random value to L block 
 feistel_r = []      #R block address container
 feistel_r_bak = []  #backup of R block
 feistel_l = []      #L block container
