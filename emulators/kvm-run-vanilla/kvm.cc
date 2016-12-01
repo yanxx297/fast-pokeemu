@@ -665,11 +665,11 @@ void KVM::Save(const char *fname) {
     s.exception_state.error_code = 0;
 
     // Fill MSR state
-    vcpus[i]->GetMSRs(msrs, (int *) &(s.msrs_state.n));
+/*    vcpus[i]->GetMSRs(msrs, (int *) &(s.msrs_state.n));
     for (r = 0; r < s.msrs_state.n; r++) {
       s.msrs_state.msr_regs[r].idx = msrs[r].index;
       s.msrs_state.msr_regs[r].val = msrs[r].data;
-    }
+    }*/
 
     r = fwrite(f, &s, sizeof(s));
     assert(r == sizeof(s));
@@ -710,7 +710,7 @@ void KVM::Print(FILE *f) {
     fprintf(f, "========================== CONTROLS ==========================\n");
     fprintf(f, "CR0: %.16lx CR2: %.16lx\n", PAD64(ksregs.cr0), PAD64(ksregs.cr2));
     fprintf(f, "CR3: %.16lx CR4: %.16lx\n", PAD64(ksregs.cr3), PAD64(ksregs.cr4));    
-    fprintf(f, "============================ MSRS ============================\n");
+  /*  fprintf(f, "============================ MSRS ============================\n");
     int n = sizeof(MSRs_to_save)/sizeof(int);
     for (int j = 0; j < n; j++) {
       msrs[j].index = MSRs_to_save[j];
@@ -720,7 +720,7 @@ void KVM::Print(FILE *f) {
       fprintf(f, "#%.8x: %.16lx\n", msrs[j].index, (uint64_t) msrs[j].data);
     }
     fprintf(f, "==============================================================\n");
-
+*/
   }
 }
 
