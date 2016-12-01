@@ -262,6 +262,8 @@ def diff_dumps(files, kernel_dir = None, update_guest = False,
                     continue
 
                 for i in range(j, j + 4096, 4):
+                    if i in [0x20cfd8, 0x20cfdc, 0x20cfe0]:
+                        continue
                     ss = [s[k][i:i+4] for s in states]
 
                     tmp = set(ss)
@@ -382,12 +384,12 @@ def diff_dumps(files, kernel_dir = None, update_guest = False,
                     data.append((v,e,t))
                 dd.append((k, None, data))
                 
-            elif k == "cpu[0].regs_state.rip":
-                eips = ""
-                for s in states:
-                    if eips: eips += " "
-                    eips += colorize("%16x" % s[k], GREEN)
-                print "%-40s %s" % (k, eips)
+#            elif k == "cpu[0].regs_state.rip":
+#                eips = ""
+#                for s in states:
+#                    if eips: eips += " "
+#                    eips += colorize("%16x" % s[k], GREEN)
+#                print "%-40s %s" % (k, eips)
 
     
     return (crashed, dd)
@@ -496,7 +498,7 @@ def normalize_states(dumps):
 def main():
     args = {
         "update_guest" : os.getenv("KEMUFUZZER_UPDATE_GUEST", False),
-        "pretty_print" : os.getenv("KEMUFUZZER_PRETTY_PRINT", True),
+        "pretty_print" : os.getenv("KEMUFUZZER_PRETTY_PRINT", False),
         "strict_check" : os.getenv("KEMUFUZZER_STRICT_CHECK", True),
         "kernel_dir" : os.getenv("KEMUFUZZER_KERNEL_DIR", None),
         "normalize" : os.getenv("KEMUFUZZER_NORMALIZE_DUMP", True),
