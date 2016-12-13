@@ -2,12 +2,11 @@
 
 #Config
 mode=3
-IN=/home/grad01/yan/Project/pokemu-oras/data/3_feistel-looping/single/qemu/out
-OUT=/export/scratch/tmp/out/
-TMPDIR=/export/scratch/tmp #dir storing temperary files
+IN=/tmp/non-ecpt-log
+OUT=/tmp/out2/
+TMPDIR=/tmp #dir storing temperary files
 TIMEOUT=100
 EMUPATH=./../emu/qemu-0.12.4+dfsg/run-testcase
-LOG=/log
 
 
 SUBDIRS := $(sort $(dir $(wildcard $(IN)/*/.)))
