@@ -33,7 +33,7 @@ disk: floppy.img
 
 int_wrappers.c interrupts.c interrupts.h: gen_ints_asm.py
 	# use port 69 to notify interrupts & exceptions
-#	python gen_ints_asm.py 69
+	python gen_ints_asm.py 69
 
 # dependencies
 loader.o: interrupts.h
