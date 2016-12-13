@@ -31,7 +31,7 @@ check each .post memory dump to figure out whether the corresponding test case t
 Return a list of test cases halted normally.
 
 #### aggreg_tc_from_2dumps.sh
-Similar to aggreg_tc_from_dump.sh but generate test case list according to 2 groups of.post files in different folders, 
+Similar to aggreg_tc_from_dump.sh but generate test case list according to 2 groups of.post files in different folders,
 usually one for QEMU and another for KVM.
 
 #### wrapper_diff_cpustate.sh
@@ -42,7 +42,8 @@ A wrapper for aggreg_tc_from_2dumps.sh/aggreg_tc_from_dump.sh to generate non-ex
 
 #### diff_aggreg.sh
 Given the .diff files of single test cases and aggreg test cases, this script generate categorize all the instructions into 4 classes: both mismatch, both match, only aggreg mismatch and only separate mismatch.
-Outputs are 4 lists contained in 4 files.
+Outputs are 4 lists contained in 4 files.  
+00000000.diff contains an example of diff_cpustate.py's output when the 2 memory dumps are equivalent.
 
 #### tools/emuFuzzBALL/run-CPU-explr.sh
 Given a list of instructions (in shellcode format)
