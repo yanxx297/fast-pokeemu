@@ -846,8 +846,15 @@ int main(int argc, char **argv) {
     } else if (run->exit_reason == KVM_EXIT_IO ||
 	       run->exit_reason == KVM_EXIT_MMIO) {
 
-      printf("## I/O, terminating execution\n");
-
+      if (run->exit_reason == KVM_EXIT_IO){
+      		printf("## I/O, terminating execution\n");
+	      printf("KVM_EXIT_IO\n");
+      }else{
+	      printf("KVM_EXIT_MMIO\n");
+	      r = 1;
+	      continue;
+      }
+	
       if (argc == 3) {
 	strncpy(tempfile, "/tmp/kemufuzzer-kvm-XXXXXX", PATH_MAX - 1);
 	mkstemp(tempfile);
