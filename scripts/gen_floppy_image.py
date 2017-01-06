@@ -1641,7 +1641,7 @@ class Gadget:
         define, kill, use = [reg], [], []
 
         if reg.name == "EFLAGS":
-            asm = "push $0x%.8x; popf; // eflags" % (reg.value)
+            asm = "nop; push $0x%.8x; nop; popf; // eflags" % (reg.value)
             use += ["stack*"]
         elif reg.name == "EIP":
             pass
@@ -1994,7 +1994,16 @@ class Gadget:
                 print "count_R = %d, count_L = %d" % (count_r, count_l)
                 print "R = %d, L = %d" % (len(feistel_r), len(feistel_l))
         # else :Do nothing, for single test case mode
-
+	
+        # Skip set-input code if in 1st iter
+        if MODE > 2:
+            label = random.randint(0, 0xffffffff)
+            asm1 = "cmpl $0x%x,0x%x;" \
+                    "je forward_%.8x; // Use FuzzBALL input if 1st iter" % (loop, count_addr, label)
+            asm2 = "forward_%.8x: " % label
+            g1 = Gadget(asm = asm1, mnemonic = "Skip setinput")
+            g2 = Gadget(asm = asm2, mnemonic = "Skip setinput")
+            setinput = [g1] + setinput + [g2]
         return (backup, remove_none(backup_r), setinput, code, output, restore);     
     
         
