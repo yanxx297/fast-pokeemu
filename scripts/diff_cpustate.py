@@ -440,7 +440,7 @@ def normalize_states(dumps):
                 c.regs_state.rflags &= ~0x10000
 
             # ignore ZF, SF, PF, AF, ...
-            c.regs_state.rflags &= ~(1 | 1 << 2 | 1 << 4 | 1 << 6 | 1 << 7 | 1 << 11)
+#            c.regs_state.rflags &= ~(1 | 1 << 2 | 1 << 4 | 1 << 6 | 1 << 7 | 1 << 11)
 
         # Ignore accessed bit in PDEs and PTEs (because BOCHS does not set it)
         if EMULATOR_BOCHS in emulators and dumps[0].kernel:
