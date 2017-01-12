@@ -78,7 +78,8 @@ init_l = []         #gadgets that copy random value to L block
 feistel_r = []      #R block address container
 feistel_r_bak = []  #backup of R block
 feistel_l = []      #L block container
-feistel_bak = []    #Backup original inputs for restoring at the end of each TC
+feistel_in = []     #Backup original inputs for restoring at the end of each TC
+feistel_out = []    #Backup original outputs for restoring at the end of each TC
 count_r = 0         # Pointer to the current R/L block
 count_l = 0
 count_addr = 0      # A mem location to store loop count
@@ -110,7 +111,7 @@ def flip_addrs():
     global feistel_r
     global feistel_r_bak
     global feistel_l
-    global feistel_bak
+    global feistel_in
     global count_addr
     global next_addr
     global start_addr
@@ -123,7 +124,7 @@ def flip_addrs():
     flip_list(feistel_r)
     flip_list(feistel_r_bak)
     flip_list(feistel_l)
-    flip_list(feistel_bak)
+    flip_list(feistel_in)
     count_addr = count_addr ^ 0x01000000
     next_addr = next_addr ^ 0x01000000
     start_addr = start_addr ^ 0x01000000
@@ -150,7 +151,8 @@ def print_feistel_blocks():
     print_line("R", feistel_r)
     print_line("R_bak", feistel_r_bak)
     print_line("L", feistel_l)
-    print_line("bak", feistel_bak)
+    print_line("in_bak", feistel_in)
+    print_line("out_bak", feistel_out)
     print "\n"
 
 
@@ -1228,7 +1230,7 @@ def handle_mem_read(inst, op, i, isInit = False):
     global init_r
     global feistel_r
     global feistel_r_bak
-    global feistel_bak
+    global feistel_in
     global count_l
     global count_r    
     setinput = []
@@ -1254,11 +1256,11 @@ def handle_mem_read(inst, op, i, isInit = False):
             if isInit:             
                 feistel_r += [val]
                 feistel_r_bak += [r_bak[idx]]
-                feistel_bak += [bak[idx]]
+                feistel_in += [bak[idx]]
                 r = "0x%x" % feistel_r[count_r]                
                 init_r += [gen_store_mem(op_str, r)]
             src = "0x%x" % feistel_r[count_r]
-            op_bak = "0x%x" % feistel_bak[count_r]
+            op_bak = "0x%x" % feistel_in[count_r]
             backup += [gen_store_mem(op_str, op_bak)]
             setinput += [gen_store_mem(src, op_str)]
             restore += [gen_store_mem(op_bak, op_str)]
@@ -1273,11 +1275,14 @@ def handle_mem_write(inst, op, i, isInit = False):
     global feistel_l
     global feistel_r
     global feistel_r_bak
-    global feistel_bak
+    global feistel_in
+    global feistel_out
     global count_l
     global count_r    
     setinput = []
     feistel = []      
+    restore = []
+    backup = []
     
     (op_str, op_len) = get_mem_op(inst, op, i)
     if DEBUG >= 2:
@@ -1285,7 +1290,9 @@ def handle_mem_write(inst, op, i, isInit = False):
     if inst.is_mem_written(0):
         if isInit:
             l = get_addr(op_len)
-            feistel_l += l 
+            bak = get_addr(op_len)
+            feistel_l += l
+            feistel_out += bak 
             for val in l:
                 init_l += [gen_imm2mem(gen_seed(), "0x%x" % val)]                                
         r = int(math.ceil(float(op_len)/4))
@@ -1297,15 +1304,18 @@ def handle_mem_write(inst, op, i, isInit = False):
         while count_l + r > len(feistel_r):
             feistel_r += get_addr()
             feistel_r_bak += get_addr()
-            feistel_bak += get_addr()        
+            feistel_in += get_addr()        
         for j in range(r):
             src1 = "0x%x" % feistel_l[count_l + j]
             (src2, _) = get_mem_op(inst, op, i, j * 4)
+            op_bak = "0x%x" % feistel_out[count_l + j]
             dest = "0x%x" % feistel_r[count_l + j]        
-            feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]            
+            feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]
+            backup += [gen_store_mem(src2, op_bak)]
+            restore += [gen_store_mem(op_bak, src2)]                   
         count_l += r
         
-    return ([], setinput, feistel, [])
+    return (backup, setinput, feistel, restore)
 
 
 # ===-------------------------------------------------------------------===
@@ -1324,7 +1334,7 @@ def handle_reg_read(inst, op, i, isInit = False):
     global init_r
     global feistel_r
     global feistel_r_bak
-    global feistel_bak
+    global feistel_in
     global count_l
     global count_r    
     setinput = []
@@ -1351,7 +1361,7 @@ def handle_reg_read(inst, op, i, isInit = False):
             for idx, val in enumerate(f):
                 feistel_r += [val]
                 feistel_r_bak += [r_bak[idx]]
-                feistel_bak += [bak[idx]]                
+                feistel_in += [bak[idx]]                
             r = "0x%x" % feistel_r[count_r]
             print "r = %s" % r
             init_r += [gen_reg2mem(reg_str, r, reg_len)] 
@@ -1359,7 +1369,7 @@ def handle_reg_read(inst, op, i, isInit = False):
         size = int(math.ceil(float(reg_len) / 4))                        
         src = "0x%x" % feistel_r[count_r]
         print "src = %s" % src
-        reg_bak = "0x%x" % feistel_bak[count_r]
+        reg_bak = "0x%x" % feistel_in[count_r]
         backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
         setinput += [gen_mem2reg(src, reg_str, reg_len)]
         restore += [gen_mem2reg(reg_bak, reg_str, reg_len)]
@@ -1376,11 +1386,14 @@ def handle_reg_write(inst, op, i, isInit = False):
     global feistel_l
     global feistel_r
     global feistel_r_bak
-    global feistel_bak
+    global feistel_in
+    global feistel_out
     global count_l
     global count_r    
     setinput = []
     feistel = []  
+    restore = []
+    backup = []
     
     (reg_str, reg_len) = get_reg_op(inst, op, i)
     if reg_str == "" or reg_len == 0:
@@ -1402,7 +1415,9 @@ def handle_reg_write(inst, op, i, isInit = False):
             print "RW"
         if isInit:
             l = get_addr(reg_len)
-            feistel_l += l 
+            bak = get_addr(reg_len)
+            feistel_l += l
+            feistel_out += bak 
             for val in l:
                 init_l += [gen_imm2mem(gen_seed(), "0x%x" % val)]                  
         src1 = "0x%x" % feistel_l[count_l]
@@ -1416,7 +1431,7 @@ def handle_reg_write(inst, op, i, isInit = False):
         while count_l + r > len(feistel_r):
             feistel_r += get_addr()
             feistel_r_bak += get_addr()
-            feistel_bak += get_addr()
+            feistel_in += get_addr()
         dest = "0x%x" % feistel_r[count_l]
         if reg_str.startswith("st"):
             l = get_addr(reg_len, True)            
@@ -1428,9 +1443,12 @@ def handle_reg_write(inst, op, i, isInit = False):
                 feistel += [gen_feistel_cipher(src1, src2, "0x%x" % feistel_r[count_l + j], 4, True)]
         else:
             feistel += [gen_feistel_cipher(src1, src2, dest, reg_len, True)]
+        reg_bak = "0x%x" % feistel_out[count_l]
+        backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
+        restore += [gen_mem2reg(reg_bak, reg_str, reg_len)]
         count_l += r
         
-    return ([], setinput, feistel, [])         
+    return (backup, setinput, feistel, restore)         
 
 
 # ===-------------------------------------------------------------------===
