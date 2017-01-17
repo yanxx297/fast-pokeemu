@@ -63,7 +63,9 @@ PG = 1
 # ===-----------------------------------------------------------------------===
 # Range for additional memory access
 # ===-----------------------------------------------------------------------===
-next_addr = 0x01278008
+tc_end = 0x1278008      # The location to store test case end address
+edata = tc_end + 4      # Starting address of exception data
+next_addr = edata + 8
 start_addr = next_addr
 end_addr = 0x013fffff
 
@@ -116,6 +118,8 @@ def flip_addrs():
     global next_addr
     global start_addr
     global end_addr
+    global tc_end
+    global edata
     
     def flip_list(l):
         for idx, val in enumerate(l):
@@ -125,6 +129,8 @@ def flip_addrs():
     flip_list(feistel_r_bak)
     flip_list(feistel_l)
     flip_list(feistel_in)
+    tc_end = tc_end ^ 0x01000000
+    edata = edata ^ 0x01000000
     count_addr = count_addr ^ 0x01000000
     next_addr = next_addr ^ 0x01000000
     start_addr = start_addr ^ 0x01000000
@@ -1951,6 +1957,28 @@ class Gadget:
             print "count_R = %d, count_L = %d" % (count_r, count_l)
 #             print "R = %d, L = %d" % (len(feistel_r), len(feistel_l))
             
+            # Initialize feistel blocks for exception info
+            if isInit:
+                print "Ecpt blocks"
+                feistel_l += get_addr()
+                feistel_l += get_addr()
+                print "********************************************************************************"
+                while len(feistel_r) < len(feistel_l):
+                    feistel_r += get_addr()
+                    feistel_r_bak += get_addr()
+            
+            # Generate gadgets computing feistel ciphertext for exception data 
+            src1 = "0x%x" % feistel_l[count_l]
+            src2 = "0x%x" % edata
+            dest = "0x%x" % feistel_r[count_l]
+            feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]
+            count_l += 1
+            src1 = "0x%x" % feistel_l[count_l]
+            src2 = "0x%x" % (edata + 4)
+            dest = "0x%x" % feistel_r[count_l]
+            feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]
+            count_l += 1
+                                                    
    
             if isInit:
                 # NOTE: We handle the case where read > write there, while 
@@ -2026,7 +2054,7 @@ class Gadget:
     
         
     @staticmethod
-    def gen_prologue(label, snapshot, tcn, addr = None):
+    def gen_prologue(start, end, snapshot, tcn, addr = None):
         asm = [];
         if MODE <= 2:
             asm = "invlpg 0x0;" \
@@ -2037,9 +2065,11 @@ class Gadget:
             asm = "movl $0x%.8x,0x%x; " \
                 "forward_%.8x: " \
                 "invlpg 0x0;" \
-                "prefetch 0x%s;" % (loop, addr, label, tcn) 
+                "prefetch 0x%s;" % (loop, addr, start, tcn) 
 #         ds = in_snapshot_sreg("DS", snapshot)
 #         asm += "mov $0x%.4x,%%ax; mov %%ax,%%ds;" % ds 
+        # Copy test case end address to a global location
+        asm += "movl $forward_%.8x,0x%x;" % (end, tc_end)
         mnemonic = "prologue"
         return [Gadget(asm = asm, mnemonic = mnemonic)]
 
@@ -2167,7 +2197,7 @@ def compile_gadgets(gadget, epilogue, directive = ""):
     asm = "";
     i = 0
     for tuple in gadget:
-        (startup, init, bak_r, backup, setin, code, output, restore, revert, loop) = tuple;
+        (startup, init, bak_r, backup, setin, code, mid, output, restore, revert, end, loop) = tuple;
         bak_sort = get_subtree(bak_r, "bak R")
         setin_sort = get_subtree(setin, "set input")
         
@@ -2176,7 +2206,7 @@ def compile_gadgets(gadget, epilogue, directive = ""):
         depgraph = build_dependency_graph(revert)
         revert = sort_gadget(depgraph, 0, revert)
         # Generate the assembly code        
-        for g in startup + init + bak_sort + backup + setin_sort + code + output + restore + revert + loop:
+        for g in startup + init + bak_sort + backup + setin_sort + code + mid + output + restore + revert + end + loop:
             if g != None:
                 asm += "%s\n" % (g.asm)
                 if i and i % 8 == 0:
@@ -2467,8 +2497,10 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
     
         if count == 1:
             count_addr = get_addr()[0]
-        label = random.randint(0, 0xffffffff)   #label at the beginnign of this test case                               
-        startup = Gadget.gen_prologue(label, snapshot, tc.split("/")[-2], count_addr)
+        s = random.randint(0, 0xffffffff)   #label at the beginnign of this test case
+        m = random.randint(0, 0xffffffff)   #label at the end of tested insn      
+        e = random.randint(0, 0xffffffff)   #label at the end of this test case                            
+        startup = Gadget.gen_prologue(s, m, snapshot, tc.split("/")[-2], count_addr)
         (backup, backup_r, setinput, code, output, restore) = Gadget.gen_root(snapshot, shellcode, count)        
         print "%d backup gadgets" % len(backup)
         #append extra init code for gadgets before tested insn
@@ -2484,13 +2516,22 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         if MODE > 2:
             #jump to TC beginning for a fixed # of times                   
             asm = "decl 0x%x; " \
-                "jnz forward_%.8x; // back to loop entrance" % (count_addr, label)
+                "jnz forward_%.8x; // back to loop entrance" % (count_addr, s)
         loop = [Gadget(asm = asm, mnemonic = "loop")] 
         
+        # Label at the middle of a test case, immediately after the tested insn        
+        asm = "forward_%.8x:" \
+            "movl $forward_%.8x,0x%x;" % (m, e, tc_end)
+        mid = [Gadget(asm = asm, mnemonic = "After tested insn")]
+        
+        # Label at the end of a test case
+        asm = "forward_%.8x:" % (e)
+        end = [Gadget(asm = asm, mnemonic = "End of testcase")]
+                
         if MODE <= 0:
             revert = [];
              
-        gadget.append((startup, init, bak, backup, setin, code, output, restore, revert, loop))
+        gadget.append((startup, init, bak, backup, setin, code, mid, output, restore, revert, end, loop))
         #TODO: Rewrite DEBUG
 #         if DEBUG >= 1:
 #             for g in prologue + body + epilogue:
