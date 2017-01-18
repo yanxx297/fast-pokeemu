@@ -85,75 +85,288 @@ void set_interrupt_handlers(idte_t *pidt, uint16_t seg)
 
 void int_handler_0(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 0 speaking\n");
-  asm volatile ("hlt;");
+//  kprintf("interrupt handler 0 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_1(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 1 speaking\n");
-   asm volatile ("hlt;");
+//  kprintf("interrupt handler 1 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_2(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 2 speaking\n");
-  asm volatile ("hlt;");
+//  kprintf("interrupt handler 2 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_3(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 3 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 3 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_4(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 4 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 4 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_5(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 5 speaking\n");
+//  kprintf("interrupt handler 5 speaking\n");
     asm volatile (
-    "mov 0x1c(%esp),%eax;"
-    "mov 0x20(%esp),%ebx;"
-    "mov 0x24(%esp),%ecx;"
-    "mov 0x28(%esp),%edx;"
-    "mov 0x2c(%esp),%esi;"
-    "hlt;"
-    );
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_6(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 6 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 6 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_7(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 7 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 7 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_8(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 8 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 8 speaking\n");
+	asm volatile (
+	"push %eax;"
+	"mov %cr0,%eax;"
+	"and $0x80000000,%eax;"
+	"cmpl $0x80000000,%eax;"
+	"je .pg;"
+	"pop %eax;"
+	"pop 0x27800c;"
+	"movl $0xb,0x278010;"
+	"add $0x4,%esp;"
+	"push 0x278008;"
+	"jmp .end;"
+	".pg:"
+	"pop %eax;"
+	"pop 0x127800c;"
+	"movl $0xb,0x1278010;"
+	"add $0x4,%esp;"
+	"push 0x1278008;"
+	".end:"
+	"iret;"
+	"hlt;");
   return;
 }
 void int_handler_9(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 9 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 9 speaking\n");
+	asm volatile (
+	"push %eax;"
+	"mov %cr0,%eax;"
+	"and $0x80000000,%eax;"
+	"cmpl $0x80000000,%eax;"
+	"je .pg;"
+	"pop %eax;"
+	"pop 0x27800c;"
+	"movl $0xb,0x278010;"
+	"add $0x4,%esp;"
+	"push 0x278008;"
+	"jmp .end;"
+	".pg:"
+	"pop %eax;"
+	"pop 0x127800c;"
+	"movl $0xb,0x1278010;"
+	"add $0x4,%esp;"
+	"push 0x1278008;"
+	".end:"
+	"iret;"
+	"hlt;");
   return;
 }
 void int_handler_10(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 10 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 10 speaking\n");
+	asm volatile (
+	"push %eax;"
+	"mov %cr0,%eax;"
+	"and $0x80000000,%eax;"
+	"cmpl $0x80000000,%eax;"
+	"je .pg;"
+	"pop %eax;"
+	"pop 0x27800c;"
+	"movl $0xb,0x278010;"
+	"add $0x4,%esp;"
+	"push 0x278008;"
+	"jmp .end;"
+	".pg:"
+	"pop %eax;"
+	"pop 0x127800c;"
+	"movl $0xb,0x1278010;"
+	"add $0x4,%esp;"
+	"push 0x1278008;"
+	".end:"
+	"iret;"
+	"hlt;");
   return;
 }
 void int_handler_11(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
@@ -164,28 +377,48 @@ void int_handler_11(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
     		"mov %cr0,%eax;"
     		"and $0x80000000,%eax;"
     		"cmpl $0x80000000,%eax;"
-    		"je pg11;"
+    		"je .pg;"
     		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0xb,0x278010;"
     		"add $0x4,%esp;"
     		"push 0x278008;"
-    		"jmp end11;"
-    		"pg11:"
+    		"jmp .end;"
+    		".pg:"
     		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0xb,0x1278010;"
     		"add $0x4,%esp;"
     		"push 0x1278008;"
-    		"end11:"
+    		".end:"
     		"iret;"
     		"hlt;");
   return;
 }
 void int_handler_12(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 12 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 12 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_13(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
@@ -196,59 +429,178 @@ void int_handler_13(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
     		"mov %cr0,%eax;"
     		"and $0x80000000,%eax;"
     		"cmpl $0x80000000,%eax;"
-    		"je pg13;"
+    		"je .pg;"
     		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0xb,0x278010;"
     		"add $0x4,%esp;"
     		"push 0x278008;"
-    		"jmp end13;"
-    		"pg13:"
+    		"jmp .end;"
+    		".pg:"
     		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0xb,0x1278010;"
     		"add $0x4,%esp;"
     		"push 0x1278008;"
-    		"end13:"
+    		".end:"
     		"iret;"
     		"hlt;");
-
   return;
 }
 void int_handler_14(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 14 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 14 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_15(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 15 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 15 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_16(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 16 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 16 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_17(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 17 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 17 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_18(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 18 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 18 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_19(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
-  kprintf("interrupt handler 19 speaking\n");
-    asm volatile ("hlt;");
+//  kprintf("interrupt handler 19 speaking\n");
+    asm volatile (
+    		"push %eax;"
+    		"mov %cr0,%eax;"
+    		"and $0x80000000,%eax;"
+    		"cmpl $0x80000000,%eax;"
+    		"je .pg;"
+    		"pop %eax;"
+    		"pop 0x27800c;"
+    		"movl $0xb,0x278010;"
+    		"add $0x4,%esp;"
+    		"push 0x278008;"
+    		"jmp .end;"
+    		".pg:"
+    		"pop %eax;"
+    		"pop 0x127800c;"
+    		"movl $0xb,0x1278010;"
+    		"add $0x4,%esp;"
+    		"push 0x1278008;"
+    		".end:"
+    		"iret;"
+    		"hlt;");
   return;
 }
 void int_handler_20(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
