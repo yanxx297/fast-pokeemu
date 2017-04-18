@@ -303,7 +303,6 @@ void int_handler_8(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 8 speaking\n");
 	asm volatile (
-	"sub $0x4,%esp;"
 	"push %eax;"
 	"mov %cr0,%eax;"
 	"and $0x80000000,%eax;"
@@ -357,7 +356,6 @@ void int_handler_10(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 10 speaking\n");
 	asm volatile (
-	"sub $0x4,%esp;"
 	"push %eax;"
 	"mov %cr0,%eax;"
 	"and $0x80000000,%eax;"
@@ -384,7 +382,6 @@ void int_handler_11(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 11 speaking\n");
     asm volatile (
-		"sub $0x4,%esp;"
     		"push %eax;"
     		"mov %cr0,%eax;"
     		"and $0x80000000,%eax;"
@@ -411,7 +408,6 @@ void int_handler_12(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 12 speaking\n");
     asm volatile (
-		"sub $0x4,%esp;"
     		"push %eax;"
     		"mov %cr0,%eax;"
     		"and $0x80000000,%eax;"
@@ -438,7 +434,6 @@ void int_handler_13(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 13 speaking\n");
     asm volatile (
-		"sub $0x4,%esp;"
     		"push %eax;"
     		"mov %cr0,%eax;"
     		"and $0x80000000,%eax;"
@@ -465,7 +460,6 @@ void int_handler_14(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 14 speaking\n");
     asm volatile (
-		"sub $0x4,%esp;"
     		"push %eax;"
     		"mov %cr0,%eax;"
     		"and $0x80000000,%eax;"
@@ -492,7 +486,6 @@ void int_handler_15(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 15 speaking\n");
     asm volatile (
-		"sub $0x4,%esp;"
     		"push %eax;"
     		"mov %cr0,%eax;"
     		"and $0x80000000,%eax;"
@@ -546,7 +539,6 @@ void int_handler_17(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 17 speaking\n");
     asm volatile (
-		"sub $0x4,%esp;"
     		"push %eax;"
     		"mov %cr0,%eax;"
     		"and $0x80000000,%eax;"
