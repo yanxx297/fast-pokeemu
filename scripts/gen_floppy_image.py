@@ -2054,7 +2054,7 @@ class Gadget:
     
         
     @staticmethod
-    def gen_prologue(start, end, snapshot, tcn, addr = None):
+    def gen_prologue(start, mid, snapshot, tcn, addr = None):
         asm = [];
         if MODE <= 2:
             asm = "invlpg 0x0;" \
@@ -2068,8 +2068,8 @@ class Gadget:
                 "prefetch 0x%s;" % (loop, addr, start, tcn) 
 #         ds = in_snapshot_sreg("DS", snapshot)
 #         asm += "mov $0x%.4x,%%ax; mov %%ax,%%ds;" % ds 
-        # Copy test case end address to a global location
-        asm += "movl $forward_%.8x,0x%x;" % (end, tc_end)
+        # Copy the eip after tested insn to a global location
+        asm += "movl $forward_%.8x,0x%x;" % (mid, tc_end)
         mnemonic = "prologue"
         return [Gadget(asm = asm, mnemonic = mnemonic)]
 
@@ -2197,7 +2197,7 @@ def compile_gadgets(gadget, epilogue, directive = ""):
     asm = "";
     i = 0
     for tuple in gadget:
-        (startup, init, bak_r, backup, setin, code, mid, output, restore, revert, end, loop) = tuple;
+        (startup, init, mod, bak_r, backup, setin, code, mid, output, restore, revert, end, loop) = tuple;
         bak_sort = get_subtree(bak_r, "bak R")
         setin_sort = get_subtree(setin, "set input")
         
@@ -2206,7 +2206,7 @@ def compile_gadgets(gadget, epilogue, directive = ""):
         depgraph = build_dependency_graph(revert)
         revert = sort_gadget(depgraph, 0, revert)
         # Generate the assembly code        
-        for g in startup + init + bak_sort + backup + setin_sort + code + mid + output + restore + revert + end + loop:
+        for g in startup + init + mod + bak_sort + backup + setin_sort + code + mid + output + restore + revert + end + loop:
             if g != None:
                 asm += "%s\n" % (g.asm)
                 if i and i % 8 == 0:
@@ -2519,6 +2519,10 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
                 "jnz forward_%.8x; // back to loop entrance" % (count_addr, s)
         loop = [Gadget(asm = asm, mnemonic = "loop")] 
         
+        # Set the return address to the end of the test case
+        asm = "movl $forward_%.8x,0x%x;" % (e, tc_end)
+        mod = [Gadget(asm = asm, mnemonic = "Modify the exception handler return target to the end of current test case")]
+
         # Label at the middle of a test case, immediately after the tested insn        
         asm = "forward_%.8x:" \
             "movl $forward_%.8x,0x%x;" % (m, e, tc_end)
@@ -2531,7 +2535,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         if MODE <= 0:
             revert = [];
              
-        gadget.append((startup, init, bak, backup, setin, code, mid, output, restore, revert, end, loop))
+        gadget.append((startup, init, mod, bak, backup, setin, code, mid, output, restore, revert, end, loop))
         #TODO: Rewrite DEBUG
 #         if DEBUG >= 1:
 #             for g in prologue + body + epilogue:
