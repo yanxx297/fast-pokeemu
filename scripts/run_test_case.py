@@ -86,7 +86,15 @@ def run_testcase(outdir, code, path, script, floppy, timeout, tmp):
     print cmdline
     
     try:
+        filename = outdir + "/time"
+        t0 = time.time()
         exec_with_timeout(cmdline = cmdline, timeout = timeout)
+        exectime = time.time() - t0
+        f = open(filename, 'a')
+        f.write("%f\n" % exectime)
+        f.close()
+        print "done in %.3fs" % (exectime)
+        print "save time at %s" % filename
     except Timeout:
         # Create a fake post state
         print "TIMEOUT!!!!"
@@ -125,13 +133,5 @@ if __name__ == "__main__":
 
     floppy = gen_floppy(opts["testcase"], opts["mode"])
     code, path = gen_testcase_name(opts["testcase"])
-    t0 = time.time()
     run_testcase(opts["outdir"], code, path, opts["script"], floppy, 
                  int(opts["timeout"]), opts["tmp"])
-    exectime = time.time() - t0
-    print >> sys.stderr, "Done in %.3fs" % (exectime)
-    filename = opts["outdir"] + "/time"
-    f = open(filename, 'a')
-    f.write("%f\n" % exectime)
-    f.close()
-    print "Save time at %s" % filename

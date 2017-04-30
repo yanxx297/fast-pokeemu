@@ -3,11 +3,10 @@
 from run_test_case import *
 
 # Run one test case for once and return time  
-def run_test_case(opts):
-    floppy = gen_floppy(opts["testcase"], opts["mode"])
-    code, path = gen_testcase_name(opts["testcase"])
+def run_test_case(args):
+
     t0 = time.time()
-    run_testcase(opts["outdir"], code, path, opts["script"], floppy,int(opts["timeout"]), opts["tmp"])
+    run_testcase(*args)
     t1 = time.time()
     print >> sys.stderr, "Done in %.3fs" % (t1 - t0)
     return  (t1 - t0)
@@ -46,7 +45,11 @@ if __name__ == "__main__":
     assert os.path.isdir(opts["outdir"])
     print "outdir valid\n"
     assert os.path.isfile(opts["script"]), opts["script"]
-    t = get_avg(run_test_case, opts, int(extraopts["repeat"]))
+    floppy = gen_floppy(opts["testcase"], opts["mode"])
+    code, path = gen_testcase_name(opts["testcase"])    
+
+    args = (opts["outdir"], code, path, opts["script"], floppy,int(opts["timeout"]), opts["tmp"])
+    t = get_avg(run_test_case, args, int(extraopts["repeat"]))
     filename = opts["outdir"] + "/time"
     f = open(filename, 'a')
     f.write("%f\n" % t)
