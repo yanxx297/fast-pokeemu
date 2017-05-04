@@ -1,17 +1,24 @@
 #! /bin/bash
 
 aggreg=false
-mode=0
-in_dir=/export/scratch/tmp/sample
-out_dir=/export/scratch/tmp/out/
+kvm=false
+gen_list=false
+mode=
+in_dir=
+out_dir=
 timeout=10
-tmp_dir=/export/scratch/tmp
+tmp_dir=/tmp
 
 while [ "$1" != "" ]; do
 	case $1 in
 		-a | --aggreg )
 			aggreg=true
-			shift
+			;;
+		-kvm )
+			kvm=true
+			;;
+		--gen-list )
+			$gen_list=true
 			;;
 		-m | --mode )
 			shift
@@ -37,22 +44,33 @@ while [ "$1" != "" ]; do
 	shift
 done
 
-if ! [ -e $in_dir ]; then
+if ! [ -e $in_dir ] && [ "$kvm" == false ] ; then
 	echo "Input folder doesn't exist."
 	exit
 fi
-mkdir -p $out_dir $tmp_dir
-export MODE=$mode
-export IN=$in_dir
-export OUT=$out_dir
-export TMP_DIR=$tmp_dir
-export TIMEOUT=$timeout
 
-if [[ "$aggreg" == false ]]; then
-	make -f batchRunTestcase -i -j 6
-else
+mkdir -p $out_dir $tmp_dir
+if ! [ -z $mode ]; then export MODE=$mode; fi
+if ! [ -z $in_dir ]; then export IN=$in_dir; fi
+if ! [ -z $out_dir ]; then export OUT=$out_dir; fi
+if ! [ -z $tmp_dir ]; then export TMP_DIR=$tmp_dir; fi
+if ! [ -z $timeout ]; then export TIMEOUT=$timeout; fi
+
+if [[ "$aggreg" == true ]]; then
 	make -f batchRunAggregTC -i -j 6
 	rm -r $tmp_dir/tmp.*
+elif [[ "$kvm" == true ]]; then
+	if [[ -z "$in_dir" ]]; then
+		echo "Please set remote input directory with -in option"
+	else
+		insn_list=$(ssh yan@logan.cs.umn.edu $(echo ls $in_dir))
+		insn_list=$(echo $insn_list| tr "\n" " ")
+		export INSN_LIST=$insn_list
+		export OPT_GEN_LIST=$gen_list
+		make -f batchRunTestcase-kvm -i -j 6 all
+	fi
+else
+	make -f batchRunTestcase -i -j 6
 fi
 
 rm -r /tmp/tmp.*
