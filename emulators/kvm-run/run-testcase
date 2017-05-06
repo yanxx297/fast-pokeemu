@@ -4,7 +4,7 @@ here=$(readlink -f $0)
 here=$(dirname "$0")
 pre="$1"
 out="$2"
-dir=$(dirname $2)/time
+dir=$(dirname $2)/ktime
 
 if [ "$out" = "" -o "$pre" = "" ]
 then
@@ -24,11 +24,13 @@ export KEMUFUZZER_PRE_STATE="$pre"
 export KEMUFUZZER_POST_STATE="$post"
 export KEMUFUZZER_TESTCASE_CHECKSUM="no checksum"
 
-{ /usr/bin/time -f %e $here/kvm $pre $post; } 2>> $dir
+{ TIMEFORMAT='%3R'; time $here/kvm $pre $post; } 2>>$dir
 ret=$?
 if [ $ret -eq 0 ]
 then
-    mv "$post" "$out"
+	mv "$post" "$out"
+else
+	sed -i '$ d' $dir
 fi
 
 rm -f "$post"

@@ -2,10 +2,7 @@
 import os
 import sys
 
-splitlen = 800
-base = ''
-
-def split_file(file):
+def split_file(file, splitlen):
     if not os.path.isfile(file):
         return
     input = open(file, 'r').read().split(',')
@@ -20,8 +17,6 @@ def split_file(file):
         idx += 1
 
 if __name__ == "__main__":
-    global base
-    base = sys.argv[1]
-    for subdir,dirs,files in os.walk(base):
-        file = subdir + '/log'
-        split_file(file)
+    filename = sys.argv[1]
+    splitlen = sys.argv[2]
+    split_file(filename, int(splitlen))

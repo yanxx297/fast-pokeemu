@@ -2,7 +2,6 @@
 
 aggreg=false
 kvm=false
-gen_list=false
 mode=
 in_dir=
 out_dir=
@@ -16,9 +15,6 @@ while [ "$1" != "" ]; do
 			;;
 		-kvm )
 			kvm=true
-			;;
-		--gen-list )
-			$gen_list=true
 			;;
 		-m | --mode )
 			shift
@@ -49,6 +45,11 @@ if ! [ -e $in_dir ] && [ "$kvm" == false ] ; then
 	exit
 fi
 
+if ! [ $out_dir ] ;then
+	echo "Output folder doesn't exist"
+	exit
+fi
+
 mkdir -p $out_dir $tmp_dir
 if ! [ -z $mode ]; then export MODE=$mode; fi
 if ! [ -z $in_dir ]; then export IN=$in_dir; fi
@@ -66,7 +67,6 @@ elif [[ "$kvm" == true ]]; then
 		insn_list=$(ssh yan@logan.cs.umn.edu $(echo ls $in_dir))
 		insn_list=$(echo $insn_list| tr "\n" " ")
 		export INSN_LIST=$insn_list
-		export OPT_GEN_LIST=$gen_list
 		make -f batchRunTestcase-kvm -i -j 6 all
 	fi
 else

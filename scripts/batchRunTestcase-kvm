@@ -1,25 +1,26 @@
 #Usage: make -f batchRunTestcase -j 6
 
 #Config
-IN=/tmp/aggreg_m3_qemu
-OUT=/tmp/out/
-TMPDIR=/tmp #dir storing temperary files
-TIMEOUT=100
-EMUPATH=./../emulators/kvm-run/run-testcase
+IN?=/home/yddanxx297/Project/state-explr
+OUT?=/tmp/out/
+EMUPATH?=./../emulators/kvm-run/run-testcase
+INSN_LIST?=
 
-
-SUBDIRS := $(sort $(dir $(wildcard $(IN)/*/.)))
-
-all:$(addsuffix /00000000.post, $(addprefix $(OUT), $(foreach dir, $(SUBDIRS), $(shell basename $(dir)))))
+all:$(addsuffix /00000000.diff, $(addprefix $(OUT), $(foreach dir, $(INSN_LIST), $(dir))))
 
 define run-target
-$(addprefix $(OUT), $(shell basename $1))/00000000.post:: ;
-	$(eval OUTDIR:= $(addprefix $(OUT), $(shell basename $1)))
-	mkdir $(OUTDIR)
-	$(foreach tc, $(sort $(wildcard $1*.pre)), \
-	./$(EMUPATH) \
-	$(tc) \
-	$(addprefix $(OUTDIR)/, $(basename $(notdir $(tc))).post);)
+$(addprefix $(OUT), $1)/00000000.diff:
+	$(eval INDIR:= $(addprefix $(IN), $1))
+	$(eval OUTDIR:= $(addprefix $(OUT), $1))
+	scp -r yan@logan.cs.umn.edu:$(IN)/$1 $(OUT)
+	for file in $(OUTDIR)/*.pre; do\
+		tcname=$$$$(basename $$$$file .pre);\
+		./$(EMUPATH) $$$$file $(OUTDIR)/$$$$tcname.post.kvm;\
+		python diff_cpustate.py $(OUTDIR)/$$$$tcname.post $(OUTDIR)/$$$$tcname.post.kvm > $(OUTDIR)/$$$$tcname.diff && echo $$$$tcname >> $(OUTDIR)/match;\
+	done;
+	find $(OUTDIR) -type f -empty -delete
+	rm $(OUTDIR)/*.pre $(OUTDIR)/*.post $(OUTDIR)/*.kvm
 endef
 
-$(foreach dir,$(SUBDIRS),$(eval $(call run-target,$(dir))))
+$(foreach dir,$(INSN_LIST),$(eval $(call run-target,$(dir))))
+
