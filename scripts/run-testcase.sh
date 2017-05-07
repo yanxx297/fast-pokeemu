@@ -6,11 +6,11 @@ mode=
 in_dir=
 out_dir=
 timeout=10
-tmp_dir=/tmp
+tmp_dir=
 
 while [ "$1" != "" ]; do
 	case $1 in
-		-a | --aggreg )
+		-aggreg )
 			aggreg=true
 			;;
 		-kvm )

@@ -2,7 +2,7 @@
 
 #Config
 MODE?=0
-IN?=/home/grad01/yan/tmp/aggreg-list
+IN?=/export/scratch/tmp/aggreg_list
 OUT?=/export/scratch/tmp/out/
 TMP_DIR?=/export/scratch/tmp/
 TIMEOUT?=10
@@ -25,7 +25,7 @@ $(addprefix $(OUT), $(shell basename $1))/time:: ;
 		timeout:$(TIMEOUT) \
 		outdir:$(OUTDIR) \
 		script:$(EMUPATH) mode:$(MODE) tmp:$(TMP);)
-	mv $(OUTDIR) $(addprefix $(OUT), $(shell basename $1));
+	mv $(OUTDIR) $(addprefix $(OUT)/, $(shell basename $1));
 endef
 
 $(foreach dir,$(SUBDIRS),$(eval $(call run-target,$(dir))))

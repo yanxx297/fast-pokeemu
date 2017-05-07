@@ -1,7 +1,7 @@
 #Usage: make -f batchRunTestcase -j 6
 
 #Config
-IN?=/home/yddanxx297/Project/state-explr
+IN?=/home/yanxx297/Project/state-explr
 OUT?=/tmp/out/
 EMUPATH?=./../emulators/kvm-run/run-testcase
 INSN_LIST?=
