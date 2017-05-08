@@ -1,22 +1,29 @@
-#Usage: make -f batchRunTestcase -j 6
+# Usage: make -f batchRunTestcase -j 6
+SHELL := /bin/bash
 
-#Config
-IN?=/home/yanxx297/Project/state-explr
+# Config
+IN?=/tmp/out/
 OUT?=/tmp/out/
 EMUPATH?=./../emulators/kvm-run/run-testcase
 INSN_LIST?=
 
-all:$(addsuffix /00000000.diff, $(addprefix $(OUT), $(foreach dir, $(INSN_LIST), $(dir))))
+all:$(addsuffix /ktime, $(addprefix $(OUT), $(foreach dir, $(INSN_LIST), $(dir))))
 
 define run-target
-$(addprefix $(OUT), $1)/00000000.diff:
+$(addprefix $(OUT), $1)/ktime:
 	$(eval INDIR:= $(addprefix $(IN), $1))
 	$(eval OUTDIR:= $(addprefix $(OUT), $1))
 	scp -r yan@logan.cs.umn.edu:$(IN)/$1 $(OUT)
 	for file in $(OUTDIR)/*.pre; do\
 		tcname=$$$$(basename $$$$file .pre);\
 		./$(EMUPATH) $$$$file $(OUTDIR)/$$$$tcname.post.kvm;\
-		python diff_cpustate.py $(OUTDIR)/$$$$tcname.post $(OUTDIR)/$$$$tcname.post.kvm > $(OUTDIR)/$$$$tcname.diff && echo $$$$tcname >> $(OUTDIR)/match;\
+		python diff_cpustate.py $(OUTDIR)/$$$$tcname.post $(OUTDIR)/$$$$tcname.post.kvm > $(OUTDIR)/$$$$tcname.diff;\
+		err=$$$$?;\
+		if [ $$$$err == 0 ]; then\
+			echo $$$$tcname >> $(OUTDIR)/match;\
+		elif [ $$$$err == 2 ]; then\
+			echo $$$$tcname >> $(OUTDIR)/mismatch;\
+		fi;\
 	done;
 	find $(OUTDIR) -type f -empty -delete
 	rm $(OUTDIR)/*.pre $(OUTDIR)/*.post $(OUTDIR)/*.kvm

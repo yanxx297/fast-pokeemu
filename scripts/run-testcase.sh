@@ -41,12 +41,12 @@ while [ "$1" != "" ]; do
 done
 
 if ! [ -e $in_dir ] && [ "$kvm" == false ] ; then
-	echo "Input folder doesn't exist."
+	echo "Input folder $in_dir doesn't exist."
 	exit
 fi
 
 if ! [ $out_dir ] ;then
-	echo "Output folder doesn't exist"
+	echo "Output folder $out_dir doesn't exist"
 	exit
 fi
 
@@ -67,7 +67,7 @@ elif [[ "$kvm" == true ]]; then
 		insn_list=$(ssh yan@logan.cs.umn.edu $(echo ls $in_dir))
 		insn_list=$(echo $insn_list| tr "\n" " ")
 		export INSN_LIST=$insn_list
-		make -f batchRunTestcase-kvm -i -j 6 all
+		make -f batchRunTestcase-kvm -i all
 	fi
 else
 	make -f batchRunTestcase -i -j 6
