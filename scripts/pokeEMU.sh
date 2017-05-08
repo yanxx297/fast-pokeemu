@@ -6,6 +6,14 @@ remote_dir=/export/scratch/tmp
 remote_in=$remote_dir/sample/
 remote_out=$remote_dir/out/
 
+is_match () {
+	if [ -e $1/mismatch ]; then
+		return 1;
+	else
+		return 0;
+	fi
+}
+
 echo 'Run single mode 0 experiment'
 if ! [ -e $dir/single-m0-kvm/ ]; then
 	ssh yan@logan.cs.umn.edu $(echo "cd ~/Project/pokemu-oras/scripts; ./run-testcase.sh -m 0 -in $remote_in -out $remote_out")
@@ -48,7 +56,36 @@ if ! [ -e $dir/aggreg-m3-kvm/ ]; then
 fi
 
 echo 'generate effectiveness results'
-
-
-
-
+if ! [ -e $dir/000 ]; then
+	touch $dir/000 $dir/001 $dir/010 $dir/011 $dir/100 $dir/101 $dir/110 $dir/111
+	for aggreg in $dir/aggreg-m3-kvm/*; do
+		s0=$dir/single-m0-kvm/$(basename $aggreg)
+		s3=$dir/single-m3-kvm/$(basename $aggreg)
+		if $(is_match $s0) && $(is_match $s3) && $(is_match $aggreg); then
+			echo $(basename $aggreg) >> $dir/000;
+		elif $(is_match $s0) && $(is_match $s3) && ! $(is_match $aggreg); then
+			echo $(basename $aggreg) >> $dir/001;
+		elif $(is_match $s0) && ! $(is_match $s3) && $(is_match $aggreg); then
+			echo $(basename $aggreg) >> $dir/010;
+		elif $(is_match $s0) && ! $(is_match $s3) && ! $(is_match $aggreg); then
+			echo $(basename $aggreg) >> $dir/011;
+		elif ! $(is_match $s0) && $(is_match $s3) && $(is_match $aggreg); then
+			echo $(basename $aggreg) >> $dir/100;
+		elif ! $(is_match $s0) && $(is_match $s3) && ! $(is_match $aggreg); then
+			echo $(basename $aggreg) >> $dir/101;
+		elif ! $(is_match $s0) && ! $(is_match $s3) && $(is_match $aggreg); then
+			echo $(basename $aggreg) >> $dir/110;
+		elif ! $(is_match $s0) && ! $(is_match $s3) && ! $(is_match $aggreg); then
+			echo $(basename $aggreg) >> $dir/111;
+		fi
+	done
+	echo '
+	Match     & Match    	& Match		& $(cat $dir/000| wc -l) \\
+	Match     & Match	& Mismatch 	& $(cat $dir/000| wc -l) \\
+	Match     & Mismatch    & Match		& $(cat $dir/000| wc -l) \\
+	Match     & Mismatch	& Mismatch 	& $(cat $dir/000| wc -l) \\
+	Mismatch  & Match    	& Match		& $(cat $dir/000| wc -l) \\
+	Mismatch  & Match 	& Mismatch 	& $(cat $dir/000| wc -l) \\
+	Mismatch  & Mismatch    & Match		& $(cat $dir/000| wc -l) \\
+	Mismatch  & Mismatch 	& Mismatch 	& $(cat $dir/000| wc -l) \\\hline' > $dir/output2
+fi
