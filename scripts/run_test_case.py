@@ -86,15 +86,10 @@ def run_testcase(outdir, code, path, script, floppy, timeout, tmp):
     print cmdline
     
     try:
-        filename = outdir + "/time"
         t0 = time.time()
         exec_with_timeout(cmdline = cmdline, timeout = timeout)
         exectime = time.time() - t0
-        f = open(filename, 'a')
-        f.write("%f\n" % exectime)
-        f.close()
         print "done in %.3fs" % (exectime)
-        print "save time at %s" % filename
     except Timeout:
         # Create a fake post state
         print "TIMEOUT!!!!"
