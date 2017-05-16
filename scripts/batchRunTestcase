@@ -13,10 +13,10 @@ LOG=/log
 
 SUBDIRS := $(sort $(dir $(wildcard $(IN)/*/.)))
 
-all:$(addsuffix /00000000.post, $(addprefix $(OUT), $(foreach dir, $(SUBDIRS), $(shell basename $(dir)))))
+all:$(addsuffix /time, $(addprefix $(OUT), $(foreach dir, $(SUBDIRS), $(shell basename $(dir)))))
 
 define run-target
-$(addprefix $(OUT), $(shell basename $1))/00000000.post:: ;
+$(addprefix $(OUT), $(shell basename $1))/time:
 	$(eval OUTDIR:= $(shell mktemp -d -p $(TMP_DIR)))
 	$(eval TMP:= $(shell mktemp -d -p /tmp))
 	$(eval outputs := $(addprefix $(OUT), $(shell basename $1)))
