@@ -951,7 +951,7 @@ def gen_reg2mem_asm(reg, mem, size = 4):
 def gen_mem2reg_asm(mem, reg, size = 4):
     asm = ""
     if reg == "eflags":
-        asm += "andl $0x8d5,%s;" \
+        asm += "andl $0xad5,%s;" \
             "push %s;" \
             "popf;" % (mem, mem)
     elif reg in ["eip", "ip", "cs", "tr"]:

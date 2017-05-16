@@ -67,7 +67,7 @@ elif [[ "$kvm" == true ]]; then
 		insn_list=$(ssh yan@logan.cs.umn.edu $(echo ls $in_dir))
 		insn_list=$(echo $insn_list| tr "\n" " ")
 		export INSN_LIST=$insn_list
-		make -f batchRunTestcase-kvm -i all
+		make -f batchRunTestcase-kvm -i -j 6 all
 	fi
 else
 	make -f batchRunTestcase -i -j 6

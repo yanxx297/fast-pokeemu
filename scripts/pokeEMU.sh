@@ -3,14 +3,16 @@ dir=/tmp
 in=
 out=$dir/out/
 remote_dir=/export/scratch/tmp 
-remote_in=$remote_dir/sample/
+remote_in=$remote_dir/state-explr/
 remote_out=$remote_dir/out/
 
 is_match () {
 	if [ -e $1/mismatch ]; then
 		return 1;
-	else
+	elif [ -e $1/match ]; then
 		return 0;
+	else
+		return 2;
 	fi
 }
 
@@ -44,7 +46,6 @@ if ! [ -e aggreg_list ] && ! [ -e $dir/aggreg-m3-kvm/ ]; then
 		rm aggreg_list/$(basename $insn)/log
 	done
 	scp -r aggreg_list/ yan@logan.cs.umn.edu:$remote_dir/aggreg_list/
-	rm -r aggreg_list/
 fi
 
 echo 'Run aggregate mode 3 experiment'
@@ -53,39 +54,46 @@ if ! [ -e $dir/aggreg-m3-kvm/ ]; then
 	./run-testcase.sh -kvm -in $remote_out -out $out
 	mv $out $dir/aggreg-m3-kvm/
 	ssh yan@logan.cs.umn.edu $(echo "mv $remote_out $remote_dir/aggreg-m3-qemu/")
+	rm -r aggreg_list/
 fi
 
 echo 'generate effectiveness results'
-if ! [ -e $dir/000 ]; then
-	touch $dir/000 $dir/001 $dir/010 $dir/011 $dir/100 $dir/101 $dir/110 $dir/111
+if ! [ -e $out/000 ]; then
+	mkdir -p $out
+	touch $out/000 $out/001 $out/010 $out/011 $out/100 $out/101 $out/110 $out/111
 	for aggreg in $dir/aggreg-m3-kvm/*; do
 		s0=$dir/single-m0-kvm/$(basename $aggreg)
 		s3=$dir/single-m3-kvm/$(basename $aggreg)
+		is_match $aggreg
+		if [ $? == 2 ]; then
+			echo skip $(basename $aggreg)
+			continue
+		fi
 		if $(is_match $s0) && $(is_match $s3) && $(is_match $aggreg); then
-			echo $(basename $aggreg) >> $dir/000;
+			echo $(basename $aggreg) >> $out/000;
 		elif $(is_match $s0) && $(is_match $s3) && ! $(is_match $aggreg); then
-			echo $(basename $aggreg) >> $dir/001;
+			echo $(basename $aggreg) >> $out/001;
 		elif $(is_match $s0) && ! $(is_match $s3) && $(is_match $aggreg); then
-			echo $(basename $aggreg) >> $dir/010;
+			echo $(basename $aggreg) >> $out/010;
 		elif $(is_match $s0) && ! $(is_match $s3) && ! $(is_match $aggreg); then
-			echo $(basename $aggreg) >> $dir/011;
+			echo $(basename $aggreg) >> $out/011;
 		elif ! $(is_match $s0) && $(is_match $s3) && $(is_match $aggreg); then
-			echo $(basename $aggreg) >> $dir/100;
+			echo $(basename $aggreg) >> $out/100;
 		elif ! $(is_match $s0) && $(is_match $s3) && ! $(is_match $aggreg); then
-			echo $(basename $aggreg) >> $dir/101;
+			echo $(basename $aggreg) >> $out/101;
 		elif ! $(is_match $s0) && ! $(is_match $s3) && $(is_match $aggreg); then
-			echo $(basename $aggreg) >> $dir/110;
+			echo $(basename $aggreg) >> $out/110;
 		elif ! $(is_match $s0) && ! $(is_match $s3) && ! $(is_match $aggreg); then
-			echo $(basename $aggreg) >> $dir/111;
+			echo $(basename $aggreg) >> $out/111;
 		fi
 	done
-	echo '
-	Match     & Match    	& Match		& $(cat $dir/000| wc -l) \\
-	Match     & Match	& Mismatch 	& $(cat $dir/000| wc -l) \\
-	Match     & Mismatch    & Match		& $(cat $dir/000| wc -l) \\
-	Match     & Mismatch	& Mismatch 	& $(cat $dir/000| wc -l) \\
-	Mismatch  & Match    	& Match		& $(cat $dir/000| wc -l) \\
-	Mismatch  & Match 	& Mismatch 	& $(cat $dir/000| wc -l) \\
-	Mismatch  & Mismatch    & Match		& $(cat $dir/000| wc -l) \\
-	Mismatch  & Mismatch 	& Mismatch 	& $(cat $dir/000| wc -l) \\\hline' > $dir/output2
+	echo "
+	Match     & Match    	& Match		& $(cat $out/000| wc -l) \\\\
+	Match     & Match	& Mismatch 	& $(cat $out/001| wc -l) \\\\
+	Match     & Mismatch    & Match		& $(cat $out/010| wc -l) \\\\
+	Match     & Mismatch	& Mismatch 	& $(cat $out/011| wc -l) \\\\
+	Mismatch  & Match    	& Match		& $(cat $out/100| wc -l) \\\\
+	Mismatch  & Match 	& Mismatch 	& $(cat $out/101| wc -l) \\\\
+	Mismatch  & Mismatch    & Match		& $(cat $out/110| wc -l) \\\\
+	Mismatch  & Mismatch 	& Mismatch 	& $(cat $out/111| wc -l) \\\\\\hline "> $out/output2
 fi

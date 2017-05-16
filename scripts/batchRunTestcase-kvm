@@ -13,7 +13,7 @@ define run-target
 $(addprefix $(OUT), $1)/ktime:
 	$(eval INDIR:= $(addprefix $(IN), $1))
 	$(eval OUTDIR:= $(addprefix $(OUT), $1))
-	scp -r yan@logan.cs.umn.edu:$(IN)/$1 $(OUT)
+	rsync -avz --progress yan@logan.cs.umn.edu:$(IN)/$1 $(OUT)
 	for file in $(OUTDIR)/*.pre; do\
 		tcname=$$$$(basename $$$$file .pre);\
 		./$(EMUPATH) $$$$file $(OUTDIR)/$$$$tcname.post.kvm;\
