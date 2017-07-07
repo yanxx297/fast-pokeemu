@@ -912,6 +912,82 @@ def gen_get_eip(r, r2 = None):
     return asm
 
 # ===-------------------------------------------------------------------===
+# Generate code in text format to compare a reg with a constant
+# ===-------------------------------------------------------------------===
+def gen_cmp_imm_asm(reg, imm, size = 4):
+    asm = ""
+    if reg == "eflags":
+        asm += "pushf;" \
+            "pop %%eax;" \
+            "cmpl $0x%x,%%eax;" % imm
+    elif reg in ["eip", "ip"]:
+        asm += gen_get_eip("eax")
+        asm += "cmpl $0x%x,%%eax;" % imm
+    elif reg == "mxcsr":
+        m = get_addr(4, True)[0]
+        asm += "ldmxcsr %s;" \
+                "mov %s,%%eax;" \
+                "cmp $0x%x,%%eax;"% (m, m, imm)
+    elif reg.startswith("cr") or reg.startswith("dr"):
+        asm += "mov %%%s,%%eax;" \
+            "cmp $0x%x,%%eax;" % (reg, imm)
+# TODO: finish those 2 cases
+# Note: imm must be the 1st operand
+#    elif reg.startswith("st"):
+#        if reg == "st(0)":
+#            asm += "fcom %s;" % mem
+#        else:
+#            asm += "fxch %%%s;" \
+#                "fcom %s;" \
+#                "fxch %%%s;" % (reg, mem, reg)
+#    elif reg == "xcr0":
+#        asm += "xgetbv;" \
+#                "cmp %%eax,%s;" \
+#                "cmp %%edx,%s+0x20;" % (mem, mem)
+    else:
+        r = resize_reg(reg, size)
+        asm += "cmp $0x%x,%s;" % (imm, r)
+    return asm
+
+# ===-------------------------------------------------------------------===
+# Generate code in text format to compare a reg with a mem location
+# ===-------------------------------------------------------------------===
+def gen_cmp_asm(reg, mem, size = 4):
+    asm = ""
+    if reg == "eflags":
+        asm += "pushf;" \
+            "pop %%eax;" \
+            "cmpl %%eax,%s;" % mem
+    elif reg in ["eip", "ip"]:
+        asm += gen_get_eip("eax")
+        asm += "cmpl %%eax,%s;" % mem
+    elif reg == "mxcsr":
+        m = get_addr(4, True)[0]
+        asm += "ldmxcsr %s;" \
+                "mov %s,%%eax;" \
+                "cmp %%eax,%s;"% (m, m, mem)
+    elif reg.startswith("cr") or reg.startswith("dr"):
+        asm += "mov %%%s,%%eax;" \
+            "cmp %%eax,%s;" % (reg, mem)
+    elif reg.startswith("st"):
+        if reg == "st(0)":
+            asm += "fcom %s;" % mem
+        else:
+            asm += "fxch %%%s;" \
+                "fcom %s;" \
+                "fxch %%%s;" % (reg, mem, reg)
+    elif reg == "xcr0":
+        asm += "xgetbv;" \
+                "cmp %%eax,%s;" \
+                "cmp %%edx,%s+0x20;" % (mem, mem)
+    else:
+        r = resize_reg(reg, size)
+        asm += "cmp %%%s,%s;" % (r, mem)
+    return asm
+
+
+
+# ===-------------------------------------------------------------------===
 # Generate code in text format to copy from src reg to mem dest
 # ===-------------------------------------------------------------------===
 def gen_reg2mem_asm(reg, mem, size = 4):
@@ -1065,7 +1141,7 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     
     t = ""
     if src2.startswith("mm"):
-        t = t = "mm0" if not (src2 == "mm0") else "mm1"
+        t = "mm0" if not (src2 == "mm0") else "mm1"
     elif src2.startswith("xmm"):
         t = "xmm0" if not (src2 == "xmm0") else "xmm1"
     elif size <= 4:
@@ -1118,12 +1194,15 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
         format_str = "%s %%%s,%%%s;" if src2 in reg_map else "%s %s,%%%s;" 
         asm2 += format_str % (x, src2, t)
         if clean:
+            r = random.randint(0, 0xffffffff)            
             if src2 in reg_map:
                 asm3 += "%s %%%s,%%%s;" % (x, src2, src2)
             else:
                 asm3 += "%s %%%s,%%%s;"\
                     "%s %%%s,%s;" % (x, t, t, m, t, src2)                          
-    
+            asm3 = "je forward_%.8x;" % r + asm3
+            asm3 = gen_cmp_imm_asm(src2, 0) +asm3
+            asm3 += "forward_%.8x:" %r    
     asm = asm1 + asm2 + asm3
     print "src2: %s(%d)" % (src2, size)
     if src2 in ["eax", "ax", "al", "ah", "eflags"]:
@@ -1269,7 +1348,13 @@ def handle_mem_read(inst, op, i, isInit = False):
             op_bak = "0x%x" % feistel_in[count_r]
             backup += [gen_store_mem(op_str, op_bak)]
             setinput += [gen_store_mem(src, op_str)]
-            restore += [gen_store_mem(op_bak, op_str)]
+            l = random.randint(0, 0xffffffff)
+            asm = gen_mem2reg_asm(op_str, "eax") 
+            asm += "cmpl %s,%%eax;" % op_bak
+            asm += "je forward_%.8x;" % l
+            asm += gen_store_mem_asm(op_bak, op_str)
+            asm += "forward_%.8x:" % l
+            restore += [Gadget(asm = asm, mnemonic = "restore inputs")]
             count_r += 1  
         
     return (backup, setinput, feistel, restore)
@@ -1318,7 +1403,13 @@ def handle_mem_write(inst, op, i, isInit = False):
             dest = "0x%x" % feistel_r[count_l + j]        
             feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]
             backup += [gen_store_mem(src2, op_bak)]
-            restore += [gen_store_mem(op_bak, src2)]                   
+            l = random.randint(0, 0xffffffff)
+            asm = gen_mem2reg_asm(src2, "eax") 
+            asm += "cmpl %s,%%eax;" % op_bak
+            asm += "je forward_%.8x;" % l
+            asm += gen_store_mem_asm(op_bak, src2)
+            asm += "forward_%.8x:" % l
+            restore += [Gadget(asm = asm, mnemonic = "restore outputs")]
         count_l += r
         
     return (backup, setinput, feistel, restore)
@@ -1378,7 +1469,12 @@ def handle_reg_read(inst, op, i, isInit = False):
         reg_bak = "0x%x" % feistel_in[count_r]
         backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
         setinput += [gen_mem2reg(src, reg_str, reg_len)]
-        restore += [gen_mem2reg(reg_bak, reg_str, reg_len)]
+        l = random.randint(0,0xffffffff)
+        asm = gen_cmp_asm(reg_str, reg_bak)
+        asm += "je forward_%.8x;" % l
+        asm += gen_mem2reg_asm(reg_bak, reg_str, reg_len)
+        asm += "forward_%.8x:" % l
+        restore += [Gadget(asm = asm, mnemonic = "restore inputs")]
         count_r += size
     else:
         print "No read"
@@ -1451,7 +1547,12 @@ def handle_reg_write(inst, op, i, isInit = False):
             feistel += [gen_feistel_cipher(src1, src2, dest, reg_len, True)]
         reg_bak = "0x%x" % feistel_out[count_l]
         backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
-        restore += [gen_mem2reg(reg_bak, reg_str, reg_len)]
+        l = random.randint(0,0xffffffff)
+        asm = gen_cmp_asm(reg_str, reg_bak)
+        asm += "je forward_%.8x;" % l
+        asm += gen_mem2reg_asm(reg_bak, reg_str, reg_len)
+        asm += "forward_%.8x:" % l
+        restore += [Gadget(asm = asm, mnemonic = "restore outputs")]
         count_l += r
         
     return (backup, setinput, feistel, restore)         
