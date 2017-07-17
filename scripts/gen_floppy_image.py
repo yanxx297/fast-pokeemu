@@ -1195,13 +1195,13 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
         asm2 += format_str % (x, src2, t)
         if clean:
             r = random.randint(0, 0xffffffff)            
+            asm3 += gen_cmp_imm_asm(src2, 0)
+            asm3 += "je forward_%.8x;" % r
             if src2 in reg_map:
                 asm3 += "%s %%%s,%%%s;" % (x, src2, src2)
             else:
                 asm3 += "%s %%%s,%%%s;"\
                     "%s %%%s,%s;" % (x, t, t, m, t, src2)                          
-            asm3 = "je forward_%.8x;" % r + asm3
-            asm3 = gen_cmp_imm_asm(src2, 0) +asm3
             asm3 += "forward_%.8x:" %r    
     asm = asm1 + asm2 + asm3
     print "src2: %s(%d)" % (src2, size)
@@ -2061,8 +2061,10 @@ class Gadget:
             # Initialize feistel blocks for exception info
             if isInit:
                 print "Ecpt blocks"
-                feistel_l += get_addr()
-                feistel_l += get_addr()
+                l = get_addr(8)                
+                feistel_l += l
+                for val in l:
+                    init_l += [gen_imm2mem(gen_seed(), "0x%x" % val)]
                 print "********************************************************************************"
                 while len(feistel_r) < len(feistel_l):
                     feistel_r += get_addr()
