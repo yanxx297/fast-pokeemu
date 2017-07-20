@@ -912,41 +912,45 @@ def gen_get_eip(r, r2 = None):
     return asm
 
 # ===-------------------------------------------------------------------===
-# Generate code in text format to compare a reg with a constant
+# Generate code in text format to compare a reg/mem with a constant
 # ===-------------------------------------------------------------------===
-def gen_cmp_imm_asm(reg, imm, size = 4):
+def gen_cmp_imm_asm(src, imm, size = 4):
     asm = ""
-    if reg == "eflags":
-        asm += "pushf;" \
-            "pop %%eax;" \
-            "cmpl $0x%x,%%eax;" % imm
-    elif reg in ["eip", "ip"]:
-        asm += gen_get_eip("eax")
-        asm += "cmpl $0x%x,%%eax;" % imm
-    elif reg == "mxcsr":
-        m = get_addr(4, True)[0]
-        asm += "ldmxcsr %s;" \
-                "mov %s,%%eax;" \
-                "cmp $0x%x,%%eax;"% (m, m, imm)
-    elif reg.startswith("cr") or reg.startswith("dr"):
-        asm += "mov %%%s,%%eax;" \
-            "cmp $0x%x,%%eax;" % (reg, imm)
-# TODO: finish those 2 cases
-# Note: imm must be the 1st operand
-#    elif reg.startswith("st"):
-#        if reg == "st(0)":
-#            asm += "fcom %s;" % mem
-#        else:
-#            asm += "fxch %%%s;" \
-#                "fcom %s;" \
-#                "fxch %%%s;" % (reg, mem, reg)
-#    elif reg == "xcr0":
-#        asm += "xgetbv;" \
-#                "cmp %%eax,%s;" \
-#                "cmp %%edx,%s+0x20;" % (mem, mem)
+    if src in reg_map:
+        reg = src
+        if reg == "eflags":
+            asm += "pushf;" \
+                "pop %%eax;" \
+                "cmpl $0x%x,%%eax;" % imm
+        elif reg in ["eip", "ip"]:
+            asm += gen_get_eip("eax")
+            asm += "cmpl $0x%x,%%eax;" % imm
+        elif reg == "mxcsr":
+            m = get_addr(4, True)[0]
+            asm += "ldmxcsr %s;" \
+                    "mov %s,%%eax;" \
+                    "cmp $0x%x,%%eax;"% (m, m, imm)
+        elif reg.startswith("cr") or reg.startswith("dr"):
+            asm += "mov %%%s,%%eax;" \
+                "cmp $0x%x,%%eax;" % (reg, imm)
+        elif reg.startswith("st"):
+            l = get_addr(size, True)
+            asm += gen_reg2mem_asm(reg, l[0], size)
+            for j in range(len(l)):
+                asm += "cmp $0x%x,0x%x;" % (imm, l[j])
+        elif reg == "xcr0":
+            l = random.randint(0, 0xffffffff)
+            asm += "xgetbv;" \
+                    "cmp $0x%x,%%edx;" \
+                    "jne forward_%.8x;" \
+                    "cmp $0x%x,%%eax;" \
+                    "forward_%.8x:" % (imm >> 32, l, imm % 0xffffffff, l)
+        else:
+            r = resize_reg(reg, size)
+            print r
+            asm += "cmp $0x%x,%%%s;" % (imm, r)
     else:
-        r = resize_reg(reg, size)
-        asm += "cmp $0x%x,%s;" % (imm, r)
+        asm += "cmp $0x%x,%s;" % (imm,src)
     return asm
 
 # ===-------------------------------------------------------------------===
@@ -977,9 +981,12 @@ def gen_cmp_asm(reg, mem, size = 4):
                 "fcom %s;" \
                 "fxch %%%s;" % (reg, mem, reg)
     elif reg == "xcr0":
+        l = random.randint(0, 0xffffffff)
         asm += "xgetbv;" \
                 "cmp %%eax,%s;" \
-                "cmp %%edx,%s+0x20;" % (mem, mem)
+                "jne forward_%.8x;" \
+                "cmp %%edx,%s+0x20;" \
+                "forward_%.8x:" % (mem, l, mem, l)
     else:
         r = resize_reg(reg, size)
         asm += "cmp %%%s,%s;" % (r, mem)
