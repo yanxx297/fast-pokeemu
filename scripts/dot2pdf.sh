@@ -1,8 +1,7 @@
 #!/bin/bash
-DIR="/tmp/"
-cd $DIR
-ls | grep ".*\.dot$" | while read -r line ; do
-#       echo $line
-        dot -Tpdf $line > $line.pdf
+for file in $1/*.dot; do
+        echo $file
+        dot -Tpdf $file > $file.pdf
 done
-pdfunite $(ls | grep ".*\.pdf$") out.pdf
+pdfunite $1/*.pdf $1/out.pdf
+rm $1/*.dot
