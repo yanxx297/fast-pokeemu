@@ -1166,7 +1166,10 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     elif src2.startswith("xmm"):
         t = "xmm0" if not (src2 == "xmm0") else "xmm1"
     elif size <= 4:
-        t = "eax"
+        if src2.find("eax") >= 0 or src1.find("eax") >= 0:
+            t = "ecx"
+        else:
+            t = "eax"
     elif size in range(9,17) or (size in range (5, 9) and src2.startswith("xmm")):
         t = "xmm0" if not (src2 == "xmm0") else "xmm1"        
     elif size in range(5, 9) :
