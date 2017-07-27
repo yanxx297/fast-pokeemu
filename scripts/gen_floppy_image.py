@@ -44,7 +44,7 @@ SNAPSHOT = joinpath(ROOT, "base.snap")
 TESTCASE = ".testcase"
 NULL = open("/dev/null", "w")
 FLOPPY_TEMPLATE = "/tmp/gen-floppy-image.template"
-DEBUG = 2
+DEBUG = 3
 
 # ===-----------------------------------------------------------------------===
 # MODE:
@@ -620,7 +620,7 @@ def append_gadget(l, ext):
     for s in l:
         b = ext[:]
         b.insert(0, s)
-        out.append(b)
+        out += b
     return out
 
 
@@ -1085,8 +1085,12 @@ def gen_imm2mem_asm(imm, dest):
 # ===-------------------------------------------------------------------===
 def gen_store_mem(src, dest, clean = False):
     asm = gen_store_mem_asm(src, dest, clean)
+    define = [dest]
+    use = [src]
+    print define
     if src != "%eax":
-        g = Gadget(asm = asm, mnemonic = "copy mem", kill= [Register("EAX")])    
+        g = Gadget(asm = asm, mnemonic = "copy mem", define = define, \
+                kill= [Register("EAX")], use = use, affect = [])    
         return g
     else:
         g = Gadget(asm = asm, mnemonic = "copy mem")    
@@ -1120,7 +1124,11 @@ def gen_reg2mem(src, dest, size = 4):
     if asm == "":
         return None
     else:
-        g = Gadget(asm = asm, mnemonic = "reg2mem")      
+        use = [Register(src)]
+        define = [dest]
+        if src.startswith("st"):
+            use += [Register("CR0")]
+        g = Gadget(asm = asm, mnemonic = "reg2mem", define = define, kill = [], use = use) 
         return g 
 
 
@@ -1132,7 +1140,13 @@ def gen_mem2reg(src, dest, size = 4):
     if asm == "":
         return None
     else:
-        g = Gadget(asm = asm, mnemonic = "mem2reg", kill = [Register(dest.upper())])      
+        use = [src]
+        define = [Register(dest)]
+        if dest.startswith("st"):
+            use += [Register("CR0")]
+        g = Gadget(asm = asm, mnemonic = "mem2reg", define = define,\
+                kill = [Register(dest.upper())],\
+                use = use)
         return g 
 
 
@@ -1166,6 +1180,8 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     asm2 = ""
     asm3 = gen_reg2mem_asm(t, dest, size)
     kill= [Register(t.upper())]
+    define = []
+    use = []
     
     if src2 == "eflags":
         r = "0x%x" % get_addr(4, True)[0]
@@ -1215,7 +1231,7 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     if src2 in ["eax", "ax", "al", "ah", "eflags"]:
         asm = "push %eax;" + asm + "pop %eax;"
         print asm
-    g = Gadget(asm = asm, mnemonic = "copy mem", kill= kill)    
+    g = Gadget(asm = asm, mnemonic = "copy mem", define = define, kill= kill, use = use)    
     return g
 
 
@@ -1749,12 +1765,23 @@ class Gadget:
         r += "   [*] use:    %s\n" % (", ".join([str(u) for u in self.use]))
         return r
 
+    def __add__(self, other):
+        asm = self.asm + other.asm
+        mnemonic = self.mnemonic + other.mnemonic
+        define = self.define | other.define
+        kill = self.kill | other.kill
+        use = self.use | other.use
+        define_ = define - (define & use)
+        use_ = use - (define & use)
+        affect = self.affect | other.affect
+        g = Gadget(asm, mnemonic, define_, kill, use_, affect)
+        return g
 
     def __repr__(self):
         return self.mnemonic
 
     # ===-------------------------------------------------------------------===
-    # Return true (= g1 define g0) if any of the followings is true:
+    # Return true (= g1 define g0 / add edge (g0, g1)) if any of the followings is true:
     # * g1 defines what g0 kills 
     # * g0 uses what g1 defines
     # * (New)g0 use what g1 affects
@@ -1851,6 +1878,7 @@ class Gadget:
                 flip_addrs()                             
         asm = "mov $0x%.8x, %%eax; mov %%eax,%%%s; // %s" % \
             (reg.value, reg.name.lower(), reg.name.lower())
+        print define
         return [Gadget(asm = asm, mnemonic = reg.name.lower(), define = define,
                        kill = kill, use = use)]
 
@@ -1981,8 +2009,9 @@ class Gadget:
         #TODO: rewrite resetting code using Xed
         #5 groups of root Gadgets that gen_root will generate from an instruction
         # * = Need Xed         
+        set_r = []
         setinput = []   #copy from R block to input*
-        backup = []     #backup original input of the tested insn for restoring
+        backup = []     #backup original input & output of the tested insn for restoring
         backup_r = []     #backup R block
         code = []       #instruction to run and corresponding reset*         
         output = []    # Handle output of the core insn. In feistel mode it compute XOR and copy it to L block* 
@@ -2010,7 +2039,8 @@ class Gadget:
             "movl $0x%s,0x%.8x; " \
             "movl $0x%.8x,0x%.8x; " \
             "movl $0x0,0x%.8x; // rebase page 0" % \
-            (eax_backup, cr0, eax_backup, binascii.hexlify(pde0[::-1]), cr3 ,newpte0, deref4(pde0) & 0xfffff000, eax_backup)
+            (eax_backup, cr0, eax_backup, binascii.hexlify(pde0[::-1]), cr3 ,\
+            newpte0, deref4(pde0) & 0xfffff000, eax_backup)
         grs = Gadget(asm = rs, mnemonic = "rebase page 0") 
         
         code += [gtc]
@@ -2124,12 +2154,12 @@ class Gadget:
                     assert(count_addr != 0)
                     label = random.randint(0, 0xffffffff)
                     asm1 = "cmpl $0x%x,0x%x;" \
-                        "jne forward_%.8x; // Init R & L blocks" % (loop, count_addr, label)
+                        "jne forward_%.8x;" % (loop, count_addr, label)
                     asm2 = "forward_%.8x: " % label
                     g1 = Gadget(asm = asm1, mnemonic = "Init R & L")
                     g2 = Gadget(asm = asm2, mnemonic = "Init R & L")
                     init_r = [g1] + init_r + init_l + [g2]
-                backup_r = init_r + backup_r  
+                set_r = init_r
                        
             #feistel restore: moving R_{i-1} to L_{i} via R's backup
             frestore = []
@@ -2155,12 +2185,13 @@ class Gadget:
         if MODE > 2:
             label = random.randint(0, 0xffffffff)
             asm1 = "cmpl $0x%x,0x%x;" \
-                    "je forward_%.8x; // Use FuzzBALL input if 1st iter" % (loop, count_addr, label)
+                    "je forward_%.8x;" % (loop, count_addr, label)
             asm2 = "forward_%.8x: " % label
             g1 = Gadget(asm = asm1, mnemonic = "Skip setinput")
             g2 = Gadget(asm = asm2, mnemonic = "Skip setinput")
             setinput = [g1] + setinput + [g2]
-        return (backup, remove_none(backup_r), setinput, code, output, restore);     
+        return (backup, remove_none(set_r), remove_none(backup_r), setinput, \
+                code, output, restore);     
     
         
     @staticmethod
@@ -2274,10 +2305,10 @@ def topological_sort(graph):
 # ===-----------------------------------------------------------------------===
 # Given a dependency graph, sort it in topological order
 # ===-----------------------------------------------------------------------===
-def sort_gadget(depgraph, idx, name):
+def sort_gadget(depgraph, name):
         if DEBUG >= 3:
-            path = "/tmp/depgraph_%s_%d.dot" % (name, idx)
-            open(path, "w").write(dot_dependency_graph(depgraph))
+            path = "/tmp/depgraph_%s.dot" % name
+            open(path.replace(" ","_"), "w").write(dot_dependency_graph(depgraph))
     
         return topological_sort(depgraph)    
 
@@ -2287,16 +2318,30 @@ def sort_gadget(depgraph, idx, name):
 # ===-----------------------------------------------------------------------===
 def get_subtree(g, name):
     sort = []
-    for idx, val in enumerate(g):
-        depgraph = build_dependency_graph(val)
-        r = sort_gadget(depgraph, idx, name)
-        #remove duplicated state setting gadgets 
-        src = val[0]
-        print "%s: Start from %s" % ("depgraph_%s_%d" % (name, idx), src.asm)
-        des = networkx.dag.descendants(depgraph, src)
-        r = [x for x in r if (x in des or x == src)]
-        sort += r
+    depgraph = build_dependency_graph(g)
+    r = sort_gadget(depgraph, name)
+    #remove duplicated state setting gadgets 
+    src = g[0]
+    print "%s: Start from %s" % ("depgraph_%s" % name, src.asm)
+    des = networkx.dag.descendants(depgraph, src)
+    r = [x for x in r if (x in des or x == src)]
+    sort += r
     return sort
+
+# ===-----------------------------------------------------------------------===
+# Given a gadget list ``g'', merge all the gadgets in g into one large gadget
+# ===-----------------------------------------------------------------------===
+def merge_glist(g, mnemonic = ""):
+    if g == []:
+        return None
+    m = g[0]
+    for e in g[1:]:
+        m += e
+    if mnemonic != "":
+        m.mnemonic = mnemonic
+        m.asm += "// %s" % mnemonic
+    return m
+
 
 # ===-----------------------------------------------------------------------===
 # Compile a sequence of gadgets into x86 code
@@ -2307,16 +2352,24 @@ def compile_gadgets(gadget, epilogue, directive = ""):
     asm = "";
     i = 0
     for tuple in gadget:
-        (startup, init, bak_r, backup, setin, code, output, restore, revert, loop) = tuple;
-        bak_sort = get_subtree(bak_r, "bak R")
-        setin_sort = get_subtree(setin, "set input")
+        (startup, param, bak_in, set_r, copy_r, setin, code, \
+                output, restore, revert, loop) = tuple;
+        # for future sorting, merge gadget lists before code into gadgets
+        pre = [merge_glist(bak_in, "backup"), merge_glist(set_r + copy_r, "prep R blocks"), \
+                merge_glist(setin, "R 2 input")]
+        pre = remove_none(param + pre)
+        depgraph = build_dependency_graph(pre)
+        pre = sort_gadget(depgraph, pre)
         
-        depgraph = build_dependency_graph(init)
-        init = sort_gadget(depgraph, 0, init)
         depgraph = build_dependency_graph(revert)
-        revert = sort_gadget(depgraph, 0, revert)
+        revert = sort_gadget(depgraph, revert)
+
+        if DEBUG >= 3:
+            for g in pre:
+                print g
+
         # Generate the assembly code        
-        for g in startup + init + bak_sort + backup + setin_sort + code + output + restore + revert + loop:
+        for g in startup + pre + code + output + restore + revert + loop:
             if g != None:
                 asm += "%s\n" % (g.asm)
                 if i and i % 8 == 0:
@@ -2332,7 +2385,6 @@ def compile_gadgets(gadget, epilogue, directive = ""):
                 r = random.randint(0, 0xffffffff)
                 asm += "jmp forward_%.8x; forward_%.8x:\n" % (r, r)
             i += 1        
-    
     # Assemble
     tmpobj = Tempfile()
     tmpelf = Tempfile()
@@ -2503,7 +2555,7 @@ def load_fuzzball_testcase(tc, snapshot):
 # ===-----------------------------------------------------------------------===
 def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
     global count_addr
-    global MODE;
+    global MODE
     global next_addr
     global start_addr
     global end_addr
@@ -2568,7 +2620,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
                 
         print "="*columns()
     
-        init = []   # initiate state according to FuzzBALL-generated test case
+        param = []   # Set FuzzBALL-generated inputs (parameters)
         revert = [] # Undo init state
         done = set()
         
@@ -2576,7 +2628,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         for rm in regs + memlocs:
             orig_value = rm.in_snapshot(snapshot)
             if orig_value != rm.value:
-                init += rm.gen_gadget(snapshot)
+                param += rm.gen_gadget(snapshot)
                 revert += rm.gen_revert_gadget(snapshot)
                 done.add(rm)
 
@@ -2588,7 +2640,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
     
             killed = set()
             defined = set()
-            for g in init:
+            for g in param:
                 killed |= g.kill
                 defined |= g.define
     
@@ -2600,7 +2652,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
                 assert rm not in done
                 stable = False
                 rm.value = rm.in_snapshot(snapshot)
-                init += rm.gen_gadget(snapshot)
+                param += rm.gen_gadget(snapshot)
     
 #         for idx, g in enumerate(revert):
 #             print "revert[%d]: %s" % (idx, g.asm)
@@ -2614,10 +2666,11 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         l4 = random.randint(0, 0xffffffff)  # label at the end of this test case                            
         # Return to 'revert' from exception handlers by default
         startup = Gadget.gen_prologue(l0, l2, snapshot, tc.split("/")[-2], count_addr)
-        (backup, backup_r, setinput, code, output, restore) = Gadget.gen_root(snapshot, shellcode, count)        
+        (backup, set_r, copy_r, setinput, code, output, restore) \
+                = Gadget.gen_root(snapshot, shellcode, count)        
         print "%d backup gadgets" % len(backup)
-        bak = append_gadget(backup_r, init)
-        setin = append_gadget(setinput, init)
+        bak = append_gadget(copy_r, param)
+        setin = append_gadget(setinput, param)
         
         #jump to TC beginning for a fixed # of times                   
         asm = "";
@@ -2631,7 +2684,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
          
         # change exception handler return points in different phase of a test case
         asm = "movl $forward_%.8x,0x%x;" % (l1, retp)
-        setin = [[Gadget(asm = asm, mnemonic = "return to restore")]] + setin
+        setinput = [Gadget(asm = asm, mnemonic = "return to restore")] + setinput
         asm = "movl $forward_%.8x,0x%x;" % (l2, retp)
         restore = [Gadget(asm = asm, mnemonic = "return to revert")] + restore
         asm = "movl $forward_%.8x,0x%x;" % (l3, retp)
@@ -2649,7 +2702,8 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         asm = "forward_%.8x:" % l4
         loop += [Gadget(asm = asm, mnemonic = "End of testcase")]                                   
             
-        gadget.append((startup, init, bak, backup, setin, code, output, restore, revert, loop))
+        gadget.append((startup, param, backup, set_r, copy_r, setinput, code, output, restore, \
+                revert, loop))
         # NOTE: bak and setin are list of gadget lists, while the rests are gadget lists
         #TODO: Rewrite DEBUG
 #         if DEBUG >= 1:
