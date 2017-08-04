@@ -171,6 +171,7 @@ void VCPU::GetMSRs(struct kvm_msr_entry *msrs, int *n) {
   //assert (i != -1);
   num_msrs = kmsrslist0.nmsrs;
   assert(num_msrs > 0);
+  assert(num_msrs <= 100);
 
   // Get the list of available MSRS
   kmsrslist = (struct kvm_msr_list*) calloc(1, sizeof(*kmsrslist) +
