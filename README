@@ -9,7 +9,7 @@ COMPILE
   Download XED from https://software.intel.com/en-us/articles/xed-x86-encoder-decoder-software-library
     for instance "xed-install-base-2015-09-10-lin-x86-64.zip"
   apply pyxed.patch to the Makefile, i.e.
-    cd tools/pyxedl patch -p1 <../pyxed.patch
+    cd tools/pyxed; patch -p1 <../pyxed.patch
   compile with "make"
 
 INSTRUCTION EXPLORING
