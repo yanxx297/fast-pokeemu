@@ -1,6 +1,6 @@
 VANILLA_KVM := 1
 
-CFLAGS = -Wall -I. -I./libudis86/
+CFLAGS = -Wall -g -I. -I./libudis86/
 ifndef VANILLA_KVM
 CFLAGS += -I../kvm-kmod-2.6.37/
 endif

@@ -150,7 +150,7 @@ void VCPU::SetMSRs(struct kvm_msr_entry *msrs, int n) {
 
   if (n == 0) return;
 
-  kmsrs = (struct kvm_msrs*) malloc(sizeof(*kmsrs) + n*sizeof(*msrs));
+  kmsrs = (struct kvm_msrs*) calloc(1, sizeof(*kmsrs) + n*sizeof(*msrs));
   assert(kmsrs);
 
   kmsrs->nmsrs = n;
@@ -162,21 +162,27 @@ void VCPU::SetMSRs(struct kvm_msr_entry *msrs, int n) {
 }
  
 void VCPU::GetMSRs(struct kvm_msr_entry *msrs, int *n) {
-  int i;
+  int i, num_msrs;
   struct kvm_msrs *kmsrs;
-  struct kvm_msr_list *kmsrslist;
+  struct kvm_msr_list kmsrslist0, *kmsrslist;
+
+  kmsrslist0.nmsrs = 0;
+  i = ioctl(kvm->fd, KVM_GET_MSR_INDEX_LIST, &kmsrslist0);
+  //assert (i != -1);
+  num_msrs = kmsrslist0.nmsrs;
+  assert(num_msrs > 0);
 
   // Get the list of available MSRS
-  kmsrslist = (struct kvm_msr_list*) malloc(sizeof(*kmsrslist) + 
-					    MAX_MSRS*sizeof(__u32));
+  kmsrslist = (struct kvm_msr_list*) calloc(1, sizeof(*kmsrslist) +
+					    num_msrs*sizeof(__u32));
   assert(kmsrslist);
-  kmsrslist->nmsrs = MAX_MSRS;
+  kmsrslist->nmsrs = num_msrs;
   i = ioctl(kvm->fd, KVM_GET_MSR_INDEX_LIST, kmsrslist);
   assert (i != -1);
 
   // Get the data stored in each MSR
   *n = kmsrslist->nmsrs;
-  kmsrs = (struct kvm_msrs*) malloc(sizeof(*kmsrs) + *n*sizeof(*msrs));
+  kmsrs = (struct kvm_msrs*) calloc(1, sizeof(*kmsrs) + *n*sizeof(*msrs));
   assert(kmsrs);
   
   kmsrs->nmsrs = *n;
@@ -187,7 +193,7 @@ void VCPU::GetMSRs(struct kvm_msr_entry *msrs, int *n) {
   i = ioctl(cpu_fd, KVM_GET_MSRS, kmsrs);
   assert (i != -1);
 
-  memcpy(msrs, kmsrs->entries, *n*sizeof(*msrs));
+  memcpy(msrs, kmsrs->entries, (*n)*sizeof(*msrs));
 
   free(kmsrs);
   free(kmsrslist);
@@ -456,7 +462,9 @@ void KVM::Load(const char *fname) {
   kvm_regs kregs;
   kvm_sregs ksregs;
   kvm_fpu kfpu;
-  struct kvm_msr_entry msrs[MAX_MSRS];
+  // MAX_MSRS is fixed in the file format to be 32, but modern systems
+  // have more (e.g., 41 on my system).
+  struct kvm_msr_entry msrs[100];
   file f;
 
   // Load state from disk
@@ -475,6 +483,11 @@ void KVM::Load(const char *fname) {
   strncpy(kernel_version, h.kernel_version, sizeof(kernel_version));
   strncpy(kernel_checksum, h.kernel_checksum, sizeof(kernel_checksum));
   strncpy(testcase_checksum,  h.testcase_checksum, sizeof(testcase_checksum));
+
+  // Zero-initialize the register structs
+  memset((void *)&kregs, 0, sizeof(kvm_regs));
+  memset((void *)&ksregs, 0, sizeof(kvm_sregs));
+  memset((void *)&kfpu, 0, sizeof(kvm_fpu));
 
   state_type = h.type;
   ioports[0] = h.ioports[0];
@@ -561,7 +574,9 @@ void KVM::Save(const char *fname) {
   kvm_regs kregs;
   kvm_sregs ksregs;
   kvm_fpu kfpu;
-  struct kvm_msr_entry msrs[MAX_MSRS];
+  // MAX_MSRS is fixed in the file format to be 32, but modern systems
+  // have more (e.g., 41 on my system).
+  struct kvm_msr_entry msrs[100];
 
   // Dump state to disk
   f = fopen(fname, "w");
@@ -665,11 +680,13 @@ void KVM::Save(const char *fname) {
     s.exception_state.error_code = 0;
 
     // Fill MSR state
-/*    vcpus[i]->GetMSRs(msrs, (int *) &(s.msrs_state.n));
+    vcpus[i]->GetMSRs(msrs, (int *) &(s.msrs_state.n));
+    if (s.msrs_state.n > MAX_MSRS)
+      s.msrs_state.n = MAX_MSRS;
     for (r = 0; r < s.msrs_state.n; r++) {
       s.msrs_state.msr_regs[r].idx = msrs[r].index;
       s.msrs_state.msr_regs[r].val = msrs[r].data;
-    }*/
+    }
 
     r = fwrite(f, &s, sizeof(s));
     assert(r == sizeof(s));
@@ -686,7 +703,9 @@ void KVM::Print(FILE *f) {
   struct kvm_regs kregs;
   struct kvm_sregs ksregs;
   struct kvm_fpu kfpu;
-  struct kvm_msr_entry msrs[MAX_MSRS];
+  // MAX_MSRS is fixed in the file format to be 32, but modern systems
+  // have more (e.g., 41 on my system).
+  struct kvm_msr_entry msrs[100];
 
   for (int i = 0; i < cpusno; i++) {
     vcpus[i]->GetRegs(&kregs);
@@ -710,7 +729,7 @@ void KVM::Print(FILE *f) {
     fprintf(f, "========================== CONTROLS ==========================\n");
     fprintf(f, "CR0: %.16lx CR2: %.16lx\n", PAD64(ksregs.cr0), PAD64(ksregs.cr2));
     fprintf(f, "CR3: %.16lx CR4: %.16lx\n", PAD64(ksregs.cr3), PAD64(ksregs.cr4));    
-  /*  fprintf(f, "============================ MSRS ============================\n");
+    fprintf(f, "============================ MSRS ============================\n");
     int n = sizeof(MSRs_to_save)/sizeof(int);
     for (int j = 0; j < n; j++) {
       msrs[j].index = MSRs_to_save[j];
@@ -720,7 +739,6 @@ void KVM::Print(FILE *f) {
       fprintf(f, "#%.8x: %.16lx\n", msrs[j].index, (uint64_t) msrs[j].data);
     }
     fprintf(f, "==============================================================\n");
-*/
   }
 }
 
