@@ -1262,16 +1262,15 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
         format_str = "%s %%%s,%%%s;" if src2 in reg_map else "%s %s,%%%s;" 
         asm2 += format_str % (x, src2, r)
         if clean:
-            l = random.randint(0, 0xffffffff)            
-            g3.asm += gen_cmp_imm_asm(src2, 0, t)
-            g3.asm += "je forward_%.8x;" % l
             if src2 in reg_map:
                 g3.asm += "%s %%%s,%%%s;" % (x, src2, src2)
             else:
+                l = random.randint(0, 0xffffffff)            
+                g3.asm += gen_cmp_imm_asm(src2, 0, t)
+                g3.asm += "je forward_%.8x;" % l
                 g3.asm += "%s %%%s,%%%s;"\
-                    "%s %%%s,%s;" % (x, r, r, m, r, src2)
-            # define += [src2]
-            g3.asm += "forward_%.8x:" % l
+                        "%s %%%s,%s;" % (x, r, r, m, r, src2)
+                g3.asm += "forward_%.8x:" % l
     g2 = Gadget(asm = asm2, mnemonic = "feistel", define = define, kill= kill, use = use)
     g = merge_glist([g1, g2, g3])
     g.kill = g.kill | set([Register(t.upper())])
