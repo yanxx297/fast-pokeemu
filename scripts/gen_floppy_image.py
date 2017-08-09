@@ -2686,6 +2686,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
     
         param = []   # Set FuzzBALL-generated inputs (parameters)
         revert = [] # Undo init state
+        revert_ = [] # A copy of revert; regenerate instead of copy because patch ljmp
         done = set()
         
         # Generate code for initializing registers and memory locations
@@ -2694,6 +2695,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
             if orig_value != rm.value:
                 param += rm.gen_gadget(snapshot)
                 revert += rm.gen_revert_gadget(snapshot)
+                revert_ += rm.gen_revert_gadget(snapshot)
                 done.add(rm)
 
         # Need one or more extra passes to define what has been killed but not
@@ -2755,6 +2757,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         loop = [Gadget(asm = asm, mnemonic = "loop")] 
 
         if MODE <= 0:
+            revert_ = [];
             revert = [];
                        
         # Sort gadgets & add labels to return points
@@ -2775,7 +2778,8 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         post = sort_gadget(depgraph, post)
         depgraph = build_dependency_graph(revert)
         revert = sort_gadget(depgraph, revert)
-        revert_ = revert[:]
+        depgraph = build_dependency_graph(revert_)
+        revert_ = sort_gadget(depgraph, revert_)
 
         asm = "movl $forward_%.8x,0x%x;" % (l1, retp)
         code = [Gadget(asm = asm, mnemonic = "return to revert_")] + code
