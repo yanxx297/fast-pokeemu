@@ -85,7 +85,7 @@ feistel_out = []    #Backup original outputs for restoring at the end of each TC
 count_r = 0         # Pointer to the current R/L block
 count_l = 0
 count_addr = 0      # A mem location to store loop count
-loop = 1            #repeat testing each test case for a number of times
+loop = 2            #repeat testing each test case for a number of times
 
 
 # ===-----------------------------------------------------------------------===
@@ -884,10 +884,8 @@ def resize_reg(r, size):
 # via eax, and then *clean addr1
 # ===-------------------------------------------------------------------===
 def gen_store_mem_asm(src, dest, clean = False):
-    r = "eax" if not ("eax" in src or "eax" in dest or \
-                      "ax" in src or "ax" in dest or \
-                      "ah" in src or "ah" in dest or \
-                      "al" in src or "al" in dest ) else "ecx"
+    r = "ecx" if any(x in src for x in ["eax", "ax", "ah", "al"]) or \
+            any(x in dest for x in ["eax", "ax", "ah", "al"]) else "eax"
     asm = "mov %s,%%%s;" \
         "mov %%%s,%s;" % (src, r, r, dest)
     if clean:   #clean src after copying
@@ -914,28 +912,28 @@ def gen_get_eip(r, r2 = None):
 # ===-------------------------------------------------------------------===
 # Generate code in text format to compare a reg/mem with a constant
 # ===-------------------------------------------------------------------===
-def gen_cmp_imm_asm(src, imm, size = 4):
+def gen_cmp_imm_asm(src, imm, t = "eax", size = 4):
     asm = ""
     if src in reg_map:
         reg = src
         if reg == "eflags":
             asm += "pushf;" \
-                "pop %%eax;" \
-                "cmpl $0x%x,%%eax;" % imm
+                "pop %%%s;" \
+                "cmpl $0x%x,%%%s;" % (t, imm, t)
         elif reg in ["eip", "ip"]:
-            asm += gen_get_eip("eax")
-            asm += "cmpl $0x%x,%%eax;" % imm
+            asm += gen_get_eip(t)
+            asm += "cmpl $0x%x,%%%s;" % (imm, t)
         elif reg == "mxcsr":
             m = get_addr(4, True)[0]
             asm += "ldmxcsr %s;" \
-                    "mov %s,%%eax;" \
-                    "cmp $0x%x,%%eax;"% (m, m, imm)
+                    "mov %s,%%%s;" \
+                    "cmp $0x%x,%%%s;"% (m, m, t, imm, t)
         elif reg.startswith("cr") or reg.startswith("dr"):
-            asm += "mov %%%s,%%eax;" \
-                "cmp $0x%x,%%eax;" % (reg, imm)
+            asm += "mov %%%s,%%%s;" \
+                "cmp $0x%x,%%%s;" % (reg, t, imm, t)
         elif reg.startswith("st"):
             l = get_addr(size, True)
-            asm += gen_reg2mem_asm(reg, l[0], size)
+            asm += gen_reg2mem_asm(reg, "0x%x" % l[0], size)
             for j in range(len(l)):
                 asm += "cmp $0x%x,0x%x;" % (imm, l[j])
         elif reg == "xcr0":
@@ -956,23 +954,23 @@ def gen_cmp_imm_asm(src, imm, size = 4):
 # ===-------------------------------------------------------------------===
 # Generate code in text format to compare a reg with a mem location
 # ===-------------------------------------------------------------------===
-def gen_cmp_asm(reg, mem, size = 4):
+def gen_cmp_asm(reg, mem, t = "eax", size = 4):
     asm = ""
     if reg == "eflags":
         asm += "pushf;" \
-            "pop %%eax;" \
-            "cmpl %%eax,%s;" % mem
+            "pop %%%s;" \
+            "cmpl %%%s,%s;" % (t, t, mem)
     elif reg in ["eip", "ip"]:
-        asm += gen_get_eip("eax")
-        asm += "cmpl %%eax,%s;" % mem
+        asm += gen_get_eip(t)
+        asm += "cmpl %%%s,%s;" % (t, mem)
     elif reg == "mxcsr":
         m = get_addr(4, True)[0]
         asm += "ldmxcsr %s;" \
-                "mov %s,%%eax;" \
-                "cmp %%eax,%s;"% (m, m, mem)
+                "mov %s,%%%s;" \
+                "cmp %%%s,%s;"% (m, m, t, t, mem)
     elif reg.startswith("cr") or reg.startswith("dr"):
-        asm += "mov %%%s,%%eax;" \
-            "cmp %%eax,%s;" % (reg, mem)
+        asm += "mov %%%s,%%%s;" \
+            "cmp %%%s,%s;" % (reg, t, t, mem)
     elif reg.startswith("st"):
         if reg == "st(0)":
             asm += "fcom %s;" % mem
@@ -1085,16 +1083,38 @@ def gen_imm2mem_asm(imm, dest):
 # ===-------------------------------------------------------------------===
 def gen_store_mem(src, dest, clean = False):
     asm = gen_store_mem_asm(src, dest, clean)
+    kill = []
     define = [dest]
+    if clean:
+        define += [src]
     use = [src]
-    print define
-    if src != "%eax":
-        g = Gadget(asm = asm, mnemonic = "copy mem", define = define, \
-                kill= [Register("EAX")], use = use, affect = [])    
-        return g
-    else:
-        g = Gadget(asm = asm, mnemonic = "copy mem")    
-        return g
+    r = "ecx" if any(x in src for x in ["eax", "ax", "ah", "al"]) or \
+            any(x in dest for x in ["eax", "ax", "ah", "al"]) else "eax"
+    if any(x in src for x in ["eax", "ax", "al", "ah"]):
+        use += [Register("EAX")]
+    kill += [Register(r.upper())]
+    g = Gadget(asm = asm, mnemonic = "copy mem", define = define, \
+            kill = kill, use = use)
+    return g
+
+
+# ===-------------------------------------------------------------------===
+# Generate gadget to compare a reg with a mem location
+# ===-------------------------------------------------------------------===
+def gen_cmp(reg, mem, t = "eax", size = 4):
+    kill = []
+    if reg in ["eflags", "eip", "ip", "mxcsr"] or \
+            reg.startswith("cr") or \
+            reg.startswith("dr"):
+        kill = [Register(t.upper())]
+    use = [Register(reg.upper()), mem]
+    define = []
+    asm = gen_cmp_asm(reg, mem, t, size)
+    if reg == "xcr0":
+        kill += [Register("EAX"), Register("EDX")]
+    g = Gadget(asm = asm, mnemonic = "cmp", define = define, \
+            kill = kill, use = use)
+    return g
 
 
 # ===-------------------------------------------------------------------===
@@ -1111,7 +1131,11 @@ def gen_store_eflags(dest):
 # ===-------------------------------------------------------------------===
 def gen_imm2mem(imm, dest):
     asm = gen_imm2mem_asm(imm, dest)
-    g = Gadget(asm = asm, mnemonic = "copy imm")
+    define = [dest]
+    use = []
+    kill = []    
+    g = Gadget(asm = asm, mnemonic = "copy imm", define = define, \
+            kill = kill, use = use)
     return g 
 
 
@@ -1124,10 +1148,15 @@ def gen_reg2mem(src, dest, size = 4):
     if asm == "":
         return None
     else:
-        use = [Register(src)]
-        define = [dest]
+        kill = []
+        use = [Register(src.upper())]
+        define = [dest]        
+        if any(x in dest for x in ["eax", "ax", "al", "ah"]):
+            use += [Register("EAX")]
         if src.startswith("st"):
             use += [Register("CR0")]
+        if src == "eflags":
+            use += [Register("EFLAGS")]
         g = Gadget(asm = asm, mnemonic = "reg2mem", define = define, kill = [], use = use) 
         return g 
 
@@ -1141,12 +1170,15 @@ def gen_mem2reg(src, dest, size = 4):
         return None
     else:
         use = [src]
-        define = [Register(dest)]
+        define = [Register(dest.upper())]
+        kill = []
+        if any(x in src for x in ["eax", "ax", "al", "ah"]):
+            use += [Register("EAX")]
         if dest.startswith("st"):
             use += [Register("CR0")]
+            define += [Register("ST(0)")]
         g = Gadget(asm = asm, mnemonic = "mem2reg", define = define,\
-                kill = [Register(dest.upper())],\
-                use = use)
+                kill = kill, use = use)
         return g 
 
 
@@ -1159,6 +1191,7 @@ def gen_mem2reg(src, dest, size = 4):
 # ===-------------------------------------------------------------------===
 def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     global l_insn
+    feistel = []
     
     t = ""
     if src2.startswith("mm"):
@@ -1166,7 +1199,8 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     elif src2.startswith("xmm"):
         t = "xmm0" if not (src2 == "xmm0") else "xmm1"
     elif size <= 4:
-        if src2.find("eax") >= 0 or src1.find("eax") >= 0:
+        a = ["eax", "ax", "al", "ah"]
+        if any(x in src1 for x in a) or any(x in src2 for x in a):
             t = "ecx"
         else:
             t = "eax"
@@ -1178,13 +1212,19 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
         assert 0
         
     if DEBUG >= 3:
-        print "size = %d, src2 = %s, t = %s" % (size, src2, t)
-    asm1 = gen_mem2reg_asm(src1, t, size)
+        print "dest = %s, size = %d, src2 = %s, t = %s" % (dest, size, src2, t)
+    g1 = gen_mem2reg(src1, t, size)    
+    g3 = gen_reg2mem(t, dest, size)
     asm2 = ""
-    asm3 = gen_reg2mem_asm(t, dest, size)
-    kill= [Register(t.upper())]
     define = []
+    kill = []
     use = []
+    if src2 in reg_map:
+        use += [Register(src2.upper())]
+    else:
+        use += [src2]
+    if any(x in src2 for x in ["eax", "ax", "al", "ah"]):
+        use += [Register("EAX")]
     
     if src2 == "eflags":
         r = "0x%x" % get_addr(4, True)[0]
@@ -1203,7 +1243,7 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
         or src2.startswith("dr"):
         asm2 += "mov %%%s,%%ecx; xor %%ecx,%%eax;" % src2
         if clean:
-            asm3 += "mov $0x0,%%ecx; mov %%ecx,%%%s;" % src2
+            g3.asm += "mov $0x0,%%ecx; mov %%ecx,%%%s;" % src2
         kill += [Register("ECX")]                            
     elif src2 == "mxcsr":
         d = "0x%x" % get_addr(4, True)[0]
@@ -1211,30 +1251,34 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
             "xor %s,%%%s;" % (d, d, t)
     elif src2 == "xcr0":
         d = "0x%x" % get_addr(8, True)[0]
-        asm2 += gen_reg2mem_asm(src2, d, 8)
+        asm2 += gen_reg2mem_asm(src2, d, 8)        
+        kill += [Register("EAX"), Register("EDX")]
         asm2 += "pxor %s,%%%s;" % (d, t)
+
     else:
         m = size2mov(size, src2)
         x = size2xor(size, src2)
-        t = resize_reg(t, size)
+        r = resize_reg(t, size)
         format_str = "%s %%%s,%%%s;" if src2 in reg_map else "%s %s,%%%s;" 
-        asm2 += format_str % (x, src2, t)
+        asm2 += format_str % (x, src2, r)
         if clean:
-            r = random.randint(0, 0xffffffff)            
-            asm3 += gen_cmp_imm_asm(src2, 0)
-            asm3 += "je forward_%.8x;" % r
+            l = random.randint(0, 0xffffffff)            
+            g3.asm += gen_cmp_imm_asm(src2, 0, t)
+            g3.asm += "je forward_%.8x;" % l
             if src2 in reg_map:
-                asm3 += "%s %%%s,%%%s;" % (x, src2, src2)
+                g3.asm += "%s %%%s,%%%s;" % (x, src2, src2)
             else:
-                asm3 += "%s %%%s,%%%s;"\
-                    "%s %%%s,%s;" % (x, t, t, m, t, src2)                          
-            asm3 += "forward_%.8x:" %r    
-    asm = asm1 + asm2 + asm3
-    print "src2: %s(%d)" % (src2, size)
+                g3.asm += "%s %%%s,%%%s;"\
+                    "%s %%%s,%s;" % (x, r, r, m, r, src2)
+            # define += [src2]
+            g3.asm += "forward_%.8x:" % l
+    g2 = Gadget(asm = asm2, mnemonic = "feistel", define = define, kill= kill, use = use)
+    g = merge_glist([g1, g2, g3])
+    g.kill = g.kill | set([Register(t.upper())])
+    g.define -= set([Register(t.upper())])
     if src2 in ["eax", "ax", "al", "ah", "eflags"]:
-        asm = "push %eax;" + asm + "pop %eax;"
-        print asm
-    g = Gadget(asm = asm, mnemonic = "copy mem", define = define, kill= kill, use = use)    
+        g.asm = "push %eax;" + g.asm + "pop %eax;"
+        g.kill = g.kill - set([Register("EAX")])
     return g
 
 
@@ -1372,15 +1416,23 @@ def handle_mem_read(inst, op, i, isInit = False):
                 init_r += [gen_store_mem(op_str, r)]
             src = "0x%x" % feistel_r[count_r]
             op_bak = "0x%x" % feistel_in[count_r]
-            backup += [gen_store_mem(op_str, op_bak)]
             setinput += [gen_store_mem(src, op_str)]
-            l = random.randint(0, 0xffffffff)
-            asm = gen_mem2reg_asm(op_str, "eax") 
-            asm += "cmpl %s,%%eax;" % op_bak
-            asm += "je forward_%.8x;" % l
-            asm += gen_store_mem_asm(op_bak, op_str)
-            asm += "forward_%.8x:" % l
-            restore += [Gadget(asm = asm, mnemonic = "restore inputs")]
+            if not inst.is_mem_written(0):
+                backup += [gen_store_mem(op_str, op_bak)]
+
+            if not inst.is_mem_written(0):
+                restore_ = []
+                t = "ecx" if any(x in op_str for x in ["eax", "ax", "al", "ah"]) else "eax"
+                l = random.randint(0, 0xffffffff)
+                restore_ += [gen_mem2reg(op_str, t)]
+                restore_ += [gen_cmp(t, op_bak)]
+                asm = "je forward_%.8x;" % l
+                restore_ += [Gadget(asm = asm, mnemonic = "")]
+                restore_ += [gen_store_mem(op_bak, op_str)]
+                asm = "forward_%.8x:" % l
+                restore_ += [Gadget(asm = asm, mnemonic = "")]
+                restore += [merge_glist(restore_, "restore inputs")]
+
             count_r += 1  
         
     return (backup, setinput, feistel, restore)
@@ -1429,13 +1481,18 @@ def handle_mem_write(inst, op, i, isInit = False):
             dest = "0x%x" % feistel_r[count_l + j]        
             feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]
             backup += [gen_store_mem(src2, op_bak)]
+
+            restore_ = []
             l = random.randint(0, 0xffffffff)
-            asm = gen_mem2reg_asm(src2, "eax") 
-            asm += "cmpl %s,%%eax;" % op_bak
-            asm += "je forward_%.8x;" % l
-            asm += gen_store_mem_asm(op_bak, src2)
-            asm += "forward_%.8x:" % l
-            restore += [Gadget(asm = asm, mnemonic = "restore outputs")]
+            t = "ecx" if any(x in src2 for x in ["eax", "ax", "al", "ah"]) else "eax"
+            restore_ += [gen_mem2reg(src2, t)]
+            restore_ += [gen_cmp(t, op_bak)]
+            asm = "je forward_%.8x;" % l
+            restore_ += [Gadget(asm = asm, mnemonic = "")]
+            restore_ += [gen_store_mem(op_bak, src2)]
+            asm = "forward_%.8x:" % l
+            restore_ += [Gadget(asm = asm, mnemonic = "")]
+            restore += [merge_glist(restore_, "restore outputs")]
         count_l += r
         
     return (backup, setinput, feistel, restore)
@@ -1493,14 +1550,27 @@ def handle_reg_read(inst, op, i, isInit = False):
         src = "0x%x" % feistel_r[count_r]
         print "src = %s" % src
         reg_bak = "0x%x" % feistel_in[count_r]
-        backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
         setinput += [gen_mem2reg(src, reg_str, reg_len)]
-        l = random.randint(0,0xffffffff)
-        asm = gen_cmp_asm(reg_str, reg_bak)
-        asm += "je forward_%.8x;" % l
-        asm += gen_mem2reg_asm(reg_bak, reg_str, reg_len)
-        asm += "forward_%.8x:" % l
-        restore += [Gadget(asm = asm, mnemonic = "restore inputs")]
+        if op.is_read_only():
+            backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
+
+        # Check whether reg value changed, restore if changed, otherwise do nothing        
+        if op.is_read_only():
+            restore_ = []
+            t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax"
+            l = random.randint(0,0xffffffff)
+            restore_ += [gen_cmp(reg_str, reg_bak, t)]
+            asm = "je forward_%.8x;" % l
+            restore_ += [Gadget(asm = asm, mnemonic = "")]
+            restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
+            asm = "forward_%.8x:" % l
+            restore_ += [Gadget(asm = asm, mnemonic = "")]
+            g = merge_glist(restore_, "restore inputs")
+            if reg_str == "eflags":
+                g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore inputs" % t
+                g.kill -= set([Register(t.upper())])
+            restore += [g]
+
         count_r += size
     else:
         print "No read"
@@ -1563,22 +1633,34 @@ def handle_reg_write(inst, op, i, isInit = False):
         dest = "0x%x" % feistel_r[count_l]
         if reg_str.startswith("st"):
             l = get_addr(reg_len, True)            
-            feistel += [gen_reg2mem(reg_str, l[0], reg_len)]
+            feistel_ = []
+            feistel_ += [gen_reg2mem(reg_str, "0x%x" % l[0], reg_len)]
             for j in range(len(l)):
                 src1 = "0x%x" % feistel_l[count_l + j]
                 dest = "0x%x" % feistel_r[count_l + j]
                 src2 = "0x%x" % l[j]                
-                feistel += [gen_feistel_cipher(src1, src2, "0x%x" % feistel_r[count_l + j], 4, True)]
+                feistel_ += [gen_feistel_cipher(src1, src2, "0x%x" % feistel_r[count_l + j], 4, True)]
+            feistel += [merge_glist(feistel_, "feistel fpu")]
         else:
             feistel += [gen_feistel_cipher(src1, src2, dest, reg_len, True)]
         reg_bak = "0x%x" % feistel_out[count_l]
         backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
+
+        # Check whether reg value changed, restore if changed, otherwise do nothing
+        restore_ = []
+        t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax" 
         l = random.randint(0,0xffffffff)
-        asm = gen_cmp_asm(reg_str, reg_bak)
-        asm += "je forward_%.8x;" % l
-        asm += gen_mem2reg_asm(reg_bak, reg_str, reg_len)
-        asm += "forward_%.8x:" % l
-        restore += [Gadget(asm = asm, mnemonic = "restore outputs")]
+        restore_ += [gen_cmp(reg_str, reg_bak, t)] 
+        asm = "je forward_%.8x;" % l
+        restore_ += [Gadget(asm = asm, mnemonic = "")]
+        restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
+        asm = "forward_%.8x:" % l
+        restore_ += [Gadget(asm = asm, mnemonic = "")]
+        g = merge_glist(restore_, "restore outputs")
+        if reg_str == "eflags":
+            g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore outputs" % t
+            g.kill -= set([Register(t.upper())])
+        restore += [g]
         count_l += r
         
     return (backup, setinput, feistel, restore)         
@@ -1768,16 +1850,25 @@ class Gadget:
         r += "   [*] use:    %s\n" % (", ".join([str(u) for u in self.use]))
         return r
 
+    # ===-------------------------------------------------------------------===
+    #  
+    # ===-------------------------------------------------------------------===
     def __add__(self, other):
-        asm = self.asm + other.asm
-        mnemonic = self.mnemonic + other.mnemonic
+        asm = self.asm.split("//")[0] + other.asm.split("//")[0]
+        mnemonic = self.mnemonic + "-" + other.mnemonic
         define = self.define | other.define
         kill = self.kill | other.kill
         use = self.use | other.use
-        define_ = define - (define & use)
-        use_ = use - (define & use)
         affect = self.affect | other.affect
-        g = Gadget(asm, mnemonic, define_, kill, use_, affect)
+
+        # Remove cycles
+        define -= other.kill
+        use -= other.kill
+        use -= self.kill
+        use -= (self.define & other.use)
+        kill -= (self.kill & other.define)
+        
+        g = Gadget(asm, mnemonic, define, kill, use, affect)
         return g
 
     def __repr__(self):
@@ -1792,8 +1883,8 @@ class Gadget:
     def depend(g1, g0):
         return (g1.define & g0.kill) or \
             (g0.use & g1.define or "*" in g1.define) or \
-            (g1.affect & g0.use)
-
+            (g1.affect & g0.use) or (g0.use & g1.kill) or \
+            (Register("EFLAGS") in g0.use and not Register("EFLAGS") in g1.use) 
     # ===-------------------------------------------------------------------===
     # Generate a gadget to set a register
     # ===-------------------------------------------------------------------===
@@ -2075,8 +2166,9 @@ class Gadget:
         # Feistel & Feistel looping mode
             # Handle all read operations in 1st round, and then handle write operations
             if DEBUG >= 2:
-                print "********************************************************************************"        
-                print "There are %d ops and %d mem ops" % (inst.get_noperands(), inst.get_number_of_memory_operands())
+                print "******************************************************************************"
+                print "There are %d ops and %d mem ops" % (inst.get_noperands(), \
+                        inst.get_number_of_memory_operands())
                 print "==================== READ ===================="
             feistel = []
             (b, s, f, r) = handle_op(inst, handle_mem_read, handle_reg_read, isInit)
@@ -2094,7 +2186,7 @@ class Gadget:
             backup += b
             
             if DEBUG >= 2:
-                print "********************************************************************************"
+                print "******************************************************************************"
             print "count_R = %d, count_L = %d" % (count_r, count_l)
 #             print "R = %d, L = %d" % (len(feistel_r), len(feistel_l))
             
@@ -2105,7 +2197,7 @@ class Gadget:
                 feistel_l += l
                 for val in l:
                     init_l += [gen_imm2mem(gen_seed(), "0x%x" % val)]
-                print "********************************************************************************"
+                print "******************************************************************************"
                 while len(feistel_r) < len(feistel_l):
                     feistel_r += get_addr()
                     feistel_r_bak += get_addr()
@@ -2155,13 +2247,7 @@ class Gadget:
                 #If 1st iter, mov init state input to R
                 if MODE > 2:
                     assert(count_addr != 0)
-                    label = random.randint(0, 0xffffffff)
-                    asm1 = "cmpl $0x%x,0x%x;" \
-                        "jne forward_%.8x;" % (loop, count_addr, label)
-                    asm2 = "forward_%.8x: " % label
-                    g1 = Gadget(asm = asm1, mnemonic = "Init R & L")
-                    g2 = Gadget(asm = asm2, mnemonic = "Init R & L")
-                    init_r = [g1] + init_r + init_l + [g2]
+                    init_r = init_r + init_l
                 set_r = init_r
                        
             #feistel restore: moving R_{i-1} to L_{i} via R's backup
@@ -2184,15 +2270,6 @@ class Gadget:
                 print "R = %d, L = %d" % (len(feistel_r), len(feistel_l))
         # else :Do nothing, for single test case mode
 	
-        # Skip set-input code if in 1st iter
-        if MODE > 2:
-            label = random.randint(0, 0xffffffff)
-            asm1 = "cmpl $0x%x,0x%x;" \
-                    "je forward_%.8x;" % (loop, count_addr, label)
-            asm2 = "forward_%.8x: " % label
-            g1 = Gadget(asm = asm1, mnemonic = "Skip setinput")
-            g2 = Gadget(asm = asm2, mnemonic = "Skip setinput")
-            setinput = [g1] + setinput + [g2]
         return (backup, remove_none(set_r), remove_none(backup_r), setinput, \
                 code, output, restore);     
     
@@ -2264,6 +2341,7 @@ def dot_dependency_graph(graph):
 # ===-----------------------------------------------------------------------===
 def topological_sort(graph):
 
+    print "cycle#: %d" % len(list(networkx.simple_cycles(graph)))
     assert networkx.algorithms.dag.is_directed_acyclic_graph(graph)
 
     G = graph
@@ -2293,7 +2371,10 @@ def topological_sort(graph):
             successors.sort(nodecmp)
             for n in successors:
                 if n not in explored:
-                    if n in seen: return #CYCLE !!
+                    if n in seen: 
+                        print n
+                        print "find cycle"
+                        return #CYCLE !!
                     new_nodes.append(n)
             if new_nodes:   # Add new_nodes to fringe
                 fringe.extend(new_nodes)
@@ -2355,24 +2436,10 @@ def compile_gadgets(gadget, epilogue, directive = ""):
     asm = "";
     i = 0
     for tuple in gadget:
-        (startup, param, bak_in, set_r, copy_r, setin, code, \
-                output, restore, revert, loop) = tuple;
-        # for future sorting, merge gadget lists before code into gadgets
-        pre = [merge_glist(bak_in, "backup"), merge_glist(set_r + copy_r, "prep R blocks"), \
-                merge_glist(setin, "R 2 input")]
-        pre = remove_none(param + pre)
-        depgraph = build_dependency_graph(pre)
-        pre = sort_gadget(depgraph, pre)
-        
-        depgraph = build_dependency_graph(revert)
-        revert = sort_gadget(depgraph, revert)
-
-        if DEBUG >= 3:
-            for g in pre:
-                print g
+        (startup, pre, code, revert_, post, revert, loop) = tuple;
 
         # Generate the assembly code        
-        for g in startup + pre + code + output + restore + revert + loop:
+        for g in startup + pre + code + revert_ + post + revert + loop:
             if g != None:
                 asm += "%s\n" % (g.asm)
                 if i and i % 8 == 0:
@@ -2657,62 +2724,91 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
                 rm.value = rm.in_snapshot(snapshot)
                 param += rm.gen_gadget(snapshot)
     
-#         for idx, g in enumerate(revert):
-#             print "revert[%d]: %s" % (idx, g.asm)
-    
         if count == 1:
             count_addr = get_addr()[0]
+        
+        # Labels of return points
         l0 = random.randint(0, 0xffffffff)  # label at the beginnign of this test case
-        l1 = random.randint(0, 0xffffffff)  # lable of restore
-        l2 = random.randint(0, 0xffffffff)  # lable of revert
-        l3 = random.randint(0, 0xffffffff)  # label of loop
-        l4 = random.randint(0, 0xffffffff)  # label at the end of this test case                            
-        # Return to 'revert' from exception handlers by default
-        startup = Gadget.gen_prologue(l0, l2, snapshot, tc.split("/")[-2], count_addr)
+        l1 = random.randint(0, 0xffffffff)  # lable of revert', a copy of revert
+        l2 = random.randint(0, 0xffffffff)  # lable of post (feistel & restore)
+        l3 = random.randint(0, 0xffffffff)  # lable of revert
+        l4 = random.randint(0, 0xffffffff)  # label of loop
+        l5 = random.randint(0, 0xffffffff)  # label at the end of this test case
+        ls = random.randint(0, 0xffffffff)  # start of loop 
+
+        startup = Gadget.gen_prologue(l0, l3, snapshot, tc.split("/")[-2], count_addr)
+
         (backup, set_r, copy_r, setinput, code, output, restore) \
-                = Gadget.gen_root(snapshot, shellcode, count)        
-        print "%d backup gadgets" % len(backup)
-        bak = append_gadget(copy_r, param)
-        setin = append_gadget(setinput, param)
+                = Gadget.gen_root(snapshot, shellcode, count)
+        asm = "push %eax;"
+        copy_r = [Gadget(asm = asm, mnemonic = "")] + copy_r
+        asm = "pop %eax;"
+        copy_r += [Gadget(asm = asm, mnemonic = "")]
+        asm = "jmp forward_%.8x;" % l2 # jump over revert' and execute post
+        for g in copy_r:
+            g.kill -= set([Register("EAX")])
+        code += [Gadget(asm = asm, mnemonic = "jump to post")]
+
+        # Copy initial inputs of 1st testcase to R block
+        if count == 1:
+            startup += set_r
         
         #jump to TC beginning for a fixed # of times                   
         asm = "";
         if MODE > 2:
             asm = "decl 0x%x; " \
-                "jnz forward_%.8x; // back to loop entrance" % (count_addr, l1)
+                "jnz forward_%.8x; // back to loop entrance" % (count_addr, ls)
         loop = [Gadget(asm = asm, mnemonic = "loop")] 
 
         if MODE <= 0:
             revert = [];
-         
-        # change exception handler return points in different phase of a test case
-        asm = "movl $forward_%.8x,0x%x;" % (l1, retp)
-        setinput = [Gadget(asm = asm, mnemonic = "return to restore")] + setinput
+                       
+        # Sort gadgets & add labels to return points
         asm = "movl $forward_%.8x,0x%x;" % (l2, retp)
-        restore = [Gadget(asm = asm, mnemonic = "return to revert")] + restore
+        setinput = [Gadget(asm = asm, mnemonic = "return to post")] + setinput
+        depgraph = build_dependency_graph(setinput)
+        setinput = sort_gadget(depgraph, setinput)
+
+        pre = [merge_glist(backup, "backup"), merge_glist(copy_r, "copy R blocks"), \
+                merge_glist(setinput, "R 2 input")]        
+        pre = remove_none(param + pre)        
+        depgraph = build_dependency_graph(pre)
+        pre = sort_gadget(depgraph, pre)
+        pre = [Gadget(asm = "forward_%.8x:" % ls, mnemonic = "loop start point")] + pre
+
+        post = output + restore
+        depgraph = build_dependency_graph(post)
+        post = sort_gadget(depgraph, post)
+        depgraph = build_dependency_graph(revert)
+        revert = sort_gadget(depgraph, revert)
+        revert_ = revert[:]
+
+        asm = "movl $forward_%.8x,0x%x;" % (l1, retp)
+        code = [Gadget(asm = asm, mnemonic = "return to revert_")] + code
+        asm = "movl $forward_%.8x,0x%x;" % (l2, retp)
+        revert_ = [Gadget(asm = asm, mnemonic = "return to post")] + revert_
         asm = "movl $forward_%.8x,0x%x;" % (l3, retp)
-        revert = [Gadget(asm = asm, mnemonic = "return to loop")] + revert
+        post = [Gadget(asm = asm, mnemonic = "return to revert")] + post
         asm = "movl $forward_%.8x,0x%x;" % (l4, retp)
+        revert = [Gadget(asm = asm, mnemonic = "return to loop")] + revert
+        asm = "movl $forward_%.8x,0x%x;" % (l5, retp)
         loop = [Gadget(asm = asm, mnemonic = "return to end")] + loop
         
-        # Add tags for restore, revert, loop and end of test case
         asm = "forward_%.8x:" % l1
-        restore = [Gadget(asm = asm, mnemonic = "restore")] + restore 
+        revert_ = [Gadget(asm = asm, mnemonic = "revert_")] + revert_
         asm = "forward_%.8x:" % l2
-        revert = [Gadget(asm = asm, mnemonic = "revert")] + revert
+        post = [Gadget(asm = asm, mnemonic = "restore")] + post
         asm = "forward_%.8x:" % l3
-        loop = [Gadget(asm = asm, mnemonic = "loop")] + loop
+        revert = [Gadget(asm = asm, mnemonic = "revert")] + revert
         asm = "forward_%.8x:" % l4
-        loop += [Gadget(asm = asm, mnemonic = "End of testcase")]                                   
-            
-        gadget.append((startup, param, backup, set_r, copy_r, setinput, code, output, restore, \
-                revert, loop))
-        # NOTE: bak and setin are list of gadget lists, while the rests are gadget lists
-        #TODO: Rewrite DEBUG
-#         if DEBUG >= 1:
-#             for g in prologue + body + epilogue:
-#                 print
-#                 print g
+        loop = [Gadget(asm = asm, mnemonic = "loop")] + loop
+        asm = "forward_%.8x:" % l5
+        loop += [Gadget(asm = asm, mnemonic = "End of testcase")]
+
+        gadget.append((startup, pre, code, revert_, post, revert, loop))
+        for g in pre:
+            print g
+
         if PG == 0:
             PG = 1
             print "Turn paging back on"
@@ -2720,6 +2816,8 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
 
     epilogue = Gadget.gen_end_testcase()
     print_feistel_blocks()
+
+    
     code, obj = compile_gadgets(gadget, epilogue)
 
     if DEBUG >= 2:
