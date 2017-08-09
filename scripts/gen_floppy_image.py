@@ -1558,13 +1558,7 @@ def handle_reg_read(inst, op, i, isInit = False):
         if op.is_read_only():
             restore_ = []
             t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax"
-            l = random.randint(0,0xffffffff)
-            restore_ += [gen_cmp(reg_str, reg_bak, t)]
-            asm = "je forward_%.8x;" % l
-            restore_ += [Gadget(asm = asm, mnemonic = "")]
             restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
-            asm = "forward_%.8x:" % l
-            restore_ += [Gadget(asm = asm, mnemonic = "")]
             g = merge_glist(restore_, "restore inputs")
             if reg_str == "eflags":
                 g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore inputs" % t
@@ -1649,13 +1643,7 @@ def handle_reg_write(inst, op, i, isInit = False):
         # Check whether reg value changed, restore if changed, otherwise do nothing
         restore_ = []
         t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax" 
-        l = random.randint(0,0xffffffff)
-        restore_ += [gen_cmp(reg_str, reg_bak, t)] 
-        asm = "je forward_%.8x;" % l
-        restore_ += [Gadget(asm = asm, mnemonic = "")]
         restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
-        asm = "forward_%.8x:" % l
-        restore_ += [Gadget(asm = asm, mnemonic = "")]
         g = merge_glist(restore_, "restore outputs")
         if reg_str == "eflags":
             g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore outputs" % t
