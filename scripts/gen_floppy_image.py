@@ -92,6 +92,8 @@ loop = 2            #repeat testing each test case for a number of times
 # Other global variables
 # ===-----------------------------------------------------------------------===
 l_insn = None       # Label at the tested instruction
+l_restore = []      # list of inputs/outputs for which a pair of backup/restore
+                    # gadgets has been generated  
 
 
 # ===-----------------------------------------------------------------------===
@@ -1381,6 +1383,7 @@ def get_mem_op(inst, op, i, d = 0):
 
 
 def handle_mem_read(inst, op, i, isInit = False):
+    global l_restore
     global init_r
     global feistel_r
     global feistel_r_bak
@@ -1416,10 +1419,10 @@ def handle_mem_read(inst, op, i, isInit = False):
             src = "0x%x" % feistel_r[count_r]
             op_bak = "0x%x" % feistel_in[count_r]
             setinput += [gen_store_mem(src, op_str)]
-            if not inst.is_mem_written(0):
-                backup += [gen_store_mem(op_str, op_bak)]
 
-            if not inst.is_mem_written(0):
+            if not op_str in l_restore:
+                l_restore += [op_str]
+                backup += [gen_store_mem(op_str, op_bak)]
                 restore_ = []
                 t = "ecx" if any(x in op_str for x in ["eax", "ax", "al", "ah"]) else "eax"
                 l = random.randint(0, 0xffffffff)
@@ -1433,11 +1436,11 @@ def handle_mem_read(inst, op, i, isInit = False):
                 restore += [merge_glist(restore_, "restore inputs")]
 
             count_r += 1  
-        
     return (backup, setinput, feistel, restore)
     
     
 def handle_mem_write(inst, op, i, isInit = False):
+    global l_restore
     global init_r
     global init_l
     global feistel_l
@@ -1479,19 +1482,21 @@ def handle_mem_write(inst, op, i, isInit = False):
             op_bak = "0x%x" % feistel_out[count_l + j]
             dest = "0x%x" % feistel_r[count_l + j]        
             feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]
-            backup += [gen_store_mem(src2, op_bak)]
 
-            restore_ = []
-            l = random.randint(0, 0xffffffff)
-            t = "ecx" if any(x in src2 for x in ["eax", "ax", "al", "ah"]) else "eax"
-            restore_ += [gen_mem2reg(src2, t)]
-            restore_ += [gen_cmp(t, op_bak)]
-            asm = "je forward_%.8x;" % l
-            restore_ += [Gadget(asm = asm, mnemonic = "")]
-            restore_ += [gen_store_mem(op_bak, src2)]
-            asm = "forward_%.8x:" % l
-            restore_ += [Gadget(asm = asm, mnemonic = "")]
-            restore += [merge_glist(restore_, "restore outputs")]
+            if not op_str in l_restore: 
+                l_restore += [op_str]
+                backup += [gen_store_mem(src2, op_bak)]
+                restore_ = []
+                l = random.randint(0, 0xffffffff)
+                t = "ecx" if any(x in src2 for x in ["eax", "ax", "al", "ah"]) else "eax"
+                restore_ += [gen_mem2reg(src2, t)]
+                restore_ += [gen_cmp(t, op_bak)]
+                asm = "je forward_%.8x;" % l
+                restore_ += [Gadget(asm = asm, mnemonic = "")]
+                restore_ += [gen_store_mem(op_bak, src2)]
+                asm = "forward_%.8x:" % l
+                restore_ += [Gadget(asm = asm, mnemonic = "")]
+                restore += [merge_glist(restore_, "restore outputs")]
         count_l += r
         
     return (backup, setinput, feistel, restore)
@@ -1510,6 +1515,7 @@ def get_reg_op(inst, op, i):
 
 
 def handle_reg_read(inst, op, i, isInit = False):
+    global l_restore
     global init_r
     global feistel_r
     global feistel_r_bak
@@ -1550,11 +1556,10 @@ def handle_reg_read(inst, op, i, isInit = False):
         print "src = %s" % src
         reg_bak = "0x%x" % feistel_in[count_r]
         setinput += [gen_mem2reg(src, reg_str, reg_len)]
-        if op.is_read_only():
-            backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
 
-        # Check whether reg value changed, restore if changed, otherwise do nothing        
-        if op.is_read_only():
+        if not reg_str in l_restore:
+            l_restore += [reg_str]
+            backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
             restore_ = []
             t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax"
             restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
@@ -1572,6 +1577,7 @@ def handle_reg_read(inst, op, i, isInit = False):
          
          
 def handle_reg_write(inst, op, i, isInit = False):
+    global l_restore
     global init_r
     global init_l
     global feistel_l
@@ -1637,17 +1643,17 @@ def handle_reg_write(inst, op, i, isInit = False):
         else:
             feistel += [gen_feistel_cipher(src1, src2, dest, reg_len, True)]
         reg_bak = "0x%x" % feistel_out[count_l]
-        backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
 
-        # Check whether reg value changed, restore if changed, otherwise do nothing
-        restore_ = []
-        t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax" 
-        restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
-        g = merge_glist(restore_, "restore outputs")
-        if reg_str == "eflags":
-            g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore outputs" % t
-            g.kill -= set([Register(t.upper())])
-        restore += [g]
+        if not reg_str in l_restore:            
+            backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
+            restore_ = []
+            t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax" 
+            restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
+            g = merge_glist(restore_, "restore outputs")
+            if reg_str == "eflags":
+                g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore outputs" % t
+                g.kill -= set([Register(t.upper())])
+            restore += [g]
         count_l += r
         
     return (backup, setinput, feistel, restore)         
