@@ -2378,8 +2378,9 @@ def topological_sort(graph):
 # ===-----------------------------------------------------------------------===
 def sort_gadget(depgraph, name):
         if DEBUG >= 3:
-            path = "/tmp/depgraph_%s.dot" % name
-            open(path.replace(" ","_"), "w").write(dot_dependency_graph(depgraph))
+            name_ = "%s" % name
+            path = "/tmp/depgraph_%s.dot" % name_.replace(" ","_")[:255]
+            open(path, "w").write(dot_dependency_graph(depgraph))
     
         return topological_sort(depgraph)    
 
