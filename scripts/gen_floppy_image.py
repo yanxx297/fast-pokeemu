@@ -1505,7 +1505,7 @@ def handle_mem_write(inst, op, i, isInit = False):
             (src2, _) = get_mem_op(inst, op, i, j * 4)
             op_bak = "0x%x" % feistel_out[count_l + j]
             dest = "0x%x" % feistel_r[count_l + j]        
-            feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]
+            feistel += [gen_feistel_cipher(src1, src2, dest, 4)]
 
             if not op_str in l_restore: 
                 l_restore += [op_str]
