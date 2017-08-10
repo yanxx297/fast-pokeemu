@@ -1662,10 +1662,10 @@ def handle_reg_write(inst, op, i, isInit = False):
                 src1 = "0x%x" % feistel_l[count_l + j]
                 dest = "0x%x" % feistel_r[count_l + j]
                 src2 = "0x%x" % l[j]                
-                feistel_ += [gen_feistel_cipher(src1, src2, "0x%x" % feistel_r[count_l + j], 4, True)]
+                feistel_ += [gen_feistel_cipher(src1, src2, "0x%x" % feistel_r[count_l + j], 4)]
             feistel += [merge_glist(feistel_, "feistel fpu")]
         else:
-            feistel += [gen_feistel_cipher(src1, src2, dest, reg_len, True)]
+            feistel += [gen_feistel_cipher(src1, src2, dest, reg_len)]
         reg_bak = "0x%x" % feistel_out[count_l]
 
         if not reg_str in l_restore:            
@@ -2223,12 +2223,12 @@ class Gadget:
             src1 = "0x%x" % feistel_l[count_l]
             src2 = "0x%x" % edata
             dest = "0x%x" % feistel_r[count_l]
-            feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]
+            feistel += [gen_feistel_cipher(src1, src2, dest, 4)]
             count_l += 1
             src1 = "0x%x" % feistel_l[count_l]
             src2 = "0x%x" % (edata + 4)
             dest = "0x%x" % feistel_r[count_l]
-            feistel += [gen_feistel_cipher(src1, src2, dest, 4, True)]
+            feistel += [gen_feistel_cipher(src1, src2, dest, 4)]
             count_l += 1
                                                     
    
