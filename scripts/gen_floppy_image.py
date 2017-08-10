@@ -1587,7 +1587,7 @@ def handle_reg_read(inst, op, i, isInit = False):
             restore_ = []
             t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax"
             restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
-            g = merge_glist(restore_, "restore inputs")
+            g = merge_glist(remove_none(restore_), "restore inputs")
             if reg_str == "eflags":
                 g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore inputs" % t
                 g.kill -= set([Register(t.upper())])
@@ -1673,7 +1673,7 @@ def handle_reg_write(inst, op, i, isInit = False):
             restore_ = []
             t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax" 
             restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
-            g = merge_glist(restore_, "restore outputs")
+            g = merge_glist(remove_none(restore_), "restore outputs")
             if reg_str == "eflags":
                 g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore outputs" % t
                 g.kill -= set([Register(t.upper())])
@@ -2409,7 +2409,7 @@ def topological_sort(graph):
 def sort_gadget(depgraph, name):
         if DEBUG >= 3:
             name_ = "%s" % name
-            path = "/tmp/depgraph_%s.dot" % name_.replace(" ","_")[:255]
+            path = "/tmp/depgraph_%s.dot" % name_.replace(" ","_")[:128]
             open(path, "w").write(dot_dependency_graph(depgraph))
     
         return topological_sort(depgraph)    
