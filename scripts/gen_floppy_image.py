@@ -1302,8 +1302,8 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     g.kill = g.kill | set([Register(t.upper())])
     g.define -= set([Register(t.upper())])
     if src2 in ["eax", "ax", "al", "ah", "eflags"]:
-        g.asm = "push %eax;" + g.asm + "pop %eax;"
-        g.kill = g.kill - set([Register("EAX")])
+        g.asm = "push %eax; push %ecx;" + g.asm + "pop %ecx; pop %eax;"
+        g.kill = g.kill - set([Register("EAX"), Register("ECX")])
     return g
 
 
