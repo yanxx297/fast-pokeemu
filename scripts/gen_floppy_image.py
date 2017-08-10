@@ -669,6 +669,30 @@ def is_valid(op):
         return False
     return True
 
+def make_stable(l, done, snapshot):
+    # Need one or more extra passes to define what has been killed but not
+    # defined
+    l_ = l[:]
+    stable = False
+    while not stable:
+        stable = True
+    
+        killed = set()
+        defined = set()
+        for g in l:
+            killed |= g.kill
+            defined |= g.define
+    
+        if len(killed - defined):
+            print "Forcing gadgets for: ", \
+                    ", ".join([str(v) for v in killed - defined])
+    
+        for rm in killed - defined:
+            assert rm not in done
+            stable = False
+            rm.value = rm.in_snapshot(snapshot)
+            l_ += rm.gen_gadget(snapshot)
+        return l_
 
 # ===-------------------------------------------------------------------===
 # Return the next register of the same typethat are not used. 
@@ -2698,28 +2722,9 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
                 revert_ += rm.gen_revert_gadget(snapshot)
                 done.add(rm)
 
-        # Need one or more extra passes to define what has been killed but not
-        # defined
-        stable = False
-        while not stable:
-            stable = True
-    
-            killed = set()
-            defined = set()
-            for g in param:
-                killed |= g.kill
-                defined |= g.define
-    
-            if len(killed - defined):
-                print "Forcing gadgets for: ", \
-                    ", ".join([str(v) for v in killed - defined])
-    
-            for rm in killed - defined:
-                assert rm not in done
-                stable = False
-                rm.value = rm.in_snapshot(snapshot)
-                param += rm.gen_gadget(snapshot)
-    
+        param = make_stable(param, done, snapshot)
+        revert = make_stable(revert, done, snapshot)
+        revert_ = make_stable(revert_, done, snapshot)
         if count == 1:
             count_addr = get_addr()[0]
         
