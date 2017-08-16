@@ -1,0 +1,31 @@
+# Usage: make -f batchRunTestcase -j 6
+SHELL := /bin/bash
+
+# Config
+OUT?=/tmp/out/
+EMUPATH?=./../emulators/kvm-run/run-testcase
+INSN_LIST?=
+TIMEOUT?=10
+
+all:$(addsuffix /ktime, $(addprefix $(OUT), $(foreach dir, $(INSN_LIST), $(dir))))
+
+define run-target
+$(addprefix $(OUT), $1)/ktime:
+	$(eval OUTDIR:= $(addprefix $(OUT), $1))
+	for file in $(OUTDIR)/*.pre; do\
+		tcname=$$$$(basename $$$$file .pre);\
+		timeout $(TIMEOUT) ./$(EMUPATH) $$$$file $(OUTDIR)/$$$$tcname.post.kvm;\
+		python diff_cpustate.py $(OUTDIR)/$$$$tcname.post $(OUTDIR)/$$$$tcname.post.kvm > $(OUTDIR)/$$$$tcname.diff;\
+		err=$$$$?;\
+		if [ $$$$err == 0 ]; then\
+			echo $$$$tcname >> $(OUTDIR)/match;\
+		elif [ $$$$err == 2 ]; then\
+			echo $$$$tcname >> $(OUTDIR)/mismatch;\
+		fi;\
+	done;
+	find $(OUTDIR) -type f -empty -delete
+	rm $(OUTDIR)/*.pre $(OUTDIR)/*.post $(OUTDIR)/*.kvm
+endef
+
+$(foreach dir,$(INSN_LIST),$(eval $(call run-target,$(dir))))
+
