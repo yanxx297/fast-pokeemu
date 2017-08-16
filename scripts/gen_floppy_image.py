@@ -44,7 +44,7 @@ SNAPSHOT = joinpath(ROOT, "base.snap")
 TESTCASE = ".testcase"
 NULL = open("/dev/null", "w")
 FLOPPY_TEMPLATE = "/tmp/gen-floppy-image.template"
-DEBUG = 3
+DEBUG = 2
 
 # ===-----------------------------------------------------------------------===
 # MODE:
@@ -85,7 +85,7 @@ feistel_out = []    #Backup original outputs for restoring at the end of each TC
 count_r = 0         # Pointer to the current R/L block
 count_l = 0
 count_addr = 0      # A mem location to store loop count
-loop = 2            #repeat testing each test case for a number of times
+loop = 1            #repeat testing each test case for a number of times
 
 
 # ===-----------------------------------------------------------------------===
@@ -99,7 +99,7 @@ l_restore = []      # list of inputs/outputs for which a pair of backup/restore
 # ===-----------------------------------------------------------------------===
 # Generate a random number or use a constant value to L0
 # ===-----------------------------------------------------------------------===
-def gen_seed(rand = False):
+def gen_seed(rand = True):
     if rand:
         return random.randint(0, 0xffffffff)
     else:
@@ -2358,7 +2358,6 @@ def dot_dependency_graph(graph):
 # ===-----------------------------------------------------------------------===
 def topological_sort(graph):
 
-    print "cycle#: %d" % len(list(networkx.simple_cycles(graph)))
     assert networkx.algorithms.dag.is_directed_acyclic_graph(graph)
 
     G = graph
@@ -2809,8 +2808,6 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         loop += [Gadget(asm = asm, mnemonic = "End of testcase")]
 
         gadget.append((startup, pre, code, revert_, post, revert, loop))
-        for g in pre:
-            print g
 
         if PG == 0:
             PG = 1
