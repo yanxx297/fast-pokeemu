@@ -2745,14 +2745,17 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
 
         (backup, set_r, copy_r, setinput, code, output, restore) \
                 = Gadget.gen_root(snapshot, shellcode, count)
-        asm = "push %eax;"
-        copy_r = [Gadget(asm = asm, mnemonic = "")] + copy_r
-        asm = "pop %eax;"
-        copy_r += [Gadget(asm = asm, mnemonic = "")]
+
         asm = "jmp forward_%.8x;" % l2 # jump over revert' and execute post
-        for g in copy_r:
-            g.kill -= set([Register("EAX")])
         code += [Gadget(asm = asm, mnemonic = "jump to post")]
+
+        if copy_r != []:
+            asm = "push %eax;"
+            copy_r = [Gadget(asm = asm, mnemonic = "")] + copy_r
+            asm = "pop %eax;"
+            copy_r += [Gadget(asm = asm, mnemonic = "")]
+            for g in copy_r:
+                g.kill -= set([Register("EAX")])
 
         # Copy initial inputs of 1st testcase to R block
         if count == 1:
@@ -2770,13 +2773,14 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
             revert = [];
                        
         # Sort gadgets & add labels to return points
-        asm = "movl $forward_%.8x,0x%x;" % (l2, retp)
-        setinput = [Gadget(asm = asm, mnemonic = "return to post")] + setinput
-        depgraph = build_dependency_graph(setinput)
-        setinput = sort_gadget(depgraph, setinput)
+        if setinput != []:            
+            asm = "movl $forward_%.8x,0x%x;" % (l2, retp)
+            setinput = [Gadget(asm = asm, mnemonic = "return to post")] + setinput
+            depgraph = build_dependency_graph(setinput)
+            setinput = sort_gadget(depgraph, setinput)
 
         pre = [merge_glist(backup, "backup"), merge_glist(copy_r, "copy R blocks"), \
-                merge_glist(setinput, "R 2 input")]        
+                merge_glist(setinput, "R to input")]        
         pre = remove_none(param + pre)        
         depgraph = build_dependency_graph(pre)
         pre = sort_gadget(depgraph, pre)
