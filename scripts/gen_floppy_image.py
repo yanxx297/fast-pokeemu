@@ -909,13 +909,11 @@ def resize_reg(r, size):
 # Generate code in text format that mov 32 bits from mem addr1 to mem addr2 
 # via eax, and then *clean addr1
 # ===-------------------------------------------------------------------===
-def gen_store_mem_asm(src, dest, clean = False):
+def gen_store_mem_asm(src, dest):
     r = "ecx" if any(x in src for x in ["eax", "ax", "ah", "al"]) or \
             any(x in dest for x in ["eax", "ax", "ah", "al"]) else "eax"
     asm = "mov %s,%%%s;" \
         "mov %%%s,%s;" % (src, r, r, dest)
-    if clean:   #clean src after copying
-        asm += "movl $0x0,%s;" % (src)        
     return asm
 
 
@@ -980,7 +978,7 @@ def gen_cmp_imm_asm(src, imm, t = "eax", size = 4):
 # ===-------------------------------------------------------------------===
 # Generate code in text format to compare a reg with a mem location
 # ===-------------------------------------------------------------------===
-def gen_cmp_asm(reg, mem, t = "eax", size = 4):
+def gen_cmp_reg2mem_asm(reg, mem, t = "eax", size = 4):
     asm = ""
     if reg == "eflags":
         asm += "pushf;" \
@@ -1125,7 +1123,7 @@ def gen_store_mem(src, dest):
 # ===-------------------------------------------------------------------===
 # Generate gadget to compare a reg with a mem location
 # ===-------------------------------------------------------------------===
-def gen_cmp(reg, mem, t = "eax", size = 4):
+def gen_cmp_reg2mem(reg, mem, t = "eax", size = 4):
     kill = []
     if reg in ["eflags", "eip", "ip", "mxcsr"] or \
             reg.startswith("cr") or \
@@ -1133,12 +1131,26 @@ def gen_cmp(reg, mem, t = "eax", size = 4):
         kill = [Register(t.upper())]
     use = [Register(reg.upper()), mem]
     define = []
-    asm = gen_cmp_asm(reg, mem, t, size)
+    asm = gen_cmp_reg2mem_asm(reg, mem, t, size)
     if reg == "xcr0":
         kill += [Register("EAX"), Register("EDX")]
     g = Gadget(asm = asm, mnemonic = "cmp", define = define, \
             kill = kill, use = use)
     return g
+
+
+# ===-------------------------------------------------------------------===
+# Generate gadget to compare 2 memory locations
+# NOTE: Though involves ``size'' as a param, this function currently only can
+# generate correct code for 4 bytes memory locations
+# ===-------------------------------------------------------------------===
+def gen_cmp_mem(src, dest, size = 4):
+    l = []
+    t = "ecx" if any(x in src for x in ["eax", "ax", "ah", "al"]) or \
+            any(x in dest for x in ["eax", "ax", "ah", "al"]) else "eax"
+    l += [gen_mem2reg(src, t, size)]
+    l += [gen_cmp_reg2mem(t, dest)]
+    return merge_glist(l, "cmp mems")
 
 
 # ===-------------------------------------------------------------------===
@@ -1446,10 +1458,8 @@ def handle_mem_read(inst, op, i, isInit = False):
                 l_restore += [op_str]
                 backup += [gen_store_mem(op_str, op_bak)]
                 restore_ = []
-                t = "ecx" if any(x in op_str for x in ["eax", "ax", "al", "ah"]) else "eax"
                 l = random.randint(0, 0xffffffff)
-                restore_ += [gen_mem2reg(op_str, t)]
-                restore_ += [gen_cmp(t, op_bak)]
+                restore_ += [gen_cmp_mem(op_str, op_bak)]
                 asm = "je forward_%.8x;" % l
                 restore_ += [Gadget(asm = asm, mnemonic = "")]
                 restore_ += [gen_store_mem(op_bak, op_str)]
@@ -1510,9 +1520,7 @@ def handle_mem_write(inst, op, i, isInit = False):
                 backup += [gen_store_mem(src2, op_bak)]
                 restore_ = []
                 l = random.randint(0, 0xffffffff)
-                t = "ecx" if any(x in src2 for x in ["eax", "ax", "al", "ah"]) else "eax"
-                restore_ += [gen_mem2reg(src2, t)]
-                restore_ += [gen_cmp(t, op_bak)]
+                restore_ += [gen_cmp_mem(src2, op_bak)]
                 asm = "je forward_%.8x;" % l
                 restore_ += [Gadget(asm = asm, mnemonic = "")]
                 restore_ += [gen_store_mem(op_bak, src2)]
