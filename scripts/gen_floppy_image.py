@@ -1851,7 +1851,7 @@ class Memory:
 # Snippets of code for setting the state of the CPU
 # ===-----------------------------------------------------------------------===
 class Gadget:
-    def __init__(self, asm, mnemonic, define = None, kill = None, use = None, affect = None):
+    def __init__(self, asm, mnemonic, define = None, kill = None, use = None):
         self.asm = asm
         self.mnemonic = mnemonic
 
@@ -1861,8 +1861,6 @@ class Gadget:
         self.kill = set(kill)
         if use is None: use = set()
         self.use = set(use)
-        if affect is None: affect = set()
-        self.affect = set(affect)
 
     def __str__(self):
         r = "Gadget '%s'\n" % (self.mnemonic)
@@ -1881,7 +1879,6 @@ class Gadget:
         define = self.define | other.define
         kill = self.kill | other.kill
         use = self.use | other.use
-        affect = self.affect | other.affect
 
         # Remove cycles
         define -= other.kill
@@ -1890,7 +1887,7 @@ class Gadget:
         use -= (self.define & other.use)
         kill -= (self.kill & other.define)
         
-        g = Gadget(asm, mnemonic, define, kill, use, affect)
+        g = Gadget(asm, mnemonic, define, kill, use)
         return g
 
     def __repr__(self):
@@ -1900,12 +1897,11 @@ class Gadget:
     # Return true (= g1 define g0 / add edge (g0, g1)) if any of the followings is true:
     # * g1 defines what g0 kills 
     # * g0 uses what g1 defines
-    # * (New)g0 use what g1 affects
     # ===-------------------------------------------------------------------===
     def depend(g1, g0):
         return (g1.define & g0.kill) or \
             (g0.use & g1.define or "*" in g1.define) or \
-            (g1.affect & g0.use) or (g0.use & g1.kill) or \
+            (g0.use & g1.kill) or \
             (Register("EFLAGS") in g0.use and not Register("EFLAGS") in g1.use) 
     # ===-------------------------------------------------------------------===
     # Generate a gadget to set a register
@@ -2016,10 +2012,8 @@ class Gadget:
         invlpg = ""
         for i in range(len(data)):
             define = [mem]
-            #use = ["mem*"]
-            use = []
+            use = ["mem*", "pde", "pte", "gdt"]
             kill = []
-            affect = []
 
             if sym: sym_ = sym
             else: sym_ = hex(addr)
@@ -2030,11 +2024,11 @@ class Gadget:
                 invlpg = " mov %cr3,%eax; mov %eax,%cr3;"
                 kill += [Register("EAX")]
                 if sym.startswith("PDE_"):
-                    use += ["pde"]
-                    affect += ["pte", "gdt", "mem*"]
+                    define += ["pde"]
+                    use = ["mem*"]
                 else:
-                    use += ["pte"]
-                    affect += ["gdt", "mem*"]
+                    define += ["pte"]
+                    use = ["mem*", "pde"]
             # elif sym.startswith("PTE_"):
             #     deref4 = lambda x: deref(x, 0, 4)
             #     cr3 = in_snapshot_creg("CR3", snapshot) & 0xfffff000
@@ -2052,8 +2046,8 @@ class Gadget:
             # If address belongs to the GDT kill the corresponding segment
             # selector
             if isgdt(sym):
-                use += ["gdt"]
-                affect += ["mem*"]
+                define += ["gdt"]
+                use = ["mem*", "pde", "pte"]
                 idx = int(sym.split("_")[1])
                 sregs = [SegmentRegister(r) for r in \
                              ["DS", "CS", "SS", "ES", "FS", "GS"]]
@@ -2061,10 +2055,8 @@ class Gadget:
                     sel = sreg.in_snapshot(snapshot) >> 3
                     if sel == idx:
                         kill += [sreg]
-            if use == []:
-                use += ["mem*"]
             gadgets += [Gadget(asm = asm, mnemonic = mnemonic, define = define,
-                               kill = kill, use = use, affect = affect)]
+                               kill = kill, use = use)]
 
         return gadgets
 
