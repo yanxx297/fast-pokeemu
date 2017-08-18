@@ -1107,12 +1107,10 @@ def gen_imm2mem_asm(imm, dest):
 # Generate gadget that mov from mem addr1 to mme addr2 via eax
 # then *clean addr1
 # ===-------------------------------------------------------------------===
-def gen_store_mem(src, dest, clean = False):
-    asm = gen_store_mem_asm(src, dest, clean)
+def gen_store_mem(src, dest):
+    asm = gen_store_mem_asm(src, dest)
     kill = []
     define = [dest]
-    if clean:
-        define += [src]
     use = [src]
     r = "ecx" if any(x in src for x in ["eax", "ax", "ah", "al"]) or \
             any(x in dest for x in ["eax", "ax", "ah", "al"]) else "eax"
@@ -1692,8 +1690,7 @@ def copy_mem_write(inst, op, i, isInit = False):
     if inst.is_mem_written(0):
         for val in get_addr(op_len, True):
             dest = "0x%x" % val
-            out += [gen_store_mem(op_str, dest, isInit)]   
-        
+            out += [gen_store_mem(op_str, dest)] 
     return ([], [], out, [])
 
 
@@ -2272,7 +2269,7 @@ class Gadget:
             for i in range(len(feistel_r_bak)):
                 src = "0x%x" % feistel_r_bak[i]
                 dest = "0x%x" % feistel_l[i]                
-                frestore += [gen_store_mem(src, dest, True)]
+                frestore += [gen_store_mem(src, dest)]
             
             count_l = 0
             count_r = 0
