@@ -2028,7 +2028,7 @@ class Gadget:
                     use = ["mem*"]
                 else:
                     define += ["pte"]
-                    use = ["mem*", "pde"]
+                    use = ["mem*"]
             # elif sym.startswith("PTE_"):
             #     deref4 = lambda x: deref(x, 0, 4)
             #     cr3 = in_snapshot_creg("CR3", snapshot) & 0xfffff000
