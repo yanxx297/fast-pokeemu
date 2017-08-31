@@ -94,6 +94,7 @@ loop = 1            #repeat testing each test case for a number of times
 l_insn = None       # Label at the tested instruction
 l_restore = []      # list of inputs/outputs for which a pair of backup/restore
                     # gadgets has been generated  
+in_to_reg = dict()  # memory operand as input -> registers involved
 
 
 # ===-----------------------------------------------------------------------===
@@ -1220,13 +1221,14 @@ def gen_mem2reg(src, dest, size = 4):
 
 # ===-------------------------------------------------------------------===
 # Generate gadget that xor src1 to src2, and copy the result(in src2) to dest
+# src1 is a block in the Feistel L block, src2 is a new output
 # Usually src1 and dest are mem locations while src2 can be either mem or reg 
 # NOTE: Xed info is not enough for this funcion, since it cannot tell registers
 # that cannot be XORed directly.
-# TODO: No idea why need `clean`. Figure it out and remove it if not necessary
 # ===-------------------------------------------------------------------===
 def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     global l_insn
+    global in_to_reg
     feistel = []
     
     t = ""
@@ -1255,12 +1257,14 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     define = []
     kill = []
     use = []
+    use__ = []
     if src2 in reg_map:
         use += [Register(src2.upper())]
     else:
         use += [src2]
-    if any(x in src2 for x in ["eax", "ax", "al", "ah"]):
-        use += [Register("EAX")]
+        if src2 in in_to_reg:
+            for r in in_to_reg[src2]:
+                use__ += [Register(r.upper())]
     
     if src2 == "eflags":
         r = "0x%x" % get_addr(4, True)[0]
@@ -1307,7 +1311,8 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
                 g3.asm += "%s %%%s,%%%s;"\
                         "%s %%%s,%s;" % (x, r, r, m, r, src2)
                 g3.asm += "forward_%.8x:" % l
-    g2 = Gadget(asm = asm2, mnemonic = "feistel", define = define, kill= kill, use = use)
+    g2 = Gadget(asm = asm2, mnemonic = "feistel", define = define, kill= kill, use = use, \
+            use__ = use__)
     g = merge_glist([g1, g2, g3])
     g.kill = g.kill | set([Register(t.upper())])
     g.define -= set([Register(t.upper())])
@@ -1315,22 +1320,6 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
         g.asm = "push %eax; push %ecx;" + g.asm + "pop %ecx; pop %eax;"
         g.kill = g.kill - set([Register("EAX"), Register("ECX")])
     return g
-
-
-# ===-------------------------------------------------------------------===
-# Get the operand string specified by `op` and `i` of instruction `inst`
-# Operand can be either memmory or register
-# The 2nd return value := whether this operand is memory accessing
-# ===-------------------------------------------------------------------===
-def get_op(inst, i):
-    op = inst.get_operand(i)
-    isMem = True
-    # TODO: check i range before get_operand
-    (op_str, _) = get_mem_op(inst, op, i)
-    if op_str == "":
-        (op_str, _) = get_reg_op(inst, op, i)
-        isMem = False
-    return (op_str, isMem)
 
 
 # ===-------------------------------------------------------------------===
@@ -1357,7 +1346,7 @@ def get_explicit_op(inst, i):
                         return (op_str, op_len, False)
                 elif name in ["XED_OPERAND_AGEN", "XED_OPERAND_MEM0", "XED_OPERAND_MEM1"]:
                     print "    mem"
-                    (op_str, op_len) = get_mem_op(inst, op, i)
+                    (op_str, op_len, _) = get_mem_op(inst, op, i)
                     if op_str == None:
                         return (None, 0, False)
                     else:
@@ -1388,6 +1377,7 @@ def get_nmemop(inst, i):
 # 0 to get seg, base, index, scale and offset (disp)
 # ===-------------------------------------------------------------------===
 def get_mem_op(inst, op, i, d = 0):      
+    reglist = []
     seg = inst.get_seg_reg(0)                
     offset = 0
     disp_len = inst.get_memory_displacement_width(0)
@@ -1404,20 +1394,27 @@ def get_mem_op(inst, op, i, d = 0):
     if disp_len != 0 or \
     not (reg_map[seg] != "" and reg_map[seg] != "ds"):  #displacement bits
         op_str += "0x%x" % (offset + d)
+    if reg_map[seg] != "":
+        reglist += [reg_map[seg]]
     if base != 0:
         op_str += "(%%%s" % reg_map[base]
+        if reg_map[base] != "":
+            reglist += [reg_map[base]]
         if reg_map[indx] != "" and iclass != "XED_ICLASS_XLAT":
             op_str += ",%%%s" % reg_map[indx]
+        if reg_map[indx] != "":
+            reglist += [reg_map[indx]]
         if scale != 0 and iclass != "XED_ICLASS_XLAT":
             op_str += ",%d" % scale
         op_str += ")"    
 #     op_len = inst.get_operand_length_bits(i)
     op_len = inst.get_operand_length(i)
-    return (op_str, op_len)    
+    return (op_str, op_len, set(reglist))    
 
 
 def handle_mem_read(inst, op, i, isInit = False):
     global l_restore
+    global in_to_reg
     global init_r
     global feistel_r
     global feistel_r_bak
@@ -1434,7 +1431,9 @@ def handle_mem_read(inst, op, i, isInit = False):
     if opcode == "XED_CATEGORY_POP":
         print trg
         return ([], [], [], [])
-    (op_str, op_len) = get_mem_op(inst, op, i)
+    (op_str, op_len, s) = get_mem_op(inst, op, i)
+    in_to_reg[op_str] = s
+
     if DEBUG >= 2:
         print "handle_mem_read    %s, %d" % (op_str, op_len)    
     if inst.is_mem_read(0):
@@ -1443,7 +1442,7 @@ def handle_mem_read(inst, op, i, isInit = False):
         bak = get_addr(op_len)
         assert(len(f) == len(r_bak))
         for idx, val in enumerate(f):
-            (op_str, _) = get_mem_op(inst, op, i, (idx * 4))
+            (op_str, _, _) = get_mem_op(inst, op, i, (idx * 4))
             if isInit:             
                 feistel_r += [val]
                 feistel_r_bak += [r_bak[idx]]
@@ -1487,7 +1486,7 @@ def handle_mem_write(inst, op, i, isInit = False):
     restore = []
     backup = []
     
-    (op_str, op_len) = get_mem_op(inst, op, i)
+    (op_str, op_len, _) = get_mem_op(inst, op, i)
     if DEBUG >= 2:
         print "handle_mem_write    %s, %d" % (op_str, op_len)
     if inst.is_mem_written(0):
@@ -1510,7 +1509,7 @@ def handle_mem_write(inst, op, i, isInit = False):
             feistel_in += get_addr()        
         for j in range(r):
             src1 = "0x%x" % feistel_l[count_l + j]
-            (src2, _) = get_mem_op(inst, op, i, j * 4)
+            (src2, _, _) = get_mem_op(inst, op, i, j * 4)
             op_bak = "0x%x" % feistel_out[count_l + j]
             dest = "0x%x" % feistel_r[count_l + j]        
             feistel += [gen_feistel_cipher(src1, src2, dest, 4)]
@@ -1694,7 +1693,7 @@ def handle_reg_write(inst, op, i, isInit = False):
 # ===-------------------------------------------------------------------===
 def copy_mem_write(inst, op, i, isInit = False):
     out = []    
-    (op_str, op_len) = get_mem_op(inst, op, i)
+    (op_str, op_len, _) = get_mem_op(inst, op, i)
     if inst.is_mem_written(0):
         for val in get_addr(op_len, True):
             dest = "0x%x" % val
@@ -1851,7 +1850,7 @@ class Memory:
 # Snippets of code for setting the state of the CPU
 # ===-----------------------------------------------------------------------===
 class Gadget:
-    def __init__(self, asm, mnemonic, define = None, kill = None, use = None):
+    def __init__(self, asm, mnemonic, define = None, kill = None, use = None, use__ = None):
         self.asm = asm
         self.mnemonic = mnemonic
 
@@ -1861,6 +1860,8 @@ class Gadget:
         self.kill = set(kill)
         if use is None: use = set()
         self.use = set(use)
+        if use__ is None: use__ = set()
+        self.use__ = set(use__)
 
     def __str__(self):
         r = "Gadget '%s'\n" % (self.mnemonic)
@@ -1868,6 +1869,7 @@ class Gadget:
         r += "   [*] define: %s\n" % (", ".join([str(d) for d in self.define]))
         r += "   [*] kill:   %s\n" % (", ".join([str(k) for k in self.kill]))
         r += "   [*] use:    %s\n" % (", ".join([str(u) for u in self.use]))
+        r += "   [*] use-after-define:    %s\n" % (", ".join([str(u) for u in self.use__]))
         return r
 
     # ===-------------------------------------------------------------------===
@@ -1879,6 +1881,7 @@ class Gadget:
         define = self.define | other.define
         kill = self.kill | other.kill
         use = self.use | other.use
+        use__ = self.use__ | other.use__
 
         # Remove cycles
         define -= other.kill
@@ -1887,7 +1890,7 @@ class Gadget:
         use -= (self.define & other.use)
         kill -= (self.kill & other.define)
         
-        g = Gadget(asm, mnemonic, define, kill, use)
+        g = Gadget(asm, mnemonic, define, kill, use, use__)
         return g
 
     def __repr__(self):
@@ -1902,6 +1905,7 @@ class Gadget:
         return (g1.define & g0.kill) or \
             (g0.use & g1.define or "*" in g1.define) or \
             (g0.use & g1.kill) or \
+            (g0.define & g1.use__) or \
             (Register("EFLAGS") in g0.use and not Register("EFLAGS") in g1.use) 
     # ===-------------------------------------------------------------------===
     # Generate a gadget to set a register
@@ -2083,6 +2087,7 @@ class Gadget:
     @staticmethod
     def gen_root(snapshot, shellcode, count):
         global l_insn
+        global l_restore
         global count_l
         global count_r  
         global init_r
@@ -2283,7 +2288,8 @@ class Gadget:
                 print "count_R = %d, count_L = %d" % (count_r, count_l)
                 print "R = %d, L = %d" % (len(feistel_r), len(feistel_l))
         # else :Do nothing, for single test case mode
-	
+
+        l_restore = []
         return (backup, remove_none(set_r), remove_none(backup_r), setinput, \
                 code, output, restore);     
     
