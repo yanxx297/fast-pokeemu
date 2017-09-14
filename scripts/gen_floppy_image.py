@@ -2287,7 +2287,7 @@ class Gadget:
                 #If 1st iter, mov init state input to R
                 if MODE > 2:
                     assert(count_addr != 0)
-                    init_r = init_r + init_l
+                    init_r = init_r + [merge_glist(init_l, "Init L blocks")]
                 set_r = init_r
                        
             #feistel restore: moving R_{i-1} to L_{i} via R's backup
@@ -2801,7 +2801,8 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
             depgraph = build_dependency_graph(setinput)
             setinput = sort_gadget(depgraph, setinput)
 
-        pre = [merge_glist(backup, "backup"), merge_glist(copy_r, "copy R blocks"), \
+        #pre = [merge_glist(backup, "backup"), merge_glist(copy_r, "copy R blocks"), \
+        pre = backup + [merge_glist(copy_r, "copy R blocks to R'"), \
                 merge_glist(setinput, "R to input")]        
         pre = remove_none(param + pre)        
         depgraph = build_dependency_graph(pre)
