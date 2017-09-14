@@ -93,8 +93,10 @@ loop = 1            #repeat testing each test case for a number of times
 # ===-----------------------------------------------------------------------===
 l_insn = None       # Label at the tested instruction
 l_restore = []      # list of inputs/outputs for which a pair of backup/restore
-                    # gadgets has been generated  
+                    # gadgets has been generated; keep this list so that each 
+                    # location only reset at most once
 in_to_reg = dict()  # memory operand as input -> registers involved
+out_to_reg = dict() # memory operand as output -> registers involved
 
 
 # ===-----------------------------------------------------------------------===
@@ -1104,20 +1106,28 @@ def gen_imm2mem_asm(imm, dest):
 
 # ===-------------------------------------------------------------------===
 # Generate gadget that mov from mem addr1 to mme addr2 via eax
-# then *clean addr1
 # ===-------------------------------------------------------------------===
 def gen_store_mem(src, dest):
+    global in_to_reg
+    global out_to_reg
     asm = gen_store_mem_asm(src, dest)
     kill = []
     define = [dest]
     use = [src]
+    use__ = []
+    to_reg = in_to_reg.copy()
+    to_reg.update(out_to_reg)
+    if src in to_reg:
+        for r in to_reg[src]:
+            use__ += [Register(r.upper())]
+    if dest in to_reg:
+        for r in to_reg[dest]:
+            use__ += [Register(r.upper())]
     r = "ecx" if any(x in src for x in ["eax", "ax", "ah", "al"]) or \
             any(x in dest for x in ["eax", "ax", "ah", "al"]) else "eax"
-    if any(x in src for x in ["eax", "ax", "al", "ah"]):
-        use += [Register("EAX")]
     kill += [Register(r.upper())]
     g = Gadget(asm = asm, mnemonic = "copy mem", define = define, \
-            kill = kill, use = use)
+            kill = kill, use = use, use__ = use__)
     return g
 
 
@@ -1187,14 +1197,19 @@ def gen_reg2mem(src, dest, size = 4):
     else:
         kill = []
         use = [Register(src.upper())]
+        use__ = []
         define = [dest]        
-        if any(x in dest for x in ["eax", "ax", "al", "ah"]):
-            use += [Register("EAX")]
+        to_reg = in_to_reg.copy()
+        to_reg.update(out_to_reg)
+        if dest in to_reg:
+            for r in to_reg[dest]:
+                use__ += [Register(r.upper())]
         if src.startswith("st"):
             use += [Register("CR0")]
         if src == "eflags":
             use += [Register("EFLAGS")]
-        g = Gadget(asm = asm, mnemonic = "reg2mem", define = define, kill = [], use = use) 
+        g = Gadget(asm = asm, mnemonic = "reg2mem", define = define, \
+                kill = kill, use = use, use__ = use__) 
         return g 
 
 
@@ -1207,15 +1222,19 @@ def gen_mem2reg(src, dest, size = 4):
         return None
     else:
         use = [src]
+        use__ = []
         define = [Register(dest.upper())]
         kill = []
-        if any(x in src for x in ["eax", "ax", "al", "ah"]):
-            use += [Register("EAX")]
+        to_reg = in_to_reg.copy()
+        to_reg.update(out_to_reg)
+        if src in to_reg:
+            for r in to_reg[src]:
+                use__ += [Register(r.upper())]
         if dest.startswith("st"):
             use += [Register("CR0")]
             define += [Register("ST(0)")]
         g = Gadget(asm = asm, mnemonic = "mem2reg", define = define,\
-                kill = kill, use = use)
+                kill = kill, use = use, use__ = use__)
         return g 
 
 
@@ -1472,6 +1491,7 @@ def handle_mem_read(inst, op, i, isInit = False):
     
 def handle_mem_write(inst, op, i, isInit = False):
     global l_restore
+    global out_to_reg
     global init_r
     global init_l
     global feistel_l
@@ -1486,7 +1506,8 @@ def handle_mem_write(inst, op, i, isInit = False):
     restore = []
     backup = []
     
-    (op_str, op_len, _) = get_mem_op(inst, op, i)
+    (op_str, op_len, s) = get_mem_op(inst, op, i)
+    out_to_reg[op_str] = s
     if DEBUG >= 2:
         print "handle_mem_write    %s, %d" % (op_str, op_len)
     if inst.is_mem_written(0):
