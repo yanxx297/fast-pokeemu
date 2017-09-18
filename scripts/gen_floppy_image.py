@@ -1110,23 +1110,29 @@ def gen_imm2mem_asm(imm, dest):
 def gen_store_mem(src, dest):
     global in_to_reg
     global out_to_reg
+    global feistel_r
+    global feistel_in
+    global feistel_out
     asm = gen_store_mem_asm(src, dest)
     kill = []
     define = [dest]
-    use = [src]
+    use = []
     use__ = []
     to_reg = in_to_reg.copy()
     to_reg.update(out_to_reg)
     if src in to_reg:
+        use__ += [src]
         for r in to_reg[src]:
             use__ += [Register(r.upper())]
+    else:
+        use += [src]
     if dest in to_reg:
         for r in to_reg[dest]:
             use__ += [Register(r.upper())]
     r = "ecx" if any(x in src for x in ["eax", "ax", "ah", "al"]) or \
             any(x in dest for x in ["eax", "ax", "ah", "al"]) else "eax"
     kill += [Register(r.upper())]
-    g = Gadget(asm = asm, mnemonic = "copy mem", define = define, \
+    g = Gadget(asm = asm, mnemonic = "mem2mem", define = define, \
             kill = kill, use = use, use__ = use__)
     return g
 
@@ -1190,20 +1196,25 @@ def gen_imm2mem(imm, dest):
 # Generate gadget to copy from src reg to mem dest
 # ===-------------------------------------------------------------------===
 def gen_reg2mem(src, dest, size = 4):
+    global in_to_reg
+    global feistel_r
+    global feistel_in
+    global feistel_out
     asm = gen_reg2mem_asm(src, dest, size)
     print asm
     if asm == "":
         return None
     else:
         kill = []
-        use = [Register(src.upper())]
+        use = []
         use__ = []
-        define = [dest]        
         to_reg = in_to_reg.copy()
         to_reg.update(out_to_reg)
-        if dest in to_reg:
-            for r in to_reg[dest]:
-                use__ += [Register(r.upper())]
+        if src in to_reg:
+            use__ += [Register(src.upper())]
+        else:
+            use += [Register(src.upper())]
+        define = [dest]        
         if src.startswith("st"):
             use += [Register("CR0")]
         if src == "eflags":
@@ -1217,6 +1228,8 @@ def gen_reg2mem(src, dest, size = 4):
 # Generate gadget to copy from mem src to dest reg
 # ===-------------------------------------------------------------------===
 def gen_mem2reg(src, dest, size = 4):
+    global feistel_in
+    global feistel_out
     asm = gen_mem2reg_asm(src, dest, size)
     if asm == "":
         return None
@@ -1566,6 +1579,7 @@ def get_reg_op(inst, op, i):
 
 def handle_reg_read(inst, op, i, isInit = False):
     global l_restore
+    global in_to_reg
     global init_r
     global feistel_r
     global feistel_r_bak
@@ -1584,6 +1598,7 @@ def handle_reg_read(inst, op, i, isInit = False):
     print "reg_str: %s" % reg_str
     if reg_str == "" or reg_len == 0:
         return ([], [], [], [])
+    in_to_reg[reg_str] = reg_str 
      
     if op.is_read_only() or op.is_read_and_written(): 
         if isInit:
@@ -1628,6 +1643,7 @@ def handle_reg_read(inst, op, i, isInit = False):
          
 def handle_reg_write(inst, op, i, isInit = False):
     global l_restore
+    global out_to_reg
     global init_r
     global init_l
     global feistel_l
@@ -1645,16 +1661,8 @@ def handle_reg_write(inst, op, i, isInit = False):
     (reg_str, reg_len) = get_reg_op(inst, op, i)
     if reg_str == "" or reg_len == 0:
         return ([], [], [], [])
-    
-    # Eip will be stored in eax
-#     print "handle_reg_write: reg_str = %s" % reg_str
-#     if reg_str in ["eip", "ip"]:
-#         reg_str = "eax"
-        
-        
-#     opcode = get_category(inst.get_category())
-#     if opcode == "XED_CATEGORY_CALL":
-        
+    out_to_reg[reg_str] = reg_str
+            
     if op.is_written_only() or op.is_read_and_written():
         if op.is_written_only():
             print "W"
