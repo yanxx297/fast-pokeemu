@@ -2156,8 +2156,9 @@ class Gadget:
         backup = []     #backup original input & output of the tested insn for restoring
         backup_r = []     #backup R block
         code = []       #instruction to run and corresponding reset*         
-        output = []    # Handle output of the core insn. In feistel mode it compute XOR and copy it to L block* 
+        output = []    # Handle output of the core insn. In feistel mode it compute XOR
         restore = []
+        update = []     # Copy R_backup to L blocks
         
         # code
         x = ",".join("0x%.2x" % ord(b) for b in shellcode)
@@ -2298,16 +2299,15 @@ class Gadget:
                     init_r = init_r + [merge_glist(init_l, "Init L blocks")]
                 set_r = init_r
                        
-            #feistel restore: moving R_{i-1} to L_{i} via R's backup
-            frestore = []
+            # Update L blocks: moving R_{i-1} to L_{i} via R's backup
             for i in range(len(feistel_r_bak)):
                 src = "0x%x" % feistel_r_bak[i]
                 dest = "0x%x" % feistel_l[i]                
-                frestore += [gen_store_mem(src, dest)]
+                update += [gen_store_mem(src, dest)]
             
             count_l = 0
             count_r = 0
-            output = feistel + frestore;
+            output = feistel;
         elif MODE >= 1:
         # simple aggregating mode
             (_, _, f, _) = handle_op(inst, copy_mem_write, copy_reg_write, isInit)
@@ -2320,7 +2320,7 @@ class Gadget:
 
         l_restore = []
         return (backup, remove_none(set_r), remove_none(backup_r), setinput, \
-                code, output, restore);     
+                code, output, update, restore);     
     
         
     @staticmethod
@@ -2770,7 +2770,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
 
         startup = Gadget.gen_prologue(l0, l3, snapshot, tc.split("/")[-2], count_addr)
 
-        (backup, set_r, copy_r, setinput, code, output, restore) \
+        (backup, set_r, copy_r, setinput, code, output, update, restore) \
                 = Gadget.gen_root(snapshot, shellcode, count)
 
         asm = "jmp forward_%.8x;" % l2 # jump over revert' and execute post
@@ -2820,6 +2820,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         post = output + restore
         depgraph = build_dependency_graph(post)
         post = sort_gadget(depgraph, post)
+        post += update
         depgraph = build_dependency_graph(revert)
         revert = sort_gadget(depgraph, revert)
         depgraph = build_dependency_graph(revert_)
