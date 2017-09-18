@@ -2814,6 +2814,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
             depgraph = build_dependency_graph(set_r)
             set_r = sort_gadget(depgraph, set_r)
             startup += set_r
+            startup += revert
         
         #jump to TC beginning for a fixed # of times                   
         asm = "";
