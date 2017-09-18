@@ -1782,6 +1782,21 @@ def handle_op(inst, handle_mem, handle_reg, isInit):
     return (remove_none(backup), remove_none(setinput), remove_none(output), remove_none(restore))
 
 
+# ===-------------------------------------------------------------------===
+# check whether 2 registers are in fact the same one
+# ===-------------------------------------------------------------------===
+def is_equal_reg(r1, r2):
+    def equal(e1, e2, l):
+        if e1 in l and e2 in l and not (e1[-1] == 'L' and e2[-1] == 'H') and \
+                not (e1[-1] == 'H' and e2[-1] == 'L'):
+            return True
+    reglist = [["EAX", "AX", "AL", "AH"], ["EBX", "BX", "BL", "BH"], \
+            ["ECX", "CX", "CL", "CH"], ["EDX", "DX", "DL", "DH"]]
+    for l in reglist:
+        if equal(r1, r2, l):
+            return True        
+
+
 class Register:
     def __init__(self, name, value = None, size = 32):
         self.name = name
@@ -1795,10 +1810,19 @@ class Register:
         return self.name
 
     def __hash__(self):
+        if self.name in ["EAX", "AX", "AL", "AH"]:
+            return hash("EAX")
+        elif self.name in ["EBX", "BX", "BL", "BH"]:
+            return hash("EBX")
+        elif self.name in ["ECX", "CX", "CL", "CH"]:
+            return hash("ECX")
+        elif self.name in ["EDX", "DX", "DL", "DH"]:
+            return hash("EDX")
         return hash(self.name)
 
     def __eq__(lhs, rhs):
-        return lhs.name == rhs.name
+        return (lhs.name == rhs.name) or \
+                (is_equal_reg(lhs.name, rhs.name))
 
     def gen_gadget(self, snapshot):
         return Gadget.gen_set_reg(self, snapshot)
