@@ -1197,7 +1197,7 @@ def gen_imm2mem(imm, dest):
 # ===-------------------------------------------------------------------===
 def gen_reg2mem(src, dest, size = 4):
     global in_to_reg
-    global feistel_r
+    global out_to_reg
     global feistel_in
     global feistel_out
     asm = gen_reg2mem_asm(src, dest, size)
@@ -1210,7 +1210,7 @@ def gen_reg2mem(src, dest, size = 4):
         use__ = []
         to_reg = in_to_reg.copy()
         to_reg.update(out_to_reg)
-        if src in to_reg:
+        if src in to_reg and int(dest, 16) in feistel_in + feistel_out:
             use__ += [Register(src.upper())]
         else:
             use += [Register(src.upper())]
@@ -1580,6 +1580,7 @@ def get_reg_op(inst, op, i):
 def handle_reg_read(inst, op, i, isInit = False):
     global l_restore
     global in_to_reg
+    global out_to_reg
     global init_r
     global feistel_r
     global feistel_r_bak
@@ -1613,9 +1614,13 @@ def handle_reg_read(inst, op, i, isInit = False):
                 feistel_r_bak += [r_bak[idx]]
                 feistel_in += [bak[idx]]                
             r = "0x%x" % feistel_r[count_r]
-            print "r = %s" % r
-            init_r += [gen_reg2mem(reg_str, r, reg_len)] 
-            print init_r       
+            g = gen_reg2mem(reg_str, r, reg_len)
+            to_reg = in_to_reg.copy()
+            to_reg.update(out_to_reg)
+            if reg_str in to_reg:
+                g.use__ |= set([Register(reg_str.upper())])
+                g.use -= set([Register(reg_str.upper())])
+            init_r += [g] 
         size = int(math.ceil(float(reg_len) / 4))                        
         src = "0x%x" % feistel_r[count_r]
         print "src = %s" % src
