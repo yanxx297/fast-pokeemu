@@ -1217,8 +1217,6 @@ def gen_reg2mem(src, dest, size = 4):
         define = [dest]        
         if src.startswith("st"):
             use += [Register("CR0")]
-        if src == "eflags":
-            use += [Register("EFLAGS")]
         g = Gadget(asm = asm, mnemonic = "reg2mem", define = define, \
                 kill = kill, use = use, use__ = use__) 
         return g 
@@ -1434,7 +1432,6 @@ def get_mem_op(inst, op, i, d = 0):
             reglist += [reg_map[base]]
         if reg_map[indx] != "" and iclass != "XED_ICLASS_XLAT":
             op_str += ",%%%s" % reg_map[indx]
-        if reg_map[indx] != "":
             reglist += [reg_map[indx]]
         if scale != 0 and iclass != "XED_ICLASS_XLAT":
             op_str += ",%d" % scale
