@@ -2835,8 +2835,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
             setinput = sort_gadget(depgraph, setinput)
 
         #pre = [merge_glist(backup, "backup"), merge_glist(copy_r, "copy R blocks"), \
-        pre = backup + [merge_glist(copy_r, "copy R blocks to R'"), \
-                merge_glist(setinput, "R to input")]        
+        pre = backup + [merge_glist(copy_r, "copy R blocks to R'")] + setinput
         pre = remove_none(param + pre)        
         depgraph = build_dependency_graph(pre)
         pre = sort_gadget(depgraph, pre)
