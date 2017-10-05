@@ -2766,7 +2766,9 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         print "="*columns()
     
         param = []   # Set FuzzBALL-generated inputs (parameters)
+        param0 = []     # set parameters for 0-th testcase
         revert = [] # Undo init state
+        revert0 = [] # Undo init state for 0-th testcase
         revert_ = [] # A copy of revert; regenerate instead of copy because patch ljmp
         done = set()
         
@@ -2775,12 +2777,16 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
             orig_value = rm.in_snapshot(snapshot)
             if orig_value != rm.value:
                 param += rm.gen_gadget(snapshot)
+                param0 += rm.gen_gadget(snapshot)
                 revert += rm.gen_revert_gadget(snapshot)
+                revert0 += rm.gen_revert_gadget(snapshot)
                 revert_ += rm.gen_revert_gadget(snapshot)
                 done.add(rm)
 
         param = make_stable(param, done, snapshot)
+        param0 = make_stable(param0, done, snapshot)
         revert = make_stable(revert, done, snapshot)
+        revert0 = make_stable(revert0, done, snapshot)
         revert_ = make_stable(revert_, done, snapshot)
         if count == 1:
             count_addr = get_addr()[0]
@@ -2810,13 +2816,19 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
             for g in copy_r:
                 g.kill -= set([Register("EAX")])
 
+        if MODE <= 0:
+            param0 = []
+            revert_ = []
+            revert0 = []
+            revert = []
+
         # Copy initial inputs of 1st testcase to R block
         if count == 1:
-            set_r = param + set_r
+            set_r = param0 + set_r
             depgraph = build_dependency_graph(set_r)
             set_r = sort_gadget(depgraph, set_r)
             startup += set_r
-            startup += revert
+            startup += revert0
         
         #jump to TC beginning for a fixed # of times                   
         asm = "";
@@ -2824,10 +2836,6 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
             asm = "decl 0x%x; " \
                 "jnz forward_%.8x; // back to loop entrance" % (count_addr, ls)
         loop = [Gadget(asm = asm, mnemonic = "loop")] 
-
-        if MODE <= 0:
-            revert_ = [];
-            revert = [];
                        
         # Sort gadgets & add labels to return points
         if setinput != []:            
