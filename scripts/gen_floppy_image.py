@@ -709,26 +709,6 @@ def make_stable(l, done, snapshot):
             l_ += rm.gen_gadget(snapshot)
         return l_
 
-# ===-------------------------------------------------------------------===
-# Return the next register of the same typethat are not used. 
-# `l` is the list of used registers
-# NOTE: Only support frequently used registers; Add more registers on demand
-# ===-------------------------------------------------------------------===
-def get_unused_reg(l):
-    s = []
-    if reg_map.index(l[0]) in range(reg_map.index("mm0"), reg_map.index("mm7")):
-        s = list(range(reg_map.index("mm0"), reg_map.index("mm7")))
-    elif reg_map.index(l[0]) in range(reg_map.index("xmm0"), reg_map.index("xmm31")):
-        s = list(range(reg_map.index("xmm0"), reg_map.index("xmm31")))
-    elif reg_map.index(l[0]) in range(reg_map.index("eax"), reg_map.index("ebx")):
-        s = list(range(reg_map.index("eax"), reg_map.index("ebx")))
-    else:
-        return None
-    for e in l:
-        if reg_map.index(e) in s:
-            s.remove(reg_map.index(e))
-    return s[0]
-
 
 def get_visibility(op):
     vis = '?'
