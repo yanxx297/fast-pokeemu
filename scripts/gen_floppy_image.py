@@ -98,6 +98,18 @@ l_restore = []      # list of inputs/outputs for which a pair of backup/restore
 in_to_reg = dict()  # memory operand as input -> registers involved
 out_to_reg = dict() # memory operand as output -> registers involved
 
+def in_dict(reg, d):
+    reglist = [["eax", "ax", "ah", "al"], ["ebx", "bx", "bh", "bl"], \
+            ["ecx", "cx", "ch", "cl"], ["edx", "dx", "dh", "dl"]]
+    if reg in d:
+        return True
+    else:
+        for l in reglist:
+            if reg in l:
+                for e in d:
+                    if e in l:
+                        return True
+    return False
 
 # ===-----------------------------------------------------------------------===
 # Generate a random number or use a constant value to L0
@@ -863,7 +875,7 @@ def fsize2xor(size, r):
 # Given a register `r`, convert it to the same register of `size` long 
 # NOTE: currenly support general registers only; Add support to other regs on demand
 # ===-------------------------------------------------------------------===
-def resize_reg(r, size):
+def resize_reg(r, size = 4):
     reg = r
     try:        
         if r in ["eax", "ax", "al", "ah"]:
@@ -1210,7 +1222,7 @@ def gen_reg2mem(src, dest, size = 4):
         use__ = []
         to_reg = in_to_reg.copy()
         to_reg.update(out_to_reg)
-        if src in to_reg and int(dest, 16) in feistel_in + feistel_out:
+        if in_dict(src, to_reg) and int(dest, 16) in feistel_in + feistel_out:
             use__ += [Register(src.upper())]
         else:
             use += [Register(src.upper())]
@@ -1238,7 +1250,7 @@ def gen_mem2reg(src, dest, size = 4):
         kill = []
         to_reg = in_to_reg.copy()
         to_reg.update(out_to_reg)
-        if src in to_reg:
+        if in_dict(src, to_reg):
             for r in to_reg[src]:
                 use__ += [Register(r.upper())]
         if dest.startswith("st"):
@@ -1626,10 +1638,10 @@ def handle_reg_read(inst, op, i, isInit = False):
 
         if not reg_str in l_restore:
             l_restore += [reg_str]
-            backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
+            backup += [gen_reg2mem(resize_reg(reg_str), reg_bak)]
             restore_ = []
             t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax"
-            restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
+            restore_ += [gen_mem2reg(reg_bak, resize_reg(reg_str))]
             g = merge_glist(remove_none(restore_), "restore inputs")
             if reg_str == "eflags":
                 g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore inputs" % t
@@ -1705,10 +1717,10 @@ def handle_reg_write(inst, op, i, isInit = False):
         reg_bak = "0x%x" % feistel_out[count_l]
 
         if not reg_str in l_restore:            
-            backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
+            backup += [gen_reg2mem(resize_reg(reg_str), reg_bak)]
             restore_ = []
             t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax" 
-            restore_ += [gen_mem2reg(reg_bak, reg_str, reg_len)]
+            restore_ += [gen_mem2reg(reg_bak, resize_reg(reg_str))]
             g = merge_glist(remove_none(restore_), "restore outputs")
             if reg_str == "eflags":
                 g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore outputs" % t
