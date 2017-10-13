@@ -2455,7 +2455,7 @@ def topological_sort(graph):
 # ===-----------------------------------------------------------------------===
 # Given a dependency graph, sort it in topological order
 # ===-----------------------------------------------------------------------===
-def sort_gadget(depgraph, name):
+def sort_graph(depgraph, name):
         if DEBUG >= 3:
             name_ = "%s" % name
             path = "/tmp/depgraph_%s.dot" % name_.replace(" ","_")[:128]
@@ -2464,13 +2464,20 @@ def sort_gadget(depgraph, name):
         return topological_sort(depgraph)    
 
 # ===-----------------------------------------------------------------------===
+# A glue of sort_graph() and build_dependency_graph()
+# ===-----------------------------------------------------------------------===
+def sort_gadget(g):
+    depgraph = build_dependency_graph(g)
+    return sort_graph(depgraph, g)
+
+# ===-----------------------------------------------------------------------===
 # Given a list of Gadgets, sort it in topological order and 
 # remove irrelavant Gadgets 
 # ===-----------------------------------------------------------------------===
 def get_subtree(g, name):
     sort = []
     depgraph = build_dependency_graph(g)
-    r = sort_gadget(depgraph, name)
+    r = sort_graph(depgraph, name)
     #remove duplicated state setting gadgets 
     src = g[0]
     print "%s: Start from %s" % ("depgraph_%s" % name, src.asm)
@@ -2817,8 +2824,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         # Copy initial inputs of 1st testcase to R block
         if count == 1:
             set_r = param0 + set_r
-            depgraph = build_dependency_graph(set_r)
-            set_r = sort_gadget(depgraph, set_r)
+            set_r = sort_gadget(set_r)
             startup += set_r
             startup += revert0
         
@@ -2833,24 +2839,19 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0):
         if setinput != []:            
             asm = "movl $forward_%.8x,0x%x;" % (l2, retp)
             setinput = [Gadget(asm = asm, mnemonic = "return to post")] + setinput
-            depgraph = build_dependency_graph(setinput)
-            setinput = sort_gadget(depgraph, setinput)
+            setinput = sort_gadget(setinput)
 
         #pre = [merge_glist(backup, "backup"), merge_glist(copy_r, "copy R blocks"), \
         pre = backup + [merge_glist(copy_r, "copy R blocks to R'")] + setinput
         pre = remove_none(param + pre)        
-        depgraph = build_dependency_graph(pre)
-        pre = sort_gadget(depgraph, pre)
+        pre = sort_gadget(pre)
         pre = [Gadget(asm = "forward_%.8x:" % ls, mnemonic = "loop start point")] + pre
 
         post = output + restore
-        depgraph = build_dependency_graph(post)
-        post = sort_gadget(depgraph, post)
+        post = sort_gadget(post)
         post += update
-        depgraph = build_dependency_graph(revert)
-        revert = sort_gadget(depgraph, revert)
-        depgraph = build_dependency_graph(revert_)
-        revert_ = sort_gadget(depgraph, revert_)
+        revert = sort_gadget(revert)    
+        revert_ = sort_gadget(revert_)
 
         asm = "movl $forward_%.8x,0x%x;" % (l1, retp)
         code = [Gadget(asm = asm, mnemonic = "return to revert_")] + code
