@@ -2471,22 +2471,6 @@ def sort_gadget(g):
     return sort_graph(depgraph, g)
 
 # ===-----------------------------------------------------------------------===
-# Given a list of Gadgets, sort it in topological order and 
-# remove irrelavant Gadgets 
-# ===-----------------------------------------------------------------------===
-def get_subtree(g, name):
-    sort = []
-    depgraph = build_dependency_graph(g)
-    r = sort_graph(depgraph, name)
-    #remove duplicated state setting gadgets 
-    src = g[0]
-    print "%s: Start from %s" % ("depgraph_%s" % name, src.asm)
-    des = networkx.dag.descendants(depgraph, src)
-    r = [x for x in r if (x in des or x == src)]
-    sort += r
-    return sort
-
-# ===-----------------------------------------------------------------------===
 # Given a gadget list ``g'', merge all the gadgets in g into one large gadget
 # ===-----------------------------------------------------------------------===
 def merge_glist(g, mnemonic = ""):
