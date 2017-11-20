@@ -894,6 +894,34 @@ def resize_reg(r, size = 4):
                 reg = "edx"
             else:
                 raise Exception('EDX', size)
+        if r in ["esi", "si"]:
+            if size == 2:
+                reg = "si"
+            elif size == 4:
+                reg = "esi"
+            else:
+                raise Exception('ESI', size)
+        if r in ["edi", "di"]:
+            if size == 2:
+                reg = "di"
+            elif size == 4:
+                reg = "edi"
+            else:
+                raise Exception('EDI', size)
+        if r in ["ebp", "bp"]:
+            if size == 2:
+                reg = "bp"
+            elif size == 4:
+                reg = "ebp"
+            else:
+                raise Exception('EBP', size)
+        if r in ["esp", "sp"]:
+            if size == 2:
+                reg = "sp"
+            elif size == 4:
+                reg = "esp"
+            else:
+                raise Exception('ESP', size)
     except Exception as (e, s):
         assert 0, "Illegal register size - %s size %d" % (e, s)
     return reg
