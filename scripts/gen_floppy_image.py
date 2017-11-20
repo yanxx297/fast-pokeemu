@@ -897,19 +897,6 @@ def resize_reg(r, size = 4):
     except Exception as (e, s):
         assert 0, "Illegal register size - %s size %d" % (e, s)
     return reg
-                    
-        
-
-# ===-------------------------------------------------------------------===
-# Generate code in text format that mov 32 bits from mem addr1 to mem addr2 
-# via eax, and then *clean addr1
-# ===-------------------------------------------------------------------===
-def gen_store_mem_asm(src, dest):
-    r = "ecx" if any(x in src for x in ["eax", "ax", "ah", "al"]) or \
-            any(x in dest for x in ["eax", "ax", "ah", "al"]) else "eax"
-    asm = "mov %s,%%%s;" \
-        "mov %%%s,%s;" % (src, r, r, dest)
-    return asm
 
 
 # ===-------------------------------------------------------------------===
@@ -931,7 +918,7 @@ def gen_get_eip(r, r2 = None):
 # ===-------------------------------------------------------------------===
 # Generate code in text format to compare a reg/mem with a constant
 # ===-------------------------------------------------------------------===
-def gen_cmp_imm_asm(src, imm, t = "eax", size = 4):
+def gen_cmp_imm(src, imm, t = "eax", size = 4):
     asm = ""
     if src in reg_map:
         reg = src
@@ -952,7 +939,7 @@ def gen_cmp_imm_asm(src, imm, t = "eax", size = 4):
                 "cmp $0x%x,%%%s;" % (reg, t, imm, t)
         elif reg.startswith("st"):
             l = get_addr(size, True)
-            asm += gen_reg2mem_asm(reg, "0x%x" % l[0], size)
+            asm += gen_reg2mem(reg, "0x%x" % l[0], size).asm
             for j in range(len(l)):
                 asm += "cmp $0x%x,0x%x;" % (imm, l[j])
         elif reg == "xcr0":
@@ -968,12 +955,57 @@ def gen_cmp_imm_asm(src, imm, t = "eax", size = 4):
             asm += "cmp $0x%x,%%%s;" % (imm, r)
     else:
         asm += "cmp $0x%x,%s;" % (imm,src)
-    return asm
+    g = Gadget(asm = asm, mnemonic = "cmp imm")
+    return g
+
 
 # ===-------------------------------------------------------------------===
-# Generate code in text format to compare a reg with a mem location
+# Generate gadget that mov from mem addr1 to mme addr2 via eax
 # ===-------------------------------------------------------------------===
-def gen_cmp_reg2mem_asm(reg, mem, t = "eax", size = 4):
+def gen_store_mem(src, dest):
+    global in_to_reg
+    global out_to_reg
+    global feistel_r
+    global feistel_in
+    global feistel_out
+    t = "ecx" if any(x in src for x in ["eax", "ax", "ah", "al"]) or \
+            any(x in dest for x in ["eax", "ax", "ah", "al"]) else "eax"
+    asm = "mov %s,%%%s;" \
+        "mov %%%s,%s;" % (src, t, t, dest)
+    kill = []
+    define = [dest]
+    use = []
+    use__ = []
+    to_reg = in_to_reg.copy()
+    to_reg.update(out_to_reg)
+    if src in to_reg:
+        use__ += [src]
+        for r in to_reg[src]:
+            use__ += [Register(r.upper())]
+    else:
+        use += [src]
+    if dest in to_reg:
+        for r in to_reg[dest]:
+            use__ += [Register(r.upper())]
+    kill += [Register(t.upper())]
+    g = Gadget(asm = asm, mnemonic = "mem2mem", define = define, \
+            kill = kill, use = use, use__ = use__)
+    return g
+
+
+# ===-------------------------------------------------------------------===
+# Generate gadget to compare a reg with a mem location
+# ===-------------------------------------------------------------------===
+def gen_cmp_reg2mem(reg, mem, t = "eax", size = 4):
+    kill = []
+    if reg in ["eflags", "eip", "ip", "mxcsr"] or \
+            reg.startswith("cr") or \
+            reg.startswith("dr"):
+        kill = [Register(t.upper())]
+    use = [Register(reg.upper()), mem]
+    define = []
+    if reg == "xcr0":
+        kill += [Register("EAX"), Register("EDX")]
     asm = ""
     if reg == "eflags":
         asm += "pushf;" \
@@ -1007,142 +1039,6 @@ def gen_cmp_reg2mem_asm(reg, mem, t = "eax", size = 4):
     else:
         r = resize_reg(reg, size)
         asm += "cmp %%%s,%s;" % (r, mem)
-    return asm
-
-
-
-# ===-------------------------------------------------------------------===
-# Generate code in text format to copy from src reg to mem dest
-# ===-------------------------------------------------------------------===
-def gen_reg2mem_asm(reg, mem, size = 4):
-    asm = ""
-    if reg == "eflags":
-        asm += "pushf;" \
-            "pop %s;" % mem
-    elif reg in ["eip", "ip"]:
-        asm += gen_get_eip("eax")
-        asm += "mov %%eax,%s;" % mem
-    elif reg == "mxcsr":
-        asm += "ldmxcsr %s;" % mem
-    elif reg.startswith("cr") or reg.startswith("dr"):
-        asm += "mov %%%s,%%eax;" \
-            "mov %%eax,%s;" % (reg, mem)
-    elif reg.startswith("st"):
-        if reg == "st(0)":
-            asm += "fstp %s;" % mem
-        else:
-            asm += "fxch %%%s;" \
-                "fstp %s;" \
-                "fxch %%%s;" % (reg, mem, reg)
-    elif reg == "xcr0":
-        asm += "xgetbv;" \
-            "mov %%edx,%s;" \
-            "mov %%eax,%s+0x4;" % (mem, mem)
-    else:
-        op = size2mov(size, reg)
-        r = resize_reg(reg, size)
-        asm += "%s %%%s,%s;" % (op, r, mem)
-    return asm
-
-
-# ===-------------------------------------------------------------------===
-# Generate code in text format to copy from mem src to dest reg
-# ===-------------------------------------------------------------------===
-def gen_mem2reg_asm(mem, reg, size = 4):
-    asm = ""
-    if reg == "eflags":
-        asm += "andl $0xad5,%s;" \
-            "push %s;" \
-            "popf;" % (mem, mem)
-    elif reg in ["eip", "ip", "cs", "tr"]:
-        return ""
-    elif reg == "mxcsr":
-        asm += "ldmxcsr %s;" % mem
-    elif reg.startswith("cr") or reg.startswith("dr"):
-        asm += "mov %s,%%eax;" \
-            "mov %%eax,%%%s;" % (mem, reg)
-    elif reg.startswith("st"):
-        if reg == "st(0)":
-            asm += "fld %s;" % mem
-        else:
-            asm += "fxch %%%s;" \
-                "fld %s;" \
-                "fxch %%%s;" % (reg, mem, reg)
-    elif reg == "xcr0":
-        asm += "mov %s,%%edx;" \
-            "mov %s+0x4,%%eax;" \
-            "xsetbv;" % (mem, mem)
-    else:
-        op = size2mov(size, reg)
-        r = resize_reg(reg, size)
-        asm += "%s %s,%%%s;" % (op, mem, r)         
-    return asm
-
-
-# ===-------------------------------------------------------------------===
-# Generate code in text format to store current flags to memory
-# ===-------------------------------------------------------------------===
-def gen_store_eflags_asm(dest):
-    asm = "pushf; " \
-        "pop %s;" % dest
-    return asm
-
-
-# ===-------------------------------------------------------------------===
-# Generate code in text format to store immediate value to 32-bit memory
-# ===-------------------------------------------------------------------===
-def gen_imm2mem_asm(imm, dest):
-    asm = "movl $0x%.8x,%s;" % (imm, dest)
-    return asm
-
-
-# ===-------------------------------------------------------------------===
-# Generate gadget that mov from mem addr1 to mme addr2 via eax
-# ===-------------------------------------------------------------------===
-def gen_store_mem(src, dest):
-    global in_to_reg
-    global out_to_reg
-    global feistel_r
-    global feistel_in
-    global feistel_out
-    asm = gen_store_mem_asm(src, dest)
-    kill = []
-    define = [dest]
-    use = []
-    use__ = []
-    to_reg = in_to_reg.copy()
-    to_reg.update(out_to_reg)
-    if src in to_reg:
-        use__ += [src]
-        for r in to_reg[src]:
-            use__ += [Register(r.upper())]
-    else:
-        use += [src]
-    if dest in to_reg:
-        for r in to_reg[dest]:
-            use__ += [Register(r.upper())]
-    r = "ecx" if any(x in src for x in ["eax", "ax", "ah", "al"]) or \
-            any(x in dest for x in ["eax", "ax", "ah", "al"]) else "eax"
-    kill += [Register(r.upper())]
-    g = Gadget(asm = asm, mnemonic = "mem2mem", define = define, \
-            kill = kill, use = use, use__ = use__)
-    return g
-
-
-# ===-------------------------------------------------------------------===
-# Generate gadget to compare a reg with a mem location
-# ===-------------------------------------------------------------------===
-def gen_cmp_reg2mem(reg, mem, t = "eax", size = 4):
-    kill = []
-    if reg in ["eflags", "eip", "ip", "mxcsr"] or \
-            reg.startswith("cr") or \
-            reg.startswith("dr"):
-        kill = [Register(t.upper())]
-    use = [Register(reg.upper()), mem]
-    define = []
-    asm = gen_cmp_reg2mem_asm(reg, mem, t, size)
-    if reg == "xcr0":
-        kill += [Register("EAX"), Register("EDX")]
     g = Gadget(asm = asm, mnemonic = "cmp", define = define, \
             kill = kill, use = use)
     return g
@@ -1166,7 +1062,8 @@ def gen_cmp_mem(src, dest, size = 4):
 # Generate gadget to store current flags to memory
 # ===-------------------------------------------------------------------===
 def gen_store_eflags(dest):
-    asm = gen_store_eflags_asm(dest)
+    asm = "pushf; " \
+        "pop %s;" % dest
     g = Gadget(asm = asm, mnemonic = "store flags")      
     return g 
 
@@ -1175,7 +1072,7 @@ def gen_store_eflags(dest):
 # Generate gadget to store immediate value to 32-bit memory
 # ===-------------------------------------------------------------------===
 def gen_imm2mem(imm, dest):
-    asm = gen_imm2mem_asm(imm, dest)
+    asm = "movl $0x%.8x,%s;" % (imm, dest)
     define = [dest]
     use = []
     kill = []    
@@ -1187,28 +1084,53 @@ def gen_imm2mem(imm, dest):
 # ===-------------------------------------------------------------------===
 # Generate gadget to copy from src reg to mem dest
 # ===-------------------------------------------------------------------===
-def gen_reg2mem(src, dest, size = 4):
+def gen_reg2mem(reg, mem, size = 4):
     global in_to_reg
     global out_to_reg
     global feistel_in
     global feistel_out
-    asm = gen_reg2mem_asm(src, dest, size)
-    print asm
+    define = []
+    kill = []
+    use = []
+    use__ = []
+    to_reg = in_to_reg.copy()
+    to_reg.update(out_to_reg)
+    if in_dict(reg, to_reg) and int(mem, 16) in feistel_in + feistel_out:
+        use__ += [Register(reg.upper())]
+    else:
+        use += [Register(reg.upper())]
+        define += [mem]        
+    asm = ""
+    if reg == "eflags":
+        asm += "pushf;" \
+            "pop %s;" % mem
+    elif reg in ["eip", "ip"]:
+        asm += gen_get_eip("eax")
+        asm += "mov %%eax,%s;" % mem
+    elif reg == "mxcsr":
+        asm += "ldmxcsr %s;" % mem
+    elif reg.startswith("cr") or reg.startswith("dr"):
+        asm += "mov %%%s,%%eax;" \
+            "mov %%eax,%s;" % (reg, mem)
+    elif reg.startswith("st"):
+        use += [Register("CR0")]
+        if reg == "st(0)":
+            asm += "fstp %s;" % mem
+        else:
+            asm += "fxch %%%s;" \
+                "fstp %s;" \
+                "fxch %%%s;" % (reg, mem, reg)
+    elif reg == "xcr0":
+        asm += "xgetbv;" \
+            "mov %%edx,%s;" \
+            "mov %%eax,%s+0x4;" % (mem, mem)
+    else:
+        op = size2mov(size, reg)
+        r = resize_reg(reg, size)
+        asm += "%s %%%s,%s;" % (op, r, mem)
     if asm == "":
         return None
     else:
-        kill = []
-        use = []
-        use__ = []
-        to_reg = in_to_reg.copy()
-        to_reg.update(out_to_reg)
-        if in_dict(src, to_reg) and int(dest, 16) in feistel_in + feistel_out:
-            use__ += [Register(src.upper())]
-        else:
-            use += [Register(src.upper())]
-        define = [dest]        
-        if src.startswith("st"):
-            use += [Register("CR0")]
         g = Gadget(asm = asm, mnemonic = "reg2mem", define = define, \
                 kill = kill, use = use, use__ = use__) 
         return g 
@@ -1217,25 +1139,50 @@ def gen_reg2mem(src, dest, size = 4):
 # ===-------------------------------------------------------------------===
 # Generate gadget to copy from mem src to dest reg
 # ===-------------------------------------------------------------------===
-def gen_mem2reg(src, dest, size = 4):
+def gen_mem2reg(mem, reg, size = 4):
     global feistel_in
     global feistel_out
-    asm = gen_mem2reg_asm(src, dest, size)
+    use = [mem]
+    use__ = []
+    define = [Register(reg.upper())]
+    kill = []
+    to_reg = in_to_reg.copy()
+    to_reg.update(out_to_reg)
+    if in_dict(mem, to_reg):
+        for r in to_reg[mem]:
+            use__ += [Register(r.upper())]
+    asm = ""
+    if reg == "eflags":
+        asm += "andl $0xad5,%s;" \
+            "push %s;" \
+            "popf;" % (mem, mem)
+    elif reg in ["eip", "ip", "cs", "tr"]:
+        asm = ""
+    elif reg == "mxcsr":
+        asm += "ldmxcsr %s;" % mem
+    elif reg.startswith("cr") or reg.startswith("dr"):
+        asm += "mov %s,%%eax;" \
+            "mov %%eax,%%%s;" % (mem, reg)
+    elif reg.startswith("st"):
+        use += [Register("CR0")]
+        define += [Register("ST(0)")]
+        if reg == "st(0)":
+            asm += "fld %s;" % mem
+        else:
+            asm += "fxch %%%s;" \
+                "fld %s;" \
+                "fxch %%%s;" % (reg, mem, reg)
+    elif reg == "xcr0":
+        asm += "mov %s,%%edx;" \
+            "mov %s+0x4,%%eax;" \
+            "xsetbv;" % (mem, mem)
+    else:
+        op = size2mov(size, reg)
+        r = resize_reg(reg, size)
+        asm += "%s %s,%%%s;" % (op, mem, r)         
     if asm == "":
         return None
     else:
-        use = [src]
-        use__ = []
-        define = [Register(dest.upper())]
-        kill = []
-        to_reg = in_to_reg.copy()
-        to_reg.update(out_to_reg)
-        if in_dict(src, to_reg):
-            for r in to_reg[src]:
-                use__ += [Register(r.upper())]
-        if dest.startswith("st"):
-            use += [Register("CR0")]
-            define += [Register("ST(0)")]
         g = Gadget(asm = asm, mnemonic = "mem2reg", define = define,\
                 kill = kill, use = use, use__ = use__)
         return g 
@@ -1290,7 +1237,7 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     
     if src2 == "eflags":
         r = "0x%x" % get_addr(4, True)[0]
-        asm2 += gen_store_eflags_asm(r)
+        asm2 += gen_store_eflags(r).asm
         asm2 += "xor %s,%%eax;" % r
 #         src2 = r
     elif src2 in ["eip", "ip"]:
@@ -1313,7 +1260,7 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
             "xor %s,%%%s;" % (d, d, t)
     elif src2 == "xcr0":
         d = "0x%x" % get_addr(8, True)[0]
-        asm2 += gen_reg2mem_asm(src2, d, 8)        
+        asm2 += gen_reg2mem(src2, d, 8).asm
         kill += [Register("EAX"), Register("EDX")]
         asm2 += "pxor %s,%%%s;" % (d, t)
 
@@ -1327,8 +1274,8 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
             if src2 in reg_map:
                 g3.asm += "%s %%%s,%%%s;" % (x, src2, src2)
             else:
-                l = random.randint(0, 0xffffffff)            
-                g3.asm += gen_cmp_imm_asm(src2, 0, t)
+                l = random.randint(0, 0xffffffff)
+                g3 = merge_glist([g3, gen_cmp_imm(src2, 0, t)])
                 g3.asm += "je forward_%.8x;" % l
                 g3.asm += "%s %%%s,%%%s;"\
                         "%s %%%s,%s;" % (x, r, r, m, r, src2)
