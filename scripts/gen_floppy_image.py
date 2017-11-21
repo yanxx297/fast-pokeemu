@@ -1189,8 +1189,13 @@ def gen_mem2reg(mem, reg, size = 4):
     elif reg == "mxcsr":
         asm += "ldmxcsr %s;" % mem
     elif reg.startswith("cr") or reg.startswith("dr"):
-        asm += "mov %s,%%eax;" \
-            "mov %%eax,%%%s;" % (mem, reg)
+        if reg == "cr0":
+            asm += "mov %s,%%eax;" \
+                    "orl $0x80000001,%%eax;" \
+                    "mov %%eax,%%%s;" % (mem, reg)
+        else:
+            asm += "mov %s,%%eax;" \
+                    "mov %%eax,%%%s;" % (mem, reg)
     elif reg.startswith("st"):
         use += [Register("CR0")]
         define += [Register("ST(0)")]
