@@ -1593,10 +1593,16 @@ def handle_reg_read(inst, op, i, isInit = False):
 
         if not reg_str in l_restore:
             l_restore += [reg_str]
-            backup += [gen_reg2mem(resize_reg(reg_str), reg_bak)]
+            if reg_str in ["cs", "ds", "es", "fs", "gs", "ss"]:
+                backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
+            else:
+                backup += [gen_reg2mem(resize_reg(reg_str), reg_bak)]
             restore_ = []
             t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax"
-            restore_ += [gen_mem2reg(reg_bak, resize_reg(reg_str))]
+            if reg_str in ["cs", "ds", "es", "fs", "gs", "ss"]:
+                restore += [gen_mem2reg(reg_bak, reg_str, reg_len)]
+            else:
+                restore_ += [gen_mem2reg(reg_bak, resize_reg(reg_str))]
             g = merge_glist(remove_none(restore_), "restore inputs")
             if reg_str == "eflags":
                 g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore inputs" % t
@@ -1672,10 +1678,16 @@ def handle_reg_write(inst, op, i, isInit = False):
         reg_bak = "0x%x" % feistel_out[count_l]
 
         if not reg_str in l_restore:            
-            backup += [gen_reg2mem(resize_reg(reg_str), reg_bak)]
+            if reg_str in ["cs", "ds", "es", "fs", "gs", "ss"]:
+                backup += [gen_reg2mem(reg_str, reg_bak, reg_len)]
+            else:
+                backup += [gen_reg2mem(resize_reg(reg_str), reg_bak)]
             restore_ = []
             t = "ecx" if reg_str in ["eax", "ax", "ah", "al"] else "eax" 
-            restore_ += [gen_mem2reg(reg_bak, resize_reg(reg_str))]
+            if reg_str in ["cs", "ds", "es", "fs", "gs", "ss"]:
+                restore += [gen_mem2reg(reg_bak, reg_str, reg_len)]
+            else:
+                restore_ += [gen_mem2reg(reg_bak, resize_reg(reg_str))]
             g = merge_glist(remove_none(restore_), "restore outputs")
             if reg_str == "eflags":
                 g.asm = "push %%%s;" % t + g.asm.split("//")[0] + "pop %%%s; //restore outputs" % t
