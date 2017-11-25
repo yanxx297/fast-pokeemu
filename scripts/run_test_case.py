@@ -60,9 +60,9 @@ def create_dummy_state(f, typ, emu, kernel_version, kernel_md5, testcase_md5):
 
 
 # build a temporary floppy image with the test-case
-def gen_floppy(testcase, mode):
+def gen_floppy(testcase, mode, loop):
     floppy = Tempfile(delete = autodelete)
-    gen_floppy_with_testcase(testcase = testcase, floppy = floppy, mode = mode)
+    gen_floppy_with_testcase(testcase = testcase, floppy = floppy, mode = mode, loop = loop)
     return floppy
 
 
@@ -106,7 +106,8 @@ def run_testcase(outdir, code, path, script, floppy, timeout, tmp):
 
 
 if __name__ == "__main__":
-    opts = {"testcase" : None, "outdir" : None, "script" : None, "timeout" : 10, "mode": 0, "tmp": ""}
+    opts = {"testcase" : None, "outdir" : None, "script" : None, "timeout" : 10, "mode": 0, \
+            "tmp": "", "loop": 1}
 
     for arg in sys.argv[1:]:
         a = arg.split(":")
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     print "outdir valid\n"
     assert os.path.isfile(opts["script"]), opts["script"]
 
-    floppy = gen_floppy(opts["testcase"], opts["mode"])
+    floppy = gen_floppy(opts["testcase"], opts["mode"], opts["loop"])
     code, path = gen_testcase_name(opts["testcase"])
     run_testcase(opts["outdir"], code, path, opts["script"], floppy, 
                  int(opts["timeout"]), opts["tmp"])
