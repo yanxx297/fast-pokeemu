@@ -2029,8 +2029,9 @@ class Gadget:
         if reg.name.lower() == "cr0":
             if not reg.value & 0x80000000:
                 print "Paging turned off. Should use unextended range only."
-                PG = 0
-                flip_addrs()                             
+                if PG != 0:
+                    PG = 0
+                    flip_addrs()
         asm = "mov $0x%.8x, %%eax; mov %%eax,%%%s; // %s" % \
             (reg.value, reg.name.lower(), reg.name.lower())
         print define
