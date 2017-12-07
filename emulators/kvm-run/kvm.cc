@@ -881,9 +881,8 @@ int main(int argc, char **argv) {
 	dump_dummy_state(tempfile, (POST_TESTCASE | CRASH_TESTCASE));
 	rename(tempfile, argv[2]);
       }
-
-      r = 0;
-      break;
+      vm->Print(stdout);
+      exit(1);
     }
 
   } while (r);
