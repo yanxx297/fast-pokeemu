@@ -23,6 +23,8 @@ $(addprefix $(OUT), $1)/ktime:
 			echo $$$$tcname >> $(OUTDIR)/match;\
 		elif [ $$$$err == 2 ]; then\
 			echo $$$$tcname >> $(OUTDIR)/mismatch;\
+                elif [ $$$$err == 1 ]; then\
+                        rm $(OUTDIR)/$$$$tcname.diff;\
 		fi;\
 	done;
 	find $(OUTDIR) -type f -empty -delete
