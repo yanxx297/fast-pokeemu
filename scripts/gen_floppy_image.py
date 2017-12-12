@@ -1087,6 +1087,20 @@ def gen_cmp_mem(src, dest, size = 4):
 
 
 # ===-------------------------------------------------------------------===
+# Generate gadget that mov from mem src to mem dest only if dest != src
+# ===-------------------------------------------------------------------===
+def gen_store_change_mem(src, dest, mnemonic=""):
+    l = random.randint(0, 0xffffffff)
+    g_ = [gen_cmp_mem(dest, src)]
+    asm = "je forward_%.8x;" % l
+    g_ += [Gadget(asm = asm, mnemonic = "")]
+    g_ += [gen_store_mem(src, dest)]
+    asm = "forward_%.8x:" % l
+    g_ += [Gadget(asm = asm, mnemonic = "")]
+    g = merge_glist(g_, mnemonic)
+    return g
+
+# ===-------------------------------------------------------------------===
 # Generate gadget to store current flags to memory
 # ===-------------------------------------------------------------------===
 def gen_store_eflags(dest):
@@ -1452,20 +1466,13 @@ def handle_mem_read(inst, op, i, isInit = False):
                 init_r += [gen_store_mem(op_str, r)]
             src = "0x%x" % feistel_r[count_r]
             op_bak = "0x%x" % feistel_in[count_r]
-            setinput += [gen_store_mem(src, op_str)]
+            setinput += [gen_store_change_mem(src, op_str, "setinput")]
 
             if not op_str in l_restore:
                 l_restore += [op_str]
                 backup += [gen_store_mem(op_str, op_bak)]
                 restore_ = []
-                l = random.randint(0, 0xffffffff)
-                restore_ += [gen_cmp_mem(op_str, op_bak)]
-                asm = "je forward_%.8x;" % l
-                restore_ += [Gadget(asm = asm, mnemonic = "")]
-                restore_ += [gen_store_mem(op_bak, op_str)]
-                asm = "forward_%.8x:" % l
-                restore_ += [Gadget(asm = asm, mnemonic = "")]
-                restore += [merge_glist(restore_, "restore inputs")]
+                restore += [gen_store_change_mem(op_bak, op_str, "restore inputs")]
 
             count_r += 1  
     return (backup, setinput, feistel, restore)
@@ -1521,14 +1528,7 @@ def handle_mem_write(inst, op, i, isInit = False):
                 l_restore += [op_str]
                 backup += [gen_store_mem(src2, op_bak)]
                 restore_ = []
-                l = random.randint(0, 0xffffffff)
-                restore_ += [gen_cmp_mem(src2, op_bak)]
-                asm = "je forward_%.8x;" % l
-                restore_ += [Gadget(asm = asm, mnemonic = "")]
-                restore_ += [gen_store_mem(op_bak, src2)]
-                asm = "forward_%.8x:" % l
-                restore_ += [Gadget(asm = asm, mnemonic = "")]
-                restore += [merge_glist(restore_, "restore outputs")]
+                restore += [gen_store_change_mem(op_bak, src2, "restore inputs")]
         count_l += r
         
     return (backup, setinput, feistel, restore)
