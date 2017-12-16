@@ -85,7 +85,7 @@ feistel_out = []    #Backup original outputs for restoring at the end of each TC
 count_r = 0         # Pointer to the current R/L block
 count_l = 0
 count_addr = 0      # A mem location to store loop count
-LOOP = 100            #repeat testing each test case for a number of times
+LOOP = 1            #repeat testing each test case for a number of times
 
 
 # ===-----------------------------------------------------------------------===
