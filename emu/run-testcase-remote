@@ -1,0 +1,39 @@
+#!/bin/bash
+
+here=$(readlink -f $0)
+here=$(dirname "$0")
+floppy="$1"
+out="$2"
+tmp="$3"
+
+cp $floppy /tmp/floppy-dbg
+if [ "$floppy" = "" -o "$out" = "" ]
+then
+    echo "Invalid argument(s)"
+    exit 1
+fi
+
+echo "#######################################################################################"
+echo ""
+
+md5=$(mtype -i "$floppy" "::kernel.md5")
+pre="$tmp/$(basename $out).pre"
+post=$(mktemp)
+
+export KEMUFUZZER_KERNEL_VERSION="prot + pag"
+export KEMUFUZZER_KERNEL_CHECKSUM="$md5"
+export KEMUFUZZER_PRE_STATE="$pre"
+export KEMUFUZZER_POST_STATE="$post"
+export KEMUFUZZER_TESTCASE_CHECKSUM="no checksum"
+
+$here/i386-softmmu/qemu -S -s -m 4 -d in_asm,cpu -fda "$floppy" -nographic $4 
+ret=$?
+if [ $ret -eq 0 ]
+then
+    mv "$pre" "$out.pre"
+    mv "$post" "$out.post"
+fi
+
+rm -f "$bochsrc" "$post"
+
+exit $ret
