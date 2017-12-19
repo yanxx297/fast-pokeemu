@@ -1,0 +1,3 @@
+[submodule "tools/pyxed"]
+	path = tools/pyxed
+	url = https://github.com/huku-/pyxed
