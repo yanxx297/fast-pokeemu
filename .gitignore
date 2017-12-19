@@ -8,5 +8,9 @@ a.out
 *.core
 .project
 .paths
-emu
-instructions.tsv
+instructions.csv
+scripts/insn
+data/
+tools/pin/
+floppy-tmp
+kernel-tmp

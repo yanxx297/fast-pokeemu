@@ -26,3 +26,5 @@ missing
 .z3-trace
 fuzzball-tmp-*
 .paths
+OCamlMakefile
+/libasmir/src/.Po
