@@ -26,14 +26,14 @@
 #include "interrupts.h"		/* for interrupt handlers */
 
 // Task segment descriptor Virtual 8086 Mode gdt entry
-#define TSS_VM 26
+#define TSS_VM 28
 
 extern seg_t *gdt;
 extern idte_t *idt;
 extern pde_t *pd;
 extern pte_t *pt;
 extern uint32_t mem_offset;
-extern tss_t tss0, tss1, tss2, tss3, tss4, tss5, tss6, tssVM;
+extern tss_t tss0, tss1, tss2, tss3, tss4, tss5, tss6, tss7, tssVM;
 extern uint32_t tc_ring0_base, tc_ring0_len;
 extern uint32_t tc_ring1_base, tc_ring1_len;
 extern uint32_t tc_ring2_base, tc_ring2_len;
@@ -152,6 +152,7 @@ void set_gdt(void)
   set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_RING3_DS)], tc_ring3_base, tc_ring3_len/4096, ACS_DATA  | ACS_DPL(3), 0xc);
   set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_RING3_SS)], tc_ring3_base, tc_ring3_len/4096, ACS_STACK | ACS_DPL(3), 0xc);
 
+  set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_SS)], tc_ring0_base, tc_ring0_len/4096, ACS_STACK | ACS_DPL(0), 0xc);
 #undef SEL_INDEX
 #undef ACS_DPL
 
@@ -161,6 +162,7 @@ void set_gdt(void)
   gdtr.base = (uint32_t) ph_gdt;
   gdtr.limit = sizeof(seg_t)*(GDT_ENTRY+1);
 
+  set_gdt_entry_tss(&ph_gdt[27], (uint32_t) &tss7, sizeof(tss_t), 0x9, 3, 1, 0, 0);
 #ifdef DEBUG
   tssdesc = (tssdesc_t *)&ph_gdt[4];
   kprintf("tss type before activation: %08x\n", tssdesc->type);
@@ -237,7 +239,7 @@ void set_idt(void)
 
   ph_idt = (idte_t *)((unsigned int)(&idt) - mem_offset);
 
-  set_interrupt_handlers(ph_idt, 0x40);
+  set_interrupt_handlers(ph_idt, SEL_EXCP_TSS);
 
   idtr.base = (uint32_t)ph_idt;
   idtr.limit = INTERRUPTS*8;

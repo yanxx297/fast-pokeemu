@@ -52,7 +52,7 @@ pde_t pd[1024] __attribute__ ((aligned(4096)));
 pte_t pt[1024] __attribute__ ((aligned(4096)));
 idte_t idt[INTERRUPTS] __attribute__ ((aligned(4096)));
 
-tss_t tss0, tss1, tss2, tss3, tss4, tss5, tss6, tssVM;
+tss_t tss0, tss1, tss2, tss3, tss4, tss5, tss6, tss7, tssVM;
 
 /* FPU state -- 512 bytes */
 static uint32_t fpustate[]  __attribute__ ((aligned (16))) = {
@@ -237,6 +237,11 @@ void kmain(int magic, multiboot_info_t *mbi)
 	  SEL_RPL(SEL_RING3_CS,3), SEL_RPL(SEL_RING3_DS,3), SEL_RPL(SEL_RING3_SS,3), get_cr3(), 
 	  SEL_RPL(SEL_RING0_SS,0), SEL_RPL(SEL_RING1_SS,1), SEL_RPL(SEL_RING2_SS,2), esp0, esp1, esp2, 0xc8);
 
+  /* TSS for exception handler */
+  set_tss(&tss7, int_handler_13, esp0, get_eflags(), 
+	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
+
   /* Create new TSS - Task-State Segment  */
   /*    EFLAGS.VM[bit 17]= 1 */
   /*    eip= 0 */
@@ -246,7 +251,7 @@ void kmain(int magic, multiboot_info_t *mbi)
   /* TI[2 bit]    => table indicator 0=GDT 1=LDT   = 0 */
   /* Index        => selector in the GDT           = X */
   
-  /* TSS_VM Descriptor GDT_ENTRY= 26 */
+  /* TSS_VM Descriptor GDT_ENTRY= 28 */
   /* 0000000011010 | 0 | 11 = 0xD3 = 26/CPL3 */
 
   /* far call entry GDT (segment selector) */

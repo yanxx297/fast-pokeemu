@@ -48,6 +48,10 @@
 #define SEL_RING3_FS SEL_RING3_DS
 #define SEL_RING3_GS SEL_RING3_DS
 
+/* Stack for exception handler */
+#define SEL_EXCP_SS 0xd0
+#define SEL_EXCP_TSS 0xd8
+
 /* Add RPL to a segment selector */
 #define SEL_RPL(s,r) ((s) | (r))
 
@@ -58,7 +62,7 @@
 #define PAGE_SIZE 0x1000
 #define PAGE_ALIGN(x) (((uint32_t) (x)) & ~PAGE_SIZE)
 
-#define GDT_ENTRY 27
+#define GDT_ENTRY 28
 
 /* Virtual 8086 Mode */
 #define VM_BIT 1<<17
