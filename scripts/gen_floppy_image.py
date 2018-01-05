@@ -2805,7 +2805,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0, l
             set_r = param0 + set_r
             set_r = sort_gadget(set_r)
             startup += set_r
-            startup += revert0
+            startup += sort_gadget(revert0)
         
         #jump to TC beginning for a fixed # of times                   
         asm = "";
