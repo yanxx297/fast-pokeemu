@@ -2,6 +2,7 @@
 
 #include "interrupts.h"
 #include <sys/tss.h>
+#include "kernel.h"
 
 extern int kprintf(const char *format, ...);
 extern tss_t tss0;
@@ -17,10 +18,8 @@ static void set_idt_entry(idte_t *idt, uint8_t n, uint16_t seg, uint32_t off)
   idt[n].present = 1;
 }
 
-static void set_idt_entry_tss(idte_t *idt, uint8_t n, uint16_t seg, uint32_t off)
+static void set_idt_entry_tss(idte_t *idt, uint8_t n, uint16_t seg)
 {
-  idt[n].off_0_15 = off & 0xffff;
-  idt[n].off_16_31 = (off>>16) & 0xffff;
   idt[n].seg = seg;
   idt[n].zero = 0;
   idt[n].type = 0x5; /* tss gate */
@@ -30,27 +29,27 @@ static void set_idt_entry_tss(idte_t *idt, uint8_t n, uint16_t seg, uint32_t off
 
 void set_interrupt_handlers(idte_t *pidt, uint16_t seg)
 {
-  set_idt_entry_tss(pidt, 0, seg, (uint32_t)int_handler_0);
-  set_idt_entry_tss(pidt, 1, seg, (uint32_t)int_handler_1);
-  set_idt_entry_tss(pidt, 2, seg, (uint32_t)int_handler_2);
-  set_idt_entry_tss(pidt, 3, seg, (uint32_t)int_handler_3);
-  set_idt_entry_tss(pidt, 4, seg, (uint32_t)int_handler_4);
-  set_idt_entry_tss(pidt, 5, seg, (uint32_t)int_handler_null);
-  set_idt_entry_tss(pidt, 6, seg, (uint32_t)int_handler_6);
-  set_idt_entry_tss(pidt, 7, seg, (uint32_t)int_handler_7);
-  set_idt_entry_tss(pidt, 8, seg, (uint32_t)int_handler_8);
-  set_idt_entry_tss(pidt, 9, seg, (uint32_t)int_handler_9);
-  set_idt_entry_tss(pidt, 10, seg, (uint32_t)int_handler_10);
-  set_idt_entry_tss(pidt, 11, seg, (uint32_t)int_handler_11);
-  set_idt_entry_tss(pidt, 12, seg, (uint32_t)int_handler_12);
-  set_idt_entry_tss(pidt, 13, seg, (uint32_t)int_handler_13);
-  set_idt_entry_tss(pidt, 14, seg, (uint32_t)int_handler_14);
-  set_idt_entry_tss(pidt, 15, seg, (uint32_t)int_handler_15);
-  set_idt_entry_tss(pidt, 16, seg, (uint32_t)int_handler_16);
-  set_idt_entry_tss(pidt, 17, seg, (uint32_t)int_handler_17);
-  set_idt_entry_tss(pidt, 18, seg, (uint32_t)int_handler_18);
-  set_idt_entry_tss(pidt, 19, seg, (uint32_t)int_handler_19);
-  set_idt_entry_tss(pidt, 20, seg, (uint32_t)int_handler_null);
+  set_idt_entry_tss(pidt, 0, SEL_EXCP00);
+  set_idt_entry_tss(pidt, 1, SEL_EXCP01);
+  set_idt_entry_tss(pidt, 2, SEL_EXCP02);
+  set_idt_entry_tss(pidt, 3, SEL_EXCP03);
+  set_idt_entry_tss(pidt, 4, SEL_EXCP04);
+  set_idt_entry_tss(pidt, 5, SEL_EXCP05);
+  set_idt_entry_tss(pidt, 6, SEL_EXCP06);
+  set_idt_entry_tss(pidt, 7, SEL_EXCP07);
+  set_idt_entry_tss(pidt, 8, SEL_EXCP08);
+  set_idt_entry_tss(pidt, 9, SEL_EXCP09);
+  set_idt_entry_tss(pidt, 10, SEL_EXCP10);
+  set_idt_entry_tss(pidt, 11, SEL_EXCP11);
+  set_idt_entry_tss(pidt, 12, SEL_EXCP12);
+  set_idt_entry_tss(pidt, 13, SEL_EXCP13);
+  set_idt_entry_tss(pidt, 14, SEL_EXCP14);
+  set_idt_entry_tss(pidt, 15, SEL_EXCP15);
+  set_idt_entry_tss(pidt, 16, SEL_EXCP16);
+  set_idt_entry_tss(pidt, 17, SEL_EXCP17);
+  set_idt_entry_tss(pidt, 18, SEL_EXCP18);
+  set_idt_entry_tss(pidt, 19, SEL_EXCP19);
+  set_idt_entry(pidt, 20, seg, (uint32_t)int_handler_null);
   set_idt_entry(pidt, 21, seg, (uint32_t)int_handler_null);
   set_idt_entry(pidt, 22, seg, (uint32_t)int_handler_null);
   set_idt_entry(pidt, 23, seg, (uint32_t)int_handler_null);
@@ -99,348 +98,349 @@ void set_interrupt_handlers(idte_t *pidt, uint16_t seg)
 void int_handler_0(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 0 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+                "hlt;"
+    		"begin0:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg0;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x0,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end0;"
     		"pg0:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x0,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end0:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin0;"
+                : "=m" (*d));
   return;
 }
 void int_handler_1(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 1 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin1:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg1;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x1,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end1;"
     		"pg1:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x1,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end1:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin1;"
+                : "=m" (*d));
   return;
 }
 void int_handler_2(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 2 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin2:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg2;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x2,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end2;"
     		"pg2:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x2,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end2:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin2;"
+                : "=m" (*d));
   return;
 }
 void int_handler_3(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 3 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
-    		"je pg3;"
-    		"pop %eax;"
+    		"begin3:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
+    		"je pg13;"
     		"pop 0x27800c;"
     		"movl $0x3,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end3;"
     		"pg3:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x3,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end3:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin3;"
+                : "=m" (*d));
   return;
 }
 void int_handler_4(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 4 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin4:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg4;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x4,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end4;"
     		"pg4:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x4,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end4:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin4;"
+                : "=m" (*d));
   return;
 }
 void int_handler_5(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 5 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin5:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg5;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x5,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end5;"
     		"pg5:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x5,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end5:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin5;"
+                : "=m" (*d));
   return;
 }
 void int_handler_6(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 6 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+                "begin6:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg6;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x6,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end6;"
     		"pg6:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x6,0x1278010;"
-    		"add $0x4,%esp;"		
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end6:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin6;"
+                : "=m" (*d));
   return;
 }
 void int_handler_7(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 7 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin7:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg7;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x7,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end7;"
     		"pg7:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x7,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end7:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin7;"
+                : "=m" (*d));
   return;
 }
 void int_handler_8(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 8 speaking\n");
+    uint32_t *d = &(tss0.eip);
 	asm volatile (
-	"push %eax;"
-	"mov %cr0,%eax;"
-	"and $0x80000000,%eax;"
-	"cmpl $0x80000000,%eax;"
-	"je pg8;"
-	"pop %eax;"
-	"pop 0x27800c;"
-	"movl $0x8,0x278010;"
-	"add $0x4,%esp;"
-	"push 0x278008;"
-	"jmp end8;"
-	"pg8:"
-	"pop %eax;"
-	"pop 0x127800c;"
-	"movl $0x8,0x1278010;"
-	"add $0x4,%esp;"
-	"push 0x1278008;"
-	"end8:"
-	"iret;"
-	"hlt;");
+    		"begin8:"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
+    		"je pg8;"
+    		"pop 0x27800c;"
+    		"movl $0x8,0x278010;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
+    		"jmp end8;"
+    		"pg8:"
+    		"pop 0x127800c;"
+    		"movl $0x8,0x1278010;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
+    		"end8:"
+    		"iret;"
+    		"jmp begin8;"
+                : "=m" (*d));
   return;
 }
 void int_handler_9(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 9 speaking\n");
+    uint32_t *d = &(tss0.eip);
 	asm volatile (
-	"sub $0x4,%esp;"
-	"push %eax;"
-	"mov %cr0,%eax;"
-	"and $0x80000000,%eax;"
-	"cmpl $0x80000000,%eax;"
-	"je pg9;"
-	"pop %eax;"
-	"pop 0x27800c;"
-	"movl $0x9,0x278010;"
-	"add $0x4,%esp;"
-	"push 0x278008;"
-	"jmp end9;"
-	"pg9:"
-	"pop %eax;"
-	"pop 0x127800c;"
-	"movl $0x9,0x1278010;"
-	"add $0x4,%esp;"
-	"push 0x1278008;"
-	"end9:"
-	"iret;"
-	"hlt;");
+    		"begin9:"
+	        "sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
+    		"je pg9;"
+    		"pop 0x27800c;"
+    		"movl $0x9,0x278010;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
+    		"jmp end9;"
+    		"pg9:"
+    		"pop 0x127800c;"
+    		"movl $0x9,0x1278010;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
+    		"end9:"
+    		"iret;"
+    		"jmp begin9;"
+                : "=m" (*d));
   return;
 }
 void int_handler_10(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 10 speaking\n");
+    uint32_t *d = &(tss0.eip);
 	asm volatile (
-	"push %eax;"
-	"mov %cr0,%eax;"
-	"and $0x80000000,%eax;"
-	"cmpl $0x80000000,%eax;"
-	"je pg10;"
-	"pop %eax;"
-	"pop 0x27800c;"
-	"movl $0xa,0x278010;"
-	"add $0x4,%esp;"
-	"push 0x278008;"
-	"jmp end10;"
-	"pg10:"
-	"pop %eax;"
-	"pop 0x127800c;"
-	"movl $0xa,0x1278010;"
-	"add $0x4,%esp;"
-	"push 0x1278008;"
-	"end10:"
-	"iret;"
-	"hlt;");
-  return;
+    		"begin10:"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
+    		"je pg10;"
+    		"pop 0x27800c;"
+    		"movl $0xa,0x278010;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
+    		"jmp end10;"
+    		"pg10:"
+    		"pop 0x127800c;"
+    		"movl $0xa,0x1278010;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
+    		"end10:"
+    		"iret;"
+    		"jmp begin10;"
+                : "=m" (*d));  
+        return;
 }
 void int_handler_11(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 11 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin11:"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg11;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0xb,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end11;"
     		"pg11:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0xb,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end11:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin11;"
+                : "=m" (*d));
   return;
 }
 void int_handler_12(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 12 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin12:"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg12;"
-    		"pop %eax;"
     		"pop 0x27800c;"
-    		"movl $0xc,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+    		"movl $0xb,0x278010;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end12;"
     		"pg12:"
-    		"pop %eax;"
     		"pop 0x127800c;"
-    		"movl $0xc,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+    		"movl $0xb,0x1278010;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end12:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin12;"
+                : "=m" (*d));
   return;
 }
 void int_handler_13(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
@@ -449,192 +449,183 @@ void int_handler_13(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
     uint32_t *d = &(tss0.eip);
     asm volatile (
     		"begin13:"
-                "push %%eax;"
     		"mov %%cr0,%%eax;"
     		"and $0x80000000,%%eax;"
     		"cmpl $0x80000000,%%eax;"
     		"je pg13;"
-    		"pop %%eax;"
     		"pop 0x27800c;"
     		"movl $0xd,0x278010;"
-    		"add $0x4,%%esp;"
-                "push %%eax;"
                 "mov 0x278008,%%eax;"
                 "mov %%eax,%0;"
-                "pop %%eax;"
     		"jmp end13;"
     		"pg13:"
-    		"pop %%eax;"
     		"pop 0x127800c;"
     		"movl $0xd,0x1278010;"
-    		"add $0x4,%%esp;"
-                "push %%eax;"
                 "mov 0x1278008,%%eax;"
-                "mov %%eax,%1;"
-                "pop %%eax;"
+                "mov %%eax,%0;"
     		"end13:"
     		"iret;"
     		"jmp begin13;"
-                : "=m" (*d), "=m" (*d));
+                : "=m" (*d));
   return;
 }
 void int_handler_14(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 14 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin14:"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg14;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0xe,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end14;"
     		"pg14:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0xe,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end14:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin14;"
+                : "=m" (*d));
   return;
 }
 void int_handler_15(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 15 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin15:"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg15;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0xf,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end15;"
     		"pg15:"
-    		"pop %eax;"
     		"pop 0x127800c;"
-    		"movl $0xf,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+    		"movl $0xa,0x1278010;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end15:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin15;"
+                : "=m" (*d));
   return;
 }
 void int_handler_16(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 16 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin16:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg16;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x10,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end16;"
     		"pg16:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x10,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end16:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin16;"
+                : "=m" (*d));
   return;
 }
 void int_handler_17(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 17 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin17:"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg17;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x11,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end17;"
     		"pg17:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x11,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end17:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin17;"
+                : "=m" (*d));
   return;
 }
 void int_handler_18(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 18 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin18:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg18;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x12,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end18;"
     		"pg18:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x12,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end18:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin18;"
+                : "=m" (*d));
   return;
 }
 void int_handler_19(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 19 speaking\n");
+    uint32_t *d = &(tss0.eip);
     asm volatile (
-		"sub $0x4,%esp;"
-    		"push %eax;"
-    		"mov %cr0,%eax;"
-    		"and $0x80000000,%eax;"
-    		"cmpl $0x80000000,%eax;"
+    		"begin19:"
+		"sub $0x4,%%esp;"
+    		"mov %%cr0,%%eax;"
+    		"and $0x80000000,%%eax;"
+    		"cmpl $0x80000000,%%eax;"
     		"je pg19;"
-    		"pop %eax;"
     		"pop 0x27800c;"
     		"movl $0x13,0x278010;"
-    		"add $0x4,%esp;"
-    		"push 0x278008;"
+                "mov 0x278008,%%eax;"
+                "mov %%eax,%0;"
     		"jmp end19;"
     		"pg19:"
-    		"pop %eax;"
     		"pop 0x127800c;"
     		"movl $0x13,0x1278010;"
-    		"add $0x4,%esp;"
-    		"push 0x1278008;"
+                "mov 0x1278008,%%eax;"
+                "mov %%eax,%0;"
     		"end19:"
     		"iret;"
-    		"hlt;");
+    		"jmp begin19;"
+                : "=m" (*d));
   return;
 }
 void int_handler_20(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
