@@ -242,102 +242,102 @@ void kmain(int magic, multiboot_info_t *mbi)
 
   /* TSS for exception handler */
 
-  /* Divide Error */
+  // Divide Error 
   set_tss(&tssEXCP00, int_handler_0, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Debug Exception */
+  // Debug Exception
   set_tss(&tssEXCP01, int_handler_1, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* NMI Interrupt */
+  // NMI Interrupt
   set_tss(&tssEXCP02, int_handler_2, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Breakpoint */
+  // Breakpoint
   set_tss(&tssEXCP03, int_handler_3, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Overflow */
+  // Overflow
   set_tss(&tssEXCP04, int_handler_4, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* BOUND Range Exceeded */
+  // BOUND Range Exceeded
   set_tss(&tssEXCP05, int_handler_5, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Invalid (Undefined) Opcode */
+  // Invalid (Undefined) Opcode
   set_tss(&tssEXCP06, int_handler_6, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Device Not Available */
+  // Device Not Available
   set_tss(&tssEXCP07, int_handler_7, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Double Fault */
+  // Double Fault
   set_tss(&tssEXCP08, int_handler_8, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Coprocessor Segment Overrun (reserved) */
+  // Coprocessor Segment Overrun (reserved)
   set_tss(&tssEXCP09, int_handler_9, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Invalid TSS */
+  // Invalid TSS
   set_tss(&tssEXCP10, int_handler_10, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Segment Not Present */
+  // Segment Not Present
   set_tss(&tssEXCP11, int_handler_11, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Stack Segment Fault */
+  // Stack Segment Fault
   set_tss(&tssEXCP12, int_handler_12, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* General Protection */
+  // General Protection
   set_tss(&tssEXCP13, int_handler_13, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Page Fault */
+  // Page Fault
   set_tss(&tssEXCP14, int_handler_14, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Intel reserverd, Do not use. */
+  // Intel reserverd, Do not use.
   set_tss(&tssEXCP15, int_handler_15, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* X87 FPU Floating Point Error (Math Fault) */
+  // X87 FPU Floating Point Error (Math Fault)
   set_tss(&tssEXCP16, int_handler_16, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Alighment Check */
+  // Alighment Check
   set_tss(&tssEXCP17, int_handler_17, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* Machine Check*/
+  // Machine Check
   set_tss(&tssEXCP18, int_handler_18, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
-  /* SIMD Floating-Point Exception*/
+  // SIMD Floating-Point Exception
   set_tss(&tssEXCP19, int_handler_19, esp0, get_eflags(), 
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
