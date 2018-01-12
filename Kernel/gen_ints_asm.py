@@ -36,7 +36,7 @@ def gen_header(n):
 void set_interrupt_handlers(idte_t *idt, uint16_t seg);
 
 """ % sys.argv[0]
-    for i in range(32):
+    for i in range(33):
         s += "void int_handler_%d(uint32_t, uint32_t, uint32_t, uint32_t);\n" % i
         s += "void int_wrapper_%d(void);\n" % i
 
