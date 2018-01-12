@@ -2111,7 +2111,7 @@ class Gadget:
     @staticmethod
     def gen_end_testcase():
         r = random.randint(0, 0xffffffff)
-        asm = "jmp forward_%.8x;forward_%.8x:" \
+        asm = "int $0x20; jmp forward_%.8x;forward_%.8x:" \
             "hlt; // notify the end of the test-case" % \
             (r, r)
         
@@ -2522,11 +2522,11 @@ def compile_gadgets(gadget, epilogue, directive = ""):
         print "[E] Can't compile asm:\n%s\n-%s-" % (prog, stderr)
         exit(1)    
     #For correct direct jump location, use linker
-    #.testcase start at 0x00214000 in base state kernel
+    #.testcase start at 0x00215000 in base state kernel
     if DEBUG >= 3:
         cmdline = "readelf --relocs %s" % tmpobj
         subprocess.call(cmdline.split())
-    cmdline = "ld -m elf_i386 -Ttext 0x214000 -o %s %s" % (tmpelf, tmpobj)
+    cmdline = "ld -m elf_i386 -Ttext 0x215000 -o %s %s" % (tmpelf, tmpobj)
     subprocess.call(cmdline.split())
 
     # Extract the asm of the gadgets (.text section) from the elf object

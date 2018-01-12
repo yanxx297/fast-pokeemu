@@ -18,37 +18,37 @@ static void set_idt_entry(idte_t *idt, uint8_t n, uint16_t seg, uint32_t off)
   idt[n].present = 1;
 }
 
-static void set_idt_entry_tss(idte_t *idt, uint8_t n, uint16_t seg)
+static void set_idt_entry_tss(idte_t *idt, uint8_t n, uint16_t seg, uint32_t off)
 {
   idt[n].seg = seg;
   idt[n].zero = 0;
   idt[n].type = 0x5; /* tss gate */
-  idt[n].dpl = 3;
+  idt[n].dpl = 0;
   idt[n].present = 1;
 }
 
 void set_interrupt_handlers(idte_t *pidt, uint16_t seg)
 {
-  set_idt_entry_tss(pidt, 0, SEL_EXCP00);
-  set_idt_entry_tss(pidt, 1, SEL_EXCP01);
-  set_idt_entry_tss(pidt, 2, SEL_EXCP02);
-  set_idt_entry_tss(pidt, 3, SEL_EXCP03);
-  set_idt_entry_tss(pidt, 4, SEL_EXCP04);
-  set_idt_entry_tss(pidt, 5, SEL_EXCP05);
-  set_idt_entry_tss(pidt, 6, SEL_EXCP06);
-  set_idt_entry_tss(pidt, 7, SEL_EXCP07);
-  set_idt_entry_tss(pidt, 8, SEL_EXCP08);
-  set_idt_entry_tss(pidt, 9, SEL_EXCP09);
-  set_idt_entry_tss(pidt, 10, SEL_EXCP10);
-  set_idt_entry_tss(pidt, 11, SEL_EXCP11);
-  set_idt_entry_tss(pidt, 12, SEL_EXCP12);
-  set_idt_entry_tss(pidt, 13, SEL_EXCP13);
-  set_idt_entry_tss(pidt, 14, SEL_EXCP14);
-  set_idt_entry_tss(pidt, 15, SEL_EXCP15);
-  set_idt_entry_tss(pidt, 16, SEL_EXCP16);
-  set_idt_entry_tss(pidt, 17, SEL_EXCP17);
-  set_idt_entry_tss(pidt, 18, SEL_EXCP18);
-  set_idt_entry_tss(pidt, 19, SEL_EXCP19);
+  set_idt_entry_tss(pidt, 0, SEL_EXCP00, (uint32_t)int_handler_0);
+  set_idt_entry_tss(pidt, 1, SEL_EXCP01, (uint32_t)int_handler_1);
+  set_idt_entry_tss(pidt, 2, SEL_EXCP02, (uint32_t)int_handler_2);
+  set_idt_entry_tss(pidt, 3, SEL_EXCP03, (uint32_t)int_handler_3);
+  set_idt_entry_tss(pidt, 4, SEL_EXCP04, (uint32_t)int_handler_4);
+  set_idt_entry_tss(pidt, 5, SEL_EXCP05, (uint32_t)int_handler_5);
+  set_idt_entry_tss(pidt, 6, SEL_EXCP06, (uint32_t)int_handler_6);
+  set_idt_entry_tss(pidt, 7, SEL_EXCP07, (uint32_t)int_handler_7);
+  set_idt_entry_tss(pidt, 8, SEL_EXCP08, (uint32_t)int_handler_8);
+  set_idt_entry_tss(pidt, 9, SEL_EXCP09, (uint32_t)int_handler_9);
+  set_idt_entry_tss(pidt, 10, SEL_EXCP10, (uint32_t)int_handler_10);
+  set_idt_entry_tss(pidt, 11, SEL_EXCP11, (uint32_t)int_handler_11);
+  set_idt_entry_tss(pidt, 12, SEL_EXCP12, (uint32_t)int_handler_12);
+  set_idt_entry_tss(pidt, 13, SEL_EXCP13, (uint32_t)int_handler_13);
+  set_idt_entry_tss(pidt, 14, SEL_EXCP14, (uint32_t)int_handler_14);
+  set_idt_entry_tss(pidt, 15, SEL_EXCP15, (uint32_t)int_handler_15);
+  set_idt_entry_tss(pidt, 16, SEL_EXCP16, (uint32_t)int_handler_16);
+  set_idt_entry_tss(pidt, 17, SEL_EXCP17, (uint32_t)int_handler_17);
+  set_idt_entry_tss(pidt, 18, SEL_EXCP18, (uint32_t)int_handler_18);
+  set_idt_entry_tss(pidt, 19, SEL_EXCP19, (uint32_t)int_handler_19);
   set_idt_entry(pidt, 20, seg, (uint32_t)int_handler_null);
   set_idt_entry(pidt, 21, seg, (uint32_t)int_handler_null);
   set_idt_entry(pidt, 22, seg, (uint32_t)int_handler_null);
@@ -61,7 +61,7 @@ void set_interrupt_handlers(idte_t *pidt, uint16_t seg)
   set_idt_entry(pidt, 29, seg, (uint32_t)int_handler_null);
   set_idt_entry(pidt, 30, seg, (uint32_t)int_handler_null);
   set_idt_entry(pidt, 31, seg, (uint32_t)int_handler_null);
-  set_idt_entry(pidt, 32, seg, (uint32_t)int_handler_null);
+  set_idt_entry_tss(pidt, 32, SEL_EXCP32, (uint32_t)int_handler_32);
   set_idt_entry(pidt, 33, seg, (uint32_t)int_handler_null);
   set_idt_entry(pidt, 34, seg, (uint32_t)int_handler_null);
   set_idt_entry(pidt, 35, seg, (uint32_t)int_handler_null);
@@ -100,7 +100,6 @@ void int_handler_0(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 //  kprintf("interrupt handler 0 speaking\n");
     uint32_t *d = &(tss0.eip);
     asm volatile (
-                "hlt;"
     		"begin0:"
 		"sub $0x4,%%esp;"
     		"mov %%cr0,%%eax;"
@@ -237,25 +236,8 @@ void int_handler_5(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
     uint32_t *d = &(tss0.eip);
     asm volatile (
     		"begin5:"
-		"sub $0x4,%%esp;"
-    		"mov %%cr0,%%eax;"
-    		"and $0x80000000,%%eax;"
-    		"cmpl $0x80000000,%%eax;"
-    		"je pg5;"
-    		"pop 0x27800c;"
-    		"movl $0x5,0x278010;"
-                "mov 0x278008,%%eax;"
-                "mov %%eax,%0;"
-    		"jmp end5;"
-    		"pg5:"
-    		"pop 0x127800c;"
-    		"movl $0x5,0x1278010;"
-                "mov 0x1278008,%%eax;"
-                "mov %%eax,%0;"
-    		"end5:"
-    		"iret;"
-    		"jmp begin5;"
-                : "=m" (*d));
+                "iret;"
+    		"jmp begin5;");
   return;
 }
 void int_handler_6(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
@@ -628,6 +610,17 @@ void int_handler_19(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
                 : "=m" (*d));
   return;
 }
+
+void int_handler_32(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
+{        
+//  kprintf("interrupt handler 31 speaking\n");
+  asm volatile (
+                  "begin32:"
+                  "add $0,%eax;"
+                  "iret;"); 
+  return;
+}
+
 void int_handler_20(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
   kprintf("interrupt handler 20 speaking\n");

@@ -72,6 +72,7 @@
 #define SEL_EXCP17 0x160
 #define SEL_EXCP18 0x168
 #define SEL_EXCP19 0x170
+#define SEL_EXCP32 0x178
 
 /* Add RPL to a segment selector */
 #define SEL_RPL(s,r) ((s) | (r))
@@ -83,7 +84,7 @@
 #define PAGE_SIZE 0x1000
 #define PAGE_ALIGN(x) (((uint32_t) (x)) & ~PAGE_SIZE)
 
-#define GDT_ENTRY 48
+#define GDT_ENTRY 49
 
 /* Virtual 8086 Mode */
 #define VM_BIT 1<<17

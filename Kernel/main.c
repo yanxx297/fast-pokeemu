@@ -55,7 +55,7 @@ idte_t idt[INTERRUPTS] __attribute__ ((aligned(4096)));
 tss_t tss0, tss1, tss2, tss3, tss4, tss5, tss6, tssVM;
 tss_t tssEXCP00, tssEXCP01, tssEXCP02, tssEXCP03, tssEXCP04, tssEXCP05, tssEXCP06, tssEXCP07, \
               tssEXCP08, tssEXCP09, tssEXCP10, tssEXCP11, tssEXCP12, tssEXCP13, tssEXCP14, \
-              tssEXCP15, tssEXCP16, tssEXCP17, tssEXCP18, tssEXCP19;
+              tssEXCP15, tssEXCP16, tssEXCP17, tssEXCP18, tssEXCP19, tssEXCP32;
 
 /* FPU state -- 512 bytes */
 static uint32_t fpustate[]  __attribute__ ((aligned (16))) = {
@@ -342,6 +342,11 @@ void kmain(int magic, multiboot_info_t *mbi)
 	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
+  // TSS for User-defined exception
+  set_tss(&tssEXCP32, int_handler_32, esp0, get_eflags(), 
+	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
+
   /* Create new TSS - Task-State Segment  */
   /*    EFLAGS.VM[bit 17]= 1 */
   /*    eip= 0 */
@@ -458,6 +463,18 @@ void switch_to_testcase_task() {
 			/* Notify the beginning of the test-case */
 			// "out %al, $0x23;"
                         "int $0x1e;"
+                        /* To cancle out the effect of exception #5 raised only
+                           on KVM, raise it manually on both */
+                        "int $0x5;"
+                        /* QEMU doesn't set the accessed bit of new stack seg
+                           correctly. As a workaround, we access this segment
+                           before testcase by loading its descriptor to SS and
+                           load the main task stack seg selector back. */
+                        "mov $0xd0,%ax;"
+                        "mov %ax,%ss;"
+                        "mov $0x50,%ax;"
+                        "mov %ax,%ss;"
+
 			"jmp testcase;"
 
 			"end_of_testcase:"
