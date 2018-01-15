@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 # Config
 OUT?=/tmp/out/
-EMUPATH?=./../emulators/kvm-run/run-testcase
+EMUPATH?=./../emu/kvm-run/run-testcase
 INSN_LIST?=
 TIMEOUT?=10
 

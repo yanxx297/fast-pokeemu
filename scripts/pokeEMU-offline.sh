@@ -4,6 +4,8 @@ in=/home/yanxx297/Project/pokemu-oras/data/state-explr
 out=$dir/out/
 q_out=$out/qemu/
 k_out=$out/kvm/
+start=10
+single=false
 
 is_match () {
 	if [ -e $1/mismatch ]; then
@@ -15,15 +17,43 @@ is_match () {
 	fi
 }
 
-echo 'Run single mode 3 experiment'
-if ! [ -e $dir/single-m3-kvm/ ]; then
+while [ "$1" != "" ]; do
+        case $1 in
+                -n )
+                        single=true
+                        ;;
+                -s | --start )
+                        shift
+                        start=$1
+                        ;;                    
+                -h | --help )
+                        echo "Usage: ./pokeEMU-offline.sh [-s STARTING_POINT] [-n]
+                        0       Run full test (single mode 3)
+                        1       Generate aggregating list
+                        2       Single mode 0
+                        3       Aggregated mode 3
+                        4       generate final results"
+                        ;;
+        esac
+        shift
+done
+
+if (( $start >= 10 )); then
+        exit 0
+fi
+
+if (( $start <= 0 )); then
+        echo 'Run single mode 3 experiment'
 	./run-testcase-offline.sh -m 3 -in $in -out $out
 	./run-testcase-offline.sh -kvm -in $in -out $out
 	mv $out $dir/single-m3-kvm/
+        if [ "$single" == true ]; then
+                exit 0
+        fi
 fi
 
-# Generate the list of valid test cases for aggregating
-if ! [ -e aggreg_list ] && ! [ -e $dir/aggreg-m3-kvm/ ]; then
+if (( $start <= 1 )); then
+        echo 'Generate the list of valid test cases for aggregating'
 	mkdir -p aggreg_list
 	for insn in $dir/single-m3-kvm/*; do
 		mkdir aggreg_list/$(basename $insn)
@@ -36,17 +66,23 @@ if ! [ -e aggreg_list ] && ! [ -e $dir/aggreg-m3-kvm/ ]; then
 		rm aggreg_list/$(basename $insn)/log
 	done
         mv aggreg_list/ $dir/aggreg_list/
+        if [ "$single" == true ]; then
+                exit 0
+        fi
 fi
 
-echo 'Run single mode 0 experiment'
-if ! [ -e $dir/single-m0-kvm/ ]; then
+if (( $start <= 2 )); then
+        echo 'Run single mode 0 experiment'
         ./run-testcase-offline.sh -m 0 -in $in -out $out
 	./run-testcase-offline.sh -kvm -in $in -out $out
 	mv $out $dir/single-m0-kvm/
+        if [ "$single" == true ]; then
+                exit 0
+        fi
 fi
 
-echo 'Run aggregate mode 3 experiment'
-if ! [ -e $dir/aggreg-m3-kvm/ ]; then
+if (( $start <= 3 )); then
+        echo 'Run aggregate mode 3 experiment'
 	./run-testcase-offline.sh -aggreg -m 3 -in $dir/aggreg_list/ -out $out
         # Compute mode 3 performance results
         for folder in $out*;
@@ -64,10 +100,13 @@ if ! [ -e $dir/aggreg-m3-kvm/ ]; then
         done;
 	./run-testcase-offline.sh -kvm -in $in -out $out
 	mv $out $dir/aggreg-m3-kvm/
+        if [ "$single" == true ]; then
+                exit 0
+        fi
 fi
 
-echo 'generate effectiveness results'
-if ! [ -e $out/000 ]; then
+if (( $start <= 4 )); then
+        echo 'generate effectiveness results'
 	mkdir -p $out
 	touch $out/000 $out/001 $out/010 $out/011 $out/100 $out/101 $out/110 $out/111
 	for aggreg in $dir/aggreg-m3-kvm/*; do
