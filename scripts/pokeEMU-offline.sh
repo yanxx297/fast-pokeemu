@@ -82,18 +82,17 @@ if (( $start <= 2 )); then
 fi
 
 if (( $start <= 3 )); then
-        echo 'Run aggregate mode 3 experiment'
+        echo 'Run aggregate mode 3 experiment and compute performance results'
 	./run-testcase-offline.sh -aggreg -m 3 -in $dir/aggreg_list/ -out $out
-        # Compute mode 3 performance results
         for folder in $out*;
         do
-                cat $folder/time >> time-m3
+                cat $folder/time >> $out/time-m3
                 for dump in $folder/*.post;
                 do
                         for log in $dir/aggreg_list/$(basename $folder)/*.log;
                         do
                                 if grep -q $(basename $dump .post) $log; then
-                                        cat $log >> count-m3
+                                        cat $log >> $out/count-m3
                                 fi;
                         done;
                 done;
