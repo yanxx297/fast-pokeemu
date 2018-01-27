@@ -63,6 +63,7 @@ PG = 1
 # ===-----------------------------------------------------------------------===
 # Range for additional memory access
 # ===-----------------------------------------------------------------------===
+retseg = "fs"         # Selector of the segment used for return point updating
 retp = 0x1278008      # The location to store current return point for ecpt handler
 edata = retp + 4      # Starting address of exception data
 next_addr = edata + 8
@@ -1392,7 +1393,8 @@ def get_nmemop(inst, i):
 # NOTE: Since an GAS instruction can have at most 1 memory accessing, use index-
 # 0 to get seg, base, index, scale and offset (disp)
 # ===-------------------------------------------------------------------===
-def get_mem_op(inst, op, i, d = 0):      
+def get_mem_op(inst, op, i, d = 0):
+    global retseg
     reglist = []
     seg = inst.get_seg_reg(0)                
     offset = 0
@@ -1407,6 +1409,8 @@ def get_mem_op(inst, op, i, d = 0):
     if (reg_map[seg] != "" and reg_map[seg] != "ds") or \
         (reg_map[seg] == "ds" and iclass == "XED_ICLASS_XLAT"):
         op_str += "%%%s:" % reg_map[seg]
+    if (reg_map[seg] == "fs"):
+        retseg = "gs"
     if disp_len != 0 or \
     not (reg_map[seg] != "" and reg_map[seg] != "ds"):  #displacement bits
         op_str += "0x%x" % (offset + d)
@@ -2350,7 +2354,7 @@ class Gadget:
 #         ds = in_snapshot_sreg("DS", snapshot)
 #         asm += "mov $0x%.4x,%%ax; mov %%ax,%%ds;" % ds 
         # Copy the eip after tested insn to a global location
-        asm += "movl $forward_%.8x,0x%x;" % (mid, retp)
+        asm += "movl $forward_%.8x,%%%s:(0x%x);" % (mid, retseg, retp)
         mnemonic = "prologue"
         return [Gadget(asm = asm, mnemonic = mnemonic)]
 
@@ -2522,11 +2526,11 @@ def compile_gadgets(gadget, epilogue, directive = ""):
         print "[E] Can't compile asm:\n%s\n-%s-" % (prog, stderr)
         exit(1)    
     #For correct direct jump location, use linker
-    #.testcase start at 0x00215000 in base state kernel
+    #.testcase start at 0x00216000 in base state kernel
     if DEBUG >= 3:
         cmdline = "readelf --relocs %s" % tmpobj
         subprocess.call(cmdline.split())
-    cmdline = "ld -m elf_i386 -Ttext 0x215000 -o %s %s" % (tmpelf, tmpobj)
+    cmdline = "ld -m elf_i386 -Ttext 0x216000 -o %s %s" % (tmpelf, tmpobj)
     subprocess.call(cmdline.split())
 
     # Extract the asm of the gadgets (.text section) from the elf object
@@ -2816,7 +2820,7 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0, l
                        
         # Sort gadgets & add labels to return points
         if setinput != []:            
-            asm = "movl $forward_%.8x,0x%x;" % (l2, retp)
+            asm = "movl $forward_%.8x,%%%s:(0x%x);" % (l2, retseg, retp)
             setinput = [Gadget(asm = asm, mnemonic = "return to post")] + setinput
             setinput = sort_gadget(setinput)
 
@@ -2832,15 +2836,15 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0, l
         revert = sort_gadget(revert)    
         revert_ = sort_gadget(revert_)
 
-        asm = "movl $forward_%.8x,0x%x;" % (l1, retp)
+        asm = "movl $forward_%.8x,%%%s:(0x%x);" % (l1, retseg, retp)
         code = [Gadget(asm = asm, mnemonic = "return to revert_")] + code
-        asm = "movl $forward_%.8x,0x%x;" % (l2, retp)
+        asm = "movl $forward_%.8x,%%%s:(0x%x);" % (l2, retseg, retp)
         revert_ = [Gadget(asm = asm, mnemonic = "return to post")] + revert_
-        asm = "movl $forward_%.8x,0x%x;" % (l3, retp)
+        asm = "movl $forward_%.8x,%%%s:(0x%x);" % (l3, retseg, retp)
         post = [Gadget(asm = asm, mnemonic = "return to revert")] + post
-        asm = "movl $forward_%.8x,0x%x;" % (l4, retp)
+        asm = "movl $forward_%.8x,%%%s:(0x%x);" % (l4, retseg, retp)
         revert = [Gadget(asm = asm, mnemonic = "return to loop")] + revert
-        asm = "movl $forward_%.8x,0x%x;" % (l5, retp)
+        asm = "movl $forward_%.8x,%%%s:(0x%x);" % (l5, retseg, retp)
         loop = [Gadget(asm = asm, mnemonic = "return to end")] + loop
         
         asm = "forward_%.8x:" % l1

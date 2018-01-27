@@ -18,11 +18,11 @@
 #include <sys/tss.h>
 #include <sys/asm.h>
 
-void set_tss(tss_t *tss, uint32_t eip, uint32_t esp, uint32_t eflags,
+void set_tss_base(tss_t *tss, uint32_t eip, uint32_t esp, uint32_t eflags,
 	     uint16_t cs, uint16_t ds, uint16_t ss, uint32_t cr3,
 	     uint16_t ss0, uint16_t ss1, uint16_t ss2,
 	     uint32_t sp0, uint32_t sp1, uint32_t sp2,
-	     uint16_t ldt)
+	     uint16_t ldt, uint16_t es, uint16_t fs, uint16_t gs) 
 {
   int i;
   char *p;
@@ -48,7 +48,10 @@ void set_tss(tss_t *tss, uint32_t eip, uint32_t esp, uint32_t eflags,
 #endif
 
   tss->ebp = esp;
-  tss->ds = tss->es = tss->fs = tss->gs = ds;
+  tss->ds = ds;
+  tss->es = es;
+  tss->fs = fs;
+  tss->gs = gs;
   tss->ss = ss;
   tss->ss0 = ss0;
   tss->ss1 = ss1;
@@ -64,4 +67,26 @@ void set_tss(tss_t *tss, uint32_t eip, uint32_t esp, uint32_t eflags,
   tss->eflags = eflags;
   
   tss->eip = eip;
+}
+
+void var_set_tss(tss_args in){
+        tss_t *tss = in.tss;
+        uint32_t eip = in.eip;
+        uint32_t esp = in.esp;
+        uint32_t eflags = in.eflags;
+        uint16_t cs = in.cs;
+        uint16_t ds = in.ds;
+        uint16_t ss = in.ss;
+        uint32_t cr3 = in.cr3;
+        uint16_t ss0 = in.ss0;
+        uint16_t ss1 = in.ss1;
+        uint16_t ss2 = in.ss2;
+        uint32_t sp0 = in.sp0;
+        uint32_t sp1 = in.sp1;
+        uint32_t sp2 = in.sp2;
+        uint16_t ldt = in.ldt;
+        uint16_t fs = in.fs ? in.fs : in.ds;
+        uint16_t gs = in.gs ? in.gs : in.ds;
+        uint16_t es = in.ds;
+        set_tss_base(tss, eip, esp, eflags, cs, ds, ss, cr3, ss0, ss1, ss2, sp0, sp1, sp2, ldt, es, fs, gs);
 }

@@ -1,15 +1,15 @@
 // This file is part of KEmuFuzzer.
-// 
+//
 // KEmuFuzzer is free software: you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free
 // Software Foundation, either version 3 of the License, or (at your option)
 // any later version.
-// 
+//
 // KEmuFuzzer is distributed in the hope that it will be useful, but WITHOUT ANY
 // WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 // FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 // details.
-// 
+//
 // You should have received a copy of the GNU General Public License along with
 // KEmuFuzzer.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -112,21 +112,21 @@ void kmain(int magic, multiboot_info_t *mbi)
   if (CHECK_FLAG (mbi->flags, 0))
     kprintf ("mem_lower = %uKB, mem_upper = %uKB\n",
 	    (unsigned) mbi->mem_lower, (unsigned) mbi->mem_upper);
-     
+
   /* Is boot_device valid? */
   if (CHECK_FLAG (mbi->flags, 1))
     kprintf ("boot_device = 0x%x\n", (unsigned) mbi->boot_device);
-     
+
   /* Is the command line passed? */
   if (CHECK_FLAG (mbi->flags, 2))
     kprintf ("cmdline = %s\n", (char *) mbi->cmdline);
-     
+
   /* Are mods_* valid? */
   if (CHECK_FLAG (mbi->flags, 3))
     {
       module_t *mod;
       int i;
-     
+
       kprintf ("mods_count = %d, mods_addr = 0x%x\n",
 	      (int) mbi->mods_count, (int) mbi->mods_addr);
       for (i = 0, mod = (module_t *) mbi->mods_addr;
@@ -137,42 +137,42 @@ void kmain(int magic, multiboot_info_t *mbi)
 		(unsigned) mod->mod_end,
 		(char *) mod->string);
     }
-     
+
   /* Bits 4 and 5 are mutually exclusive! */
   if (CHECK_FLAG (mbi->flags, 4) && CHECK_FLAG (mbi->flags, 5))
     {
       kprintf ("Both bits 4 and 5 are set.\n");
       return;
     }
-     
+
   /* Is the symbol table of a.out valid? */
   if (CHECK_FLAG (mbi->flags, 4))
     {
       aout_symbol_table_t *aout_sym = &(mbi->u.aout_sym);
-     
+
       kprintf ("aout_symbol_table: tabsize = 0x%0x, "
 	      "strsize = 0x%x, addr = 0x%x\n",
 	      (unsigned) aout_sym->tabsize,
 	      (unsigned) aout_sym->strsize,
 	      (unsigned) aout_sym->addr);
     }
-     
+
   /* Is the section header table of ELF valid? */
   if (CHECK_FLAG (mbi->flags, 5))
     {
       elf_section_header_table_t *elf_sec = &(mbi->u.elf_sec);
-     
+
       kprintf ("elf_sec: num = %u, size = 0x%x,"
 	      " addr = 0x%x, shndx = 0x%x\n",
 	      (unsigned) elf_sec->num, (unsigned) elf_sec->size,
 	      (unsigned) elf_sec->addr, (unsigned) elf_sec->shndx);
     }
-     
+
   /* Are mmap_* valid? */
   if (CHECK_FLAG (mbi->flags, 6))
     {
       memory_map_t *mmap;
-     
+
       kprintf ("mmap_addr = 0x%x, mmap_length = 0x%x\n",
 	      (unsigned) mbi->mmap_addr, (unsigned) mbi->mmap_length);
       for (mmap = (memory_map_t *) mbi->mmap_addr;
@@ -204,7 +204,7 @@ void kmain(int magic, multiboot_info_t *mbi)
   esp2 = tc_ring2_len / 2;
   esp3 = tc_ring3_len / 2;
 #if 1
-  /* 
+  /*
      FIXME FIXME FIXME
 
      Questa l'ho messa perché altrimenti capita che VMware dia differenze in
@@ -215,136 +215,136 @@ void kmain(int magic, multiboot_info_t *mbi)
      FIXME FIXME FIXME
    */
 
-  set_tss(&tss1, 0, 0, get_eflags(), 
-	  SEL_RPL(SEL_RING0_CS,0), SEL_RPL(SEL_RING0_DS,0), SEL_RPL(SEL_RING0_SS,0), get_cr3(), 
+  set_tss(&tss1, 0, 0, get_eflags(),
+	  SEL_RPL(SEL_RING0_CS,0), SEL_RPL(SEL_RING0_DS,0), SEL_RPL(SEL_RING0_SS,0), get_cr3(),
 	  SEL_RPL(SEL_RING0_SS,0), SEL_RPL(SEL_RING1_SS,1), SEL_RPL(SEL_RING2_SS,2), esp0, esp1, esp2, 0xc8);
 #endif
 
   /* Ring 0 */
-  set_tss(&tss3, 0, esp0, get_eflags(), 
-	  SEL_RPL(SEL_RING0_CS,0), SEL_RPL(SEL_RING0_DS,0), SEL_RPL(SEL_RING0_SS,0), get_cr3(), 
+  set_tss(&tss3, 0, esp0, get_eflags(),
+	  SEL_RPL(SEL_RING0_CS,0), SEL_RPL(SEL_RING0_DS,0), SEL_RPL(SEL_RING0_SS,0), get_cr3(),
 	  SEL_RPL(SEL_RING0_SS,0), SEL_RPL(SEL_RING1_SS,1), SEL_RPL(SEL_RING2_SS,2), esp0, esp1, esp2, 0xc8);
 
   /* Ring 1 */
-  set_tss(&tss4, 0, esp1, get_eflags(), 
-	  SEL_RPL(SEL_RING1_CS,1), SEL_RPL(SEL_RING1_DS,1), SEL_RPL(SEL_RING1_SS,1), get_cr3(), 
+  set_tss(&tss4, 0, esp1, get_eflags(),
+	  SEL_RPL(SEL_RING1_CS,1), SEL_RPL(SEL_RING1_DS,1), SEL_RPL(SEL_RING1_SS,1), get_cr3(),
 	  SEL_RPL(SEL_RING0_SS,0), SEL_RPL(SEL_RING1_SS,1), SEL_RPL(SEL_RING2_SS,2), esp0, esp1, esp2, 0xc8);
 
   /* Ring 2 */
-  set_tss(&tss5, 0, esp2, get_eflags(), 
-	  SEL_RPL(SEL_RING2_CS,2), SEL_RPL(SEL_RING2_DS,2), SEL_RPL(SEL_RING2_SS,2), get_cr3(), 
+  set_tss(&tss5, 0, esp2, get_eflags(),
+	  SEL_RPL(SEL_RING2_CS,2), SEL_RPL(SEL_RING2_DS,2), SEL_RPL(SEL_RING2_SS,2), get_cr3(),
 	  SEL_RPL(SEL_RING0_SS,0), SEL_RPL(SEL_RING1_SS,1), SEL_RPL(SEL_RING2_SS,2), esp0, esp1, esp2, 0xc8);
 
   /* Ring 3 */
-  set_tss(&tss6, 0, esp3, get_eflags(), 
-	  SEL_RPL(SEL_RING3_CS,3), SEL_RPL(SEL_RING3_DS,3), SEL_RPL(SEL_RING3_SS,3), get_cr3(), 
+  set_tss(&tss6, 0, esp3, get_eflags(),
+	  SEL_RPL(SEL_RING3_CS,3), SEL_RPL(SEL_RING3_DS,3), SEL_RPL(SEL_RING3_SS,3), get_cr3(),
 	  SEL_RPL(SEL_RING0_SS,0), SEL_RPL(SEL_RING1_SS,1), SEL_RPL(SEL_RING2_SS,2), esp0, esp1, esp2, 0xc8);
 
   /* TSS for exception handler */
 
-  // Divide Error 
-  set_tss(&tssEXCP00, int_handler_0, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  // Divide Error
+  set_tss(&tssEXCP00, int_handler_0, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Debug Exception
-  set_tss(&tssEXCP01, int_handler_1, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP01, int_handler_1, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // NMI Interrupt
-  set_tss(&tssEXCP02, int_handler_2, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP02, int_handler_2, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Breakpoint
-  set_tss(&tssEXCP03, int_handler_3, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP03, int_handler_3, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Overflow
-  set_tss(&tssEXCP04, int_handler_4, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP04, int_handler_4, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // BOUND Range Exceeded
-  set_tss(&tssEXCP05, int_handler_5, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP05, int_handler_5, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Invalid (Undefined) Opcode
-  set_tss(&tssEXCP06, int_handler_6, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP06, int_handler_6, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Device Not Available
-  set_tss(&tssEXCP07, int_handler_7, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP07, int_handler_7, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Double Fault
-  set_tss(&tssEXCP08, int_handler_8, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP08, int_handler_8, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Coprocessor Segment Overrun (reserved)
-  set_tss(&tssEXCP09, int_handler_9, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP09, int_handler_9, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Invalid TSS
-  set_tss(&tssEXCP10, int_handler_10, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP10, int_handler_10, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Segment Not Present
-  set_tss(&tssEXCP11, int_handler_11, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP11, int_handler_11, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Stack Segment Fault
-  set_tss(&tssEXCP12, int_handler_12, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP12, int_handler_12, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // General Protection
-  set_tss(&tssEXCP13, int_handler_13, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP13, int_handler_13, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Page Fault
-  set_tss(&tssEXCP14, int_handler_14, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP14, int_handler_14, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Intel reserverd, Do not use.
-  set_tss(&tssEXCP15, int_handler_15, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP15, int_handler_15, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // X87 FPU Floating Point Error (Math Fault)
-  set_tss(&tssEXCP16, int_handler_16, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP16, int_handler_16, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Alighment Check
-  set_tss(&tssEXCP17, int_handler_17, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP17, int_handler_17, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Machine Check
-  set_tss(&tssEXCP18, int_handler_18, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP18, int_handler_18, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // SIMD Floating-Point Exception
-  set_tss(&tssEXCP19, int_handler_19, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP19, int_handler_19, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // TSS for User-defined exception
-  set_tss(&tssEXCP32, int_handler_32, esp0, get_eflags(), 
-	  0x40, 0x48, SEL_RPL(SEL_EXCP_SS,0), get_cr3(), 
+  set_tss(&tssEXCP32, int_handler_32, esp0, get_eflags(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   /* Create new TSS - Task-State Segment  */
@@ -355,14 +355,14 @@ void kmain(int magic, multiboot_info_t *mbi)
   /* RPL[0:1 bit] => requested privilege level     = 3 */
   /* TI[2 bit]    => table indicator 0=GDT 1=LDT   = 0 */
   /* Index        => selector in the GDT           = X */
-  
-  /* TSS_VM Descriptor GDT_ENTRY= 48 */
+
+  /* TSS_VM Descriptor GDT_ENTRY= 53 */
   /* 0000000011010 | 0 | 11 = 0xD3 = 26/CPL3 */
 
   /* far call entry GDT (segment selector) */
-  
-  set_tss(&tssVM, VM_EIP, VM_ESP, (get_eflags()|VM_BIT), 
-	  SEL_VM_CS, SEL_VM_DS, SEL_VM_SS, get_cr3(), 
+
+  set_tss(&tssVM, VM_EIP, VM_ESP, (get_eflags()|VM_BIT),
+	  SEL_VM_CS, SEL_VM_DS, SEL_VM_SS, get_cr3(),
 	  SEL_RPL(SEL_RING0_SS,0), SEL_RPL(SEL_RING1_SS,1), SEL_RPL(SEL_RING2_SS,2), esp0, esp1, esp2, 0xc8);
 
 #if 1
@@ -454,7 +454,7 @@ void switch_to_testcase_task() {
 
   __asm__ __volatile__ (
 			/* @QEMU: Keep CC_OP initialized */
-			"xorl %eax, %eax;"
+			"xorl %%eax, %%eax;"
 
 			/* Force the creation of a new BB */
 			"jmp forward;"
@@ -467,13 +467,24 @@ void switch_to_testcase_task() {
                            on KVM, raise it manually on both */
                         "int $0x5;"
                         /* QEMU doesn't set the accessed bit of new stack seg
-                           correctly. As a workaround, we access this segment
-                           before testcase by loading its descriptor to SS and
-                           load the main task stack seg selector back. */
-                        "mov $0xd0,%ax;"
-                        "mov %ax,%ss;"
-                        "mov $0x50,%ax;"
-                        "mov %ax,%ss;"
+                           correctly. As a workaround, we access those segments
+                           before testcase by loading its descriptor and load
+                           the main task seg selectors back. */
+                        "mov %0,%%ax;"
+                        "mov %%ax,%%fs;"
+                        "mov %1,%%ax;"
+                        "mov %%ax,%%gs;"
+                        "mov %2,%%ax;"
+                        "mov %%ax,%%ss;"
+                        "mov $0x50,%%ax;"
+                        "mov %%ax,%%ss;"
+                        "mov %3,%%ax;"
+                        "mov %%ax,%%ds;"
+                        "mov $0x48,%%ax;"
+                        "mov %%ax,%%ds;"
+
+                        /* Exception counter for debugging*/
+                        //"movl $0x100,0x280000;"
 
 			"jmp testcase;"
 
@@ -481,6 +492,8 @@ void switch_to_testcase_task() {
 			/* Notify the end of the test-case */
 			"int $0x1f;"
 			"hlt;"
+                        :
+                        : "i" (SEL_EXCP_FS), "i" (SEL_EXCP_GS), "i" (SEL_EXCP_SS), "i" (SEL_EXCP_DS)
 			);
 
 }

@@ -48,31 +48,35 @@
 #define SEL_RING3_FS SEL_RING3_DS
 #define SEL_RING3_GS SEL_RING3_DS
 
-/* Stack for exception handler */
-#define SEL_EXCP_SS 0xd0
+/* Segments for exception handler */
+#define SEL_EXCP_CS 0xd0
+#define SEL_EXCP_DS 0xd8
+#define SEL_EXCP_SS 0xe0
+#define SEL_EXCP_FS 0xe8
+#define SEL_EXCP_GS 0xf0
 
 /* Segment selectors of task gates for each exception*/
-#define SEL_EXCP00 0xd8
-#define SEL_EXCP01 0xe0
-#define SEL_EXCP02 0xe8
-#define SEL_EXCP03 0xf0
-#define SEL_EXCP04 0xf8
-#define SEL_EXCP05 0x100
-#define SEL_EXCP06 0x108
-#define SEL_EXCP07 0x110
-#define SEL_EXCP08 0x118
-#define SEL_EXCP09 0x120
-#define SEL_EXCP10 0x128
-#define SEL_EXCP11 0x130
-#define SEL_EXCP12 0x138
-#define SEL_EXCP13 0x140
-#define SEL_EXCP14 0x148
-#define SEL_EXCP15 0x150
-#define SEL_EXCP16 0x158
-#define SEL_EXCP17 0x160
-#define SEL_EXCP18 0x168
-#define SEL_EXCP19 0x170
-#define SEL_EXCP32 0x178
+#define SEL_EXCP00 0xf8
+#define SEL_EXCP01 0x100
+#define SEL_EXCP02 0x108
+#define SEL_EXCP03 0x110
+#define SEL_EXCP04 0x118
+#define SEL_EXCP05 0x120
+#define SEL_EXCP06 0x128
+#define SEL_EXCP07 0x130
+#define SEL_EXCP08 0x138
+#define SEL_EXCP09 0x140
+#define SEL_EXCP10 0x148
+#define SEL_EXCP11 0x150
+#define SEL_EXCP12 0x158
+#define SEL_EXCP13 0x160
+#define SEL_EXCP14 0x168
+#define SEL_EXCP15 0x170
+#define SEL_EXCP16 0x178
+#define SEL_EXCP17 0x180
+#define SEL_EXCP18 0x188
+#define SEL_EXCP19 0x190
+#define SEL_EXCP32 0x198
 
 /* Add RPL to a segment selector */
 #define SEL_RPL(s,r) ((s) | (r))
@@ -84,7 +88,7 @@
 #define PAGE_SIZE 0x1000
 #define PAGE_ALIGN(x) (((uint32_t) (x)) & ~PAGE_SIZE)
 
-#define GDT_ENTRY 49
+#define GDT_ENTRY 53
 
 /* Virtual 8086 Mode */
 #define VM_BIT 1<<17

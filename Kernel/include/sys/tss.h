@@ -1,6 +1,8 @@
 #ifndef TSS_H
 #define TSS_H
 
+#define set_tss(...) var_set_tss((tss_args){__VA_ARGS__});
+
 typedef struct
 {
   uint16_t limit_0_15;
@@ -59,10 +61,32 @@ typedef struct
   uint16_t iomap;
 } __attribute__ ((__packed__)) tss_t;
 
-void set_tss(tss_t *tss, uint32_t eip, uint32_t esp, uint32_t eflags,
+typedef struct{
+        tss_t *tss;
+        uint32_t eip;
+        uint32_t esp;
+        uint32_t eflags;
+        uint16_t cs;
+        uint16_t ds;
+        uint16_t ss;
+        uint32_t cr3;
+        uint16_t ss0;
+        uint16_t ss1;
+        uint16_t ss2;
+        uint32_t sp0;
+        uint32_t sp1;
+        uint32_t sp2;
+        uint16_t ldt;
+        uint16_t fs;
+        uint16_t gs;
+}tss_args;
+
+void set_tss_base(tss_t *tss, uint32_t eip, uint32_t esp, uint32_t eflags,
 	     uint16_t cs, uint16_t ds, uint16_t ss, uint32_t cr3,
 	     uint16_t ss0, uint16_t ss1, uint16_t ss2,
 	     uint32_t sp0, uint32_t sp1, uint32_t sp2,
-	     uint16_t ldt);
+	     uint16_t ldt, uint16_t es, uint16_t fs, uint16_t gs);
+
+void var_set_tss(tss_args in);
 
 #endif

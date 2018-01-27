@@ -26,7 +26,7 @@
 #include "interrupts.h"		/* for interrupt handlers */
 
 // Task segment descriptor Virtual 8086 Mode gdt entry
-#define TSS_VM 48
+#define TSS_VM 52
 
 extern seg_t *gdt;
 extern idte_t *idt;
@@ -155,7 +155,11 @@ void set_gdt(void)
   set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_RING3_DS)], tc_ring3_base, tc_ring3_len/4096, ACS_DATA  | ACS_DPL(3), 0xc);
   set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_RING3_SS)], tc_ring3_base, tc_ring3_len/4096, ACS_STACK | ACS_DPL(3), 0xc);
 
+  set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_CS)],  0, 0xfffff, ACS_CODE  | 0x1,  0xc);
+  set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_DS)],  0, 0xfffff, ACS_DATA,  0xc);
   set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_SS)], tc_ring0_base, tc_ring0_len/4096, ACS_STACK | ACS_DPL(0), 0xc);
+  set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_FS)],  0, 0xfffff, ACS_DATA,  0xc);
+  set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_GS)],  0, 0xfffff, ACS_DATA,  0xc);
 
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP00)], (uint32_t) &tssEXCP00, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP01)], (uint32_t) &tssEXCP01, sizeof(tss_t), 0x9, 0, 1, 0, 0);
@@ -300,7 +304,7 @@ void switch_to_main_task(int magic, multiboot_info_t *mbi)
   *(--sp) = (uint32_t) halt;
   esp = (uint32_t) sp;
 
-  set_tss(&tss0, (uint32_t) kmain, esp, get_eflags(), 0x40, 0x48, 0x50, get_cr3(), 0x50, 0x50, 0x50, esp, esp, esp, 0xc8);
+  set_tss(&tss0, (uint32_t) kmain, esp, get_eflags(), 0x40, 0x48, 0x50, get_cr3(), 0x50, 0x50, 0x50, esp, esp, esp, 0xc8, SEL_EXCP_FS, SEL_EXCP_GS);
   __asm__ __volatile__ ("jmp $0x08, $0x0;");
 }
 
