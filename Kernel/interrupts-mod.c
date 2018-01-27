@@ -146,25 +146,10 @@ void int_handler_1(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 void int_handler_2(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 2 speaking\n");
-    uint32_t *d = &(tss0.eip);
     asm volatile (
     		"begin2:"
-    		"mov %%cr0,%%eax;"
-    		"and $0x80000000,%%eax;"
-    		"cmpl $0x80000000,%%eax;"
-    		"je pg2;"
-    		"movl $0x2,0x278010;"
-                "mov 0x278008,%%eax;"
-                "mov %%eax,%0;"
-    		"jmp end2;"
-    		"pg2:"
-    		"movl $0x2,0x1278010;"
-                "mov 0x1278008,%%eax;"
-                "mov %%eax,%0;"
-    		"end2:"
-    		"iret;"
-    		"jmp begin2;"
-                : "=m" (*d));
+                "iret;"
+                "jmp begin2;");
   return;
 }
 void int_handler_3(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
@@ -176,7 +161,7 @@ void int_handler_3(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
     		"mov %%cr0,%%eax;"
     		"and $0x80000000,%%eax;"
     		"cmpl $0x80000000,%%eax;"
-    		"je pg13;"
+                "je pg3;"
     		"movl $0x3,0x278010;"
                 "mov 0x278008,%%eax;"
                 "mov %%eax,%0;"
@@ -218,7 +203,6 @@ void int_handler_4(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 void int_handler_5(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 {
 //  kprintf("interrupt handler 5 speaking\n");
-    uint32_t *d = &(tss0.eip);
     asm volatile (
     		"begin5:"
                 "iret;"
@@ -346,7 +330,7 @@ void int_handler_10(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
     		"end10:"
     		"iret;"
     		"jmp begin10;"
-                : "=m" (*d));  
+                : "=m" (*d));
         return;
 }
 void int_handler_11(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
@@ -422,7 +406,7 @@ void int_handler_13(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
                 "mov 0x1278008,%%eax;"
                 "mov %%eax,%0;"
     		"end13:"
-    		"iret;"
+                "iret;"
     		"jmp begin13;"
                 : "=m" (*d));
   return;
@@ -577,12 +561,12 @@ void int_handler_19(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 }
 
 void int_handler_32(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
-{        
+{
 //  kprintf("interrupt handler 31 speaking\n");
   asm volatile (
                   "begin32:"
                   "add $0,%eax;"
-                  "iret;"); 
+                  "iret;");
   return;
 }
 
