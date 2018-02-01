@@ -1886,7 +1886,7 @@ class Memory:
 
     def gen_revert_gadget(self, snapshot):
         self.value = self.in_snapshot(snapshot)
-        return self.gen_gadget(snapshot)    
+        return Gadget.gen_set_mem(self, snapshot, retseg)
 
 
 # ===-----------------------------------------------------------------------===
@@ -2052,7 +2052,7 @@ class Gadget:
     # Generate a gadget to set the content of a memory location
     # ===-------------------------------------------------------------------===
     @staticmethod
-    def gen_set_mem(mem, snapshot):
+    def gen_set_mem(mem, snapshot, seg = None):
         gadgets = []
         data = mem.value
         addr = mem.address
@@ -2087,8 +2087,13 @@ class Gadget:
             #     invlpg = " invlpg 0x%x;" % j
             
 
-            asm = "movb $0x%.2x,0x%.8x;%s // %s + %d" % \
-                    (ord(data[i]), addr + i, invlpg, sym_, i);
+            if seg is None:
+                asm = "movb $0x%.2x,0x%.8x;%s // %s + %d" % \
+                        (ord(data[i]), addr + i, invlpg, sym_, i);
+            else:
+                asm = "movb $0x%.2x,%%%s:(0x%.8x);%s // %s + %d" % \
+                        (ord(data[i]), seg, addr + i, invlpg, sym_, i);
+
             mnemonic = "%.8x %s" % (addr + i, sym)
 
             # If address belongs to the GDT kill the corresponding segment
