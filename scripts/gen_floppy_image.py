@@ -2092,7 +2092,7 @@ class Gadget:
                         (ord(data[i]), addr + i, invlpg, sym_, i);
             else:
                 asm = "movb $0x%.2x,%%%s:(0x%.8x);%s // %s + %d" % \
-                        (ord(data[i]), seg, addr + i, invlpg, sym_, i);
+                        (ord(data[i]), seg, 0x1000000 + addr + i, invlpg, sym_, i);
 
             mnemonic = "%.8x %s" % (addr + i, sym)
 
@@ -2531,11 +2531,11 @@ def compile_gadgets(gadget, epilogue, directive = ""):
         print "[E] Can't compile asm:\n%s\n-%s-" % (prog, stderr)
         exit(1)    
     #For correct direct jump location, use linker
-    #.testcase start at 0x00216000 in base state kernel
+    #.testcase start at 0x00219000 in base state kernel
     if DEBUG >= 3:
         cmdline = "readelf --relocs %s" % tmpobj
         subprocess.call(cmdline.split())
-    cmdline = "ld -m elf_i386 -Ttext 0x216000 -o %s %s" % (tmpelf, tmpobj)
+    cmdline = "ld -m elf_i386 -Ttext 0x219000 -o %s %s" % (tmpelf, tmpobj)
     subprocess.call(cmdline.split())
 
     # Extract the asm of the gadgets (.text section) from the elf object

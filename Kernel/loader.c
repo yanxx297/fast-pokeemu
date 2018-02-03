@@ -30,8 +30,8 @@
 
 extern seg_t *gdt;
 extern idte_t *idt;
-extern pde_t *pd;
-extern pte_t *pt;
+extern pde_t *pd, *pd_EXCP;
+extern pte_t *pt, *pt_EXCP;
 extern uint32_t mem_offset;
 extern tss_t tss0, tss1, tss2, tss3, tss4, tss5, tss6, tssVM;
 extern tss_t tssEXCP00, tssEXCP01, tssEXCP02, tssEXCP03, tssEXCP04, tssEXCP05, tssEXCP06, tssEXCP07, \
@@ -121,7 +121,7 @@ void set_gdt(void)
   /* The "| 0x1" mask applied to code segment is needed to flag the segment as
      "accessed" (bit 0 of the "type" field). Otherwise, VMENTER checks fail. */
 
-  set_gdt_entry_tss(&ph_gdt[1], (uint32_t) &tss0, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[1], 0x1000000| (uint32_t) &tss0, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[2], (uint32_t) &tss1, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[3], (uint32_t) &tss2, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[4], (uint32_t) &tss3, sizeof(tss_t), 0x9, 0, 1, 0, 0);
@@ -175,13 +175,13 @@ void set_gdt(void)
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP11)], (uint32_t) &tssEXCP11, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP12)], (uint32_t) &tssEXCP12, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP13)], (uint32_t) &tssEXCP13, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP14)], (uint32_t) &tssEXCP14, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP14)], 0x1000000| (uint32_t) &tssEXCP14, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP15)], (uint32_t) &tssEXCP15, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP16)], (uint32_t) &tssEXCP16, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP17)], (uint32_t) &tssEXCP17, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP18)], (uint32_t) &tssEXCP18, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP19)], (uint32_t) &tssEXCP19, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP32)], (uint32_t) &tssEXCP32, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP32)], 0x1000000| (uint32_t) &tssEXCP32, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   
 #undef SEL_INDEX
 #undef ACS_DPL
@@ -233,16 +233,10 @@ void enable_paging(void)
   set_cr0(get_cr0() | 0x80000000);
 }
 #else
-void enable_paging(void)
-{
+
+void set_page(pde_t *p_dir, pte_t *p_tab){
   uint32_t addr;
   int i;
-  pde_t *p_dir;
-  pte_t *p_tab;
-
-  p_dir = (pde_t *)((unsigned int)(&pd) - mem_offset);
-  p_tab = (pte_t *)((unsigned int)(&pt) - mem_offset);
-
   // All PDEs point to the same PT
   for(i=0; i < 1024; i++) {
     // 0x7: present, write allowed, user access allowed
@@ -255,6 +249,21 @@ void enable_paging(void)
     /* 0x7: present, write allowed, user access allowed */
     p_tab[(addr>>12) & 0x3ff].raw = addr | 0x7;
   }
+}
+
+void enable_paging(void)
+{
+  pde_t *p_dir;
+  pte_t *p_tab;
+
+  // Set PDE and PTE for exception handling
+  p_dir = (pde_t *)((unsigned int)(&pd_EXCP) - mem_offset);
+  p_tab = (pte_t *)((unsigned int)(&pt_EXCP) - mem_offset);
+  set_page(p_dir, p_tab);
+
+  p_dir = (pde_t *)((unsigned int)(&pd) - mem_offset);
+  p_tab = (pte_t *)((unsigned int)(&pt) - mem_offset);
+  set_page(p_dir, p_tab);
 
   set_cr3((get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000));
   set_cr0(get_cr0() | 0x80000000);
@@ -282,10 +291,17 @@ void set_idt(void)
 
 int init(int magic, multiboot_info_t *mbi)
 {
+  seg_t *ph_gdt;
+  gdtr_t gdtr;
+  ph_gdt = (seg_t *)((unsigned int)(&gdt) - mem_offset);
+
   init_pic();
   console_init(80,24);
   set_gdt();
   enable_paging();
+  gdtr.base = 0x1000000| (uint32_t) ph_gdt;
+  gdtr.limit = sizeof(seg_t)*(GDT_ENTRY+1);
+  set_gdtr(&gdtr);
   set_idt();
   enable_interrupts();
   switch_to_main_task(magic, mbi);

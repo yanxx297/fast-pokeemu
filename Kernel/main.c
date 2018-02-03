@@ -46,10 +46,13 @@ extern uint32_t tc_ring1_base, tc_ring1_len;
 extern uint32_t tc_ring2_base, tc_ring2_len;
 extern uint32_t tc_ring3_base, tc_ring3_len;
 extern uint32_t tc_ringvm_base, tc_ringvm_len, tcringvm;
+extern uint32_t mem_offset;
 
 seg_t gdt[GDT_ENTRY] __attribute__ ((aligned(4096)));
 pde_t pd[1024] __attribute__ ((aligned(4096)));
+pde_t pd_EXCP[1024] __attribute__ ((aligned(4096)));
 pte_t pt[1024] __attribute__ ((aligned(4096)));
+pte_t pt_EXCP[1024] __attribute__ ((aligned(4096)));
 idte_t idt[INTERRUPTS] __attribute__ ((aligned(4096)));
 
 tss_t tss0, tss1, tss2, tss3, tss4, tss5, tss6, tssVM;
@@ -242,6 +245,7 @@ void kmain(int magic, multiboot_info_t *mbi)
 
   /* TSS for exception handler */
 
+  pde_t *p_dir = (pde_t *)((unsigned int)(&pd_EXCP) - mem_offset);
   // Divide Error
   set_tss(&tssEXCP00, int_handler_0, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
@@ -314,7 +318,7 @@ void kmain(int magic, multiboot_info_t *mbi)
 
   // Page Fault
   set_tss(&tssEXCP14, int_handler_14, esp0, get_eflags(),
-	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), get_cr3(),
+	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Intel reserverd, Do not use.
