@@ -511,7 +511,7 @@ for r, s, a in cpu_regs:
             z = True
         elif r == "creg_CR0":
             v = snapshot.cpus[0].sregs_state.cr0
-            m = 1
+            m = (1<<31) | 1
             z = True
         elif r == "creg_CR4":
             v = snapshot.cpus[0].sregs_state.cr4
