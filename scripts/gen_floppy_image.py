@@ -1470,9 +1470,9 @@ def handle_mem_read(inst, op, i, isInit = False):
                 init_r += [gen_store_mem(op_str, r)]
             src = "0x%x" % feistel_r[count_r]
             op_bak = "0x%x" % feistel_in[count_r]
-            setinput += [gen_store_change_mem(src, op_str, "setinput")]
 
             if not op_str in l_restore:
+                setinput += [gen_store_change_mem(src, op_str, "setinput")]
                 l_restore += [op_str]
                 backup += [gen_store_mem(op_str, op_bak)]
                 restore_ = []
@@ -2759,22 +2759,6 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0, l
         revert_ = [] # A copy of revert; regenerate instead of copy because patch ljmp
         done = set()
         
-        # Generate code for initializing registers and memory locations
-        for rm in regs + memlocs:
-            orig_value = rm.in_snapshot(snapshot)
-            if orig_value != rm.value:
-                param += rm.gen_gadget(snapshot)
-                param0 += rm.gen_gadget(snapshot)
-                revert += rm.gen_revert_gadget(snapshot)
-                revert0 += rm.gen_revert_gadget(snapshot)
-                revert_ += rm.gen_revert_gadget(snapshot)
-                done.add(rm)
-
-        param = make_stable(param, done, snapshot)
-        param0 = make_stable(param0, done, snapshot)
-        revert = make_stable(revert, done, snapshot)
-        revert0 = make_stable(revert0, done, snapshot)
-        revert_ = make_stable(revert_, done, snapshot)
         if count == 1:
             count_addr = get_addr()[0]
         
@@ -2791,6 +2775,23 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0, l
 
         (backup, set_r, copy_r, setinput, code, output, update, restore) \
                 = Gadget.gen_root(snapshot, shellcode, count)
+
+        # Generate code for initializing registers and memory locations
+        for rm in regs + memlocs:
+            orig_value = rm.in_snapshot(snapshot)
+            if orig_value != rm.value:
+                param += rm.gen_gadget(snapshot)
+                param0 += rm.gen_gadget(snapshot)
+                revert += rm.gen_revert_gadget(snapshot)
+                revert0 += rm.gen_revert_gadget(snapshot)
+                revert_ += rm.gen_revert_gadget(snapshot)
+                done.add(rm)
+
+        param = make_stable(param, done, snapshot)
+        param0 = make_stable(param0, done, snapshot)
+        revert = make_stable(revert, done, snapshot)
+        revert0 = make_stable(revert0, done, snapshot)
+        revert_ = make_stable(revert_, done, snapshot)
 
         asm = "jmp forward_%.8x;" % l2 # jump over revert' and execute post
         code += [Gadget(asm = asm, mnemonic = "jump to post")]
