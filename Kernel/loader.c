@@ -157,30 +157,30 @@ void set_gdt(void)
 
   set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_CS)],  0, 0xfffff, ACS_CODE  | 0x1,  0xc);
   set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_DS)],  0, 0xfffff, ACS_DATA,  0xc);
-  set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_SS)], tc_ring0_base, tc_ring0_len/4096, ACS_STACK | ACS_DPL(0), 0xc);
+  set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_SS)],  0, 0xfffff, ACS_STACK | ACS_DPL(0), 0xc);
   set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_FS)],  0, 0xfffff, ACS_DATA,  0xc);
   set_gdt_entry(&ph_gdt[SEL_INDEX(SEL_EXCP_GS)],  0, 0xfffff, ACS_DATA,  0xc);
 
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP00)], (uint32_t) &tssEXCP00, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP01)], (uint32_t) &tssEXCP01, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP02)], (uint32_t) &tssEXCP02, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP03)], (uint32_t) &tssEXCP03, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP04)], (uint32_t) &tssEXCP04, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP05)], (uint32_t) &tssEXCP05, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP06)], (uint32_t) &tssEXCP06, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP07)], (uint32_t) &tssEXCP07, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP08)], (uint32_t) &tssEXCP08, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP09)], (uint32_t) &tssEXCP09, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP10)], (uint32_t) &tssEXCP10, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP11)], (uint32_t) &tssEXCP11, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP12)], (uint32_t) &tssEXCP12, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP13)], (uint32_t) &tssEXCP13, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP00)], 0x1000000| (uint32_t) &tssEXCP00, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP01)], 0x1000000| (uint32_t) &tssEXCP01, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP02)], 0x1000000| (uint32_t) &tssEXCP02, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP03)], 0x1000000| (uint32_t) &tssEXCP03, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP04)], 0x1000000| (uint32_t) &tssEXCP04, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP05)], 0x1000000| (uint32_t) &tssEXCP05, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP06)], 0x1000000| (uint32_t) &tssEXCP06, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP07)], 0x1000000| (uint32_t) &tssEXCP07, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP08)], 0x1000000| (uint32_t) &tssEXCP08, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP09)], 0x1000000| (uint32_t) &tssEXCP09, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP10)], 0x1000000| (uint32_t) &tssEXCP10, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP11)], 0x1000000| (uint32_t) &tssEXCP11, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP12)], 0x1000000| (uint32_t) &tssEXCP12, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP13)], 0x1000000| (uint32_t) &tssEXCP13, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP14)], 0x1000000| (uint32_t) &tssEXCP14, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP15)], (uint32_t) &tssEXCP15, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP16)], (uint32_t) &tssEXCP16, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP17)], (uint32_t) &tssEXCP17, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP18)], (uint32_t) &tssEXCP18, sizeof(tss_t), 0x9, 0, 1, 0, 0);
-  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP19)], (uint32_t) &tssEXCP19, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP15)], 0x1000000| (uint32_t) &tssEXCP15, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP16)], 0x1000000| (uint32_t) &tssEXCP16, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP17)], 0x1000000| (uint32_t) &tssEXCP17, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP18)], 0x1000000| (uint32_t) &tssEXCP18, sizeof(tss_t), 0x9, 0, 1, 0, 0);
+  set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP19)], 0x1000000| (uint32_t) &tssEXCP19, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   set_gdt_entry_tss(&ph_gdt[SEL_INDEX(SEL_EXCP32)], 0x1000000| (uint32_t) &tssEXCP32, sizeof(tss_t), 0x9, 0, 1, 0, 0);
   
 #undef SEL_INDEX
