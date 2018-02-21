@@ -491,7 +491,7 @@ class X86Dump():
         cpu = self.cpus[i]
 
         # Read GDT entry
-        gdt_base = cpu.sregs_state.gdtr.base
+        gdt_base = cpu.sregs_state.gdtr.base & 0x0ffffff
         gdt_limit = cpu.sregs_state.gdtr.limit
 
         # Extract i-th entry
@@ -651,7 +651,7 @@ class X86Dump():
             s += str(self.cpus[i])
 
             s += "\n[GDT #%d]\n" % i
-            for sel in range(0,48):
+            for sel in range(0,53):
                 seg = self.parse_seg(i, sel << 3)
                 s += "   [%.2d] [%.2x] Base:%.8x Limit:%.8x Type:%.4x \n" % (sel, seg.selector, seg.base, seg.limit, seg.type)
                 
