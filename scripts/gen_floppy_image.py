@@ -2354,10 +2354,10 @@ class Gadget:
         else:
             # feistel looping mode
             assert (addr != None)
-            asm = "movl $0x%.8x,0x%x; " \
+            asm = "movl $0x%.8x,%%%s:(0x%x); " \
                 "forward_%.8x: " \
                 "invlpg 0x0;" \
-                "prefetch 0x%s;" % (LOOP, addr, start, tcn) 
+                "prefetch 0x%s;" % (LOOP, retseg, addr, start, tcn)
 #         ds = in_snapshot_sreg("DS", snapshot)
 #         asm += "mov $0x%.4x,%%ax; mov %%ax,%%ds;" % ds 
         # Copy the eip after tested insn to a global location
@@ -2822,8 +2822,8 @@ def gen_floppy_with_testcase(testcase, kernel = None, floppy = None, mode = 0, l
         #jump to TC beginning for a fixed # of times                   
         asm = "";
         if MODE > 2:
-            asm = "decl 0x%x; " \
-                "jnz forward_%.8x; // back to loop entrance" % (count_addr, ls)
+            asm = "decl %%%s:0x%x; " \
+                "jnz forward_%.8x; // back to loop entrance" % (retseg, count_addr, ls)
         loop = [Gadget(asm = asm, mnemonic = "loop")] 
                        
         # Sort gadgets & add labels to return points
