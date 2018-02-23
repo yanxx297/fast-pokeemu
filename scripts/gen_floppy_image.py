@@ -1940,7 +1940,7 @@ class Gadget:
         return self.mnemonic
 
     # ===-------------------------------------------------------------------===
-    # Return true (= g1 define g0 / add edge (g0, g1)) if any of the followings is true:
+    # Return true (= g1 depend on g0 / add edge (g0, g1)) if any of the followings is true:
     # * g1 defines what g0 kills 
     # * g0 uses what g1 defines
     # ===-------------------------------------------------------------------===
@@ -1949,7 +1949,9 @@ class Gadget:
             (g0.use & g1.define or "*" in g1.define) or \
             (g0.use & g1.kill) or \
             (g0.define & g1.use__) or \
-            (Register("EFLAGS") in g0.use and not Register("EFLAGS") in g1.use) 
+            (Register("EFLAGS") in g0.use and not Register("EFLAGS") in g1.use) or \
+            (("pde" in g0.define or "pte" in g0.define) and Register("EFLAGS") in g1.define)
+
     # ===-------------------------------------------------------------------===
     # Generate a gadget to set a register
     # ===-------------------------------------------------------------------===
