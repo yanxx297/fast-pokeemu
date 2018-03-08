@@ -64,7 +64,7 @@ PG = 1
 # Range for additional memory access
 # ===-----------------------------------------------------------------------===
 retseg = "fs"         # Selector of the segment used for return point updating
-retp = 0x1278008      # The location to store current return point for ecpt handler
+retp = 0x128d008      # The location to store current return point for ecpt handler
 edata = retp + 4      # Starting address of exception data
 next_addr = edata + 8
 start_addr = next_addr

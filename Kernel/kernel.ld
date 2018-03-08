@@ -122,7 +122,7 @@ SECTIONS
     {   testcase = .;
     	LONG(0x90909090);
 	. = ALIGN(16384);
-	. += 393216;
+	. += 458752;
 	LONG(0xF41FCD90);
         testcaseend = .;
     } = 0x90909090

@@ -66,9 +66,9 @@ for (my $i = 0; $i < $mem_size; $i += 16) {
 	if (substr($base_chunk, $j, 1) ne substr($chunk, $j, 1)) {
 	    #printf "0x%06x: %02x vs. %02x\n", $addr,
 	    #  ord(substr($base_chunk, $j, 1)), ord(substr($chunk, $j, 1));
-	    if ($addr < 0x214000) {
+	    if ($addr < 0x219000) {
 		$base_diff_count++;
-	    } elsif ($addr < 0x278000) {
+	    } elsif ($addr < 0x28d000) {
 		$tcase_diff_count++;
 	    } else {
 		$data_diff_count++;
