@@ -565,7 +565,6 @@ void int_handler_32(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
 //  kprintf("interrupt handler 31 speaking\n");
   asm volatile (
                   "begin32:"
-                  "add $0,%eax;"
                   "iret;");
   return;
 }
