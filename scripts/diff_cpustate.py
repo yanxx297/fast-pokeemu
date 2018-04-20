@@ -462,6 +462,18 @@ def normalize_states(dumps):
                 d.mem.data[pt.getAddress() + pt.getSize():]
             assert len(d.mem.data) == d.hdr.mem_size
 
+    # Ignore the eflags field in the tss of Exception#5
+    for d in dumps:
+        tss = dumps[0].kernel.getSymbol("tssEXCP05")
+        assert tss
+
+        tss_data = ""
+        for i in range(tss.getAddress(), tss.getAddress() + tss.getSize(), 105):
+            tss_data += d.mem.data[i: i+35] + chr(ord(d.mem.data[i+36]) & ~0xff) + \
+                    chr(ord(d.mem.data[i+37]) & ~0xff) + d.mem.data[i+38: i+105]
+        d.mem.data = d.mem.data[:tss.getAddress()] + tss_data + d.mem.data[tss.getAddress() + tss.getSize():]
+        assert len(d.mem.data) == d.hdr.mem_size
+
     # Ignore the eflags field in the tss of Exception#32
     for d in dumps:
         tss = dumps[0].kernel.getSymbol("tssEXCP32")
