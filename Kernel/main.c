@@ -487,8 +487,8 @@ void switch_to_testcase_task() {
                         "mov $0x48,%%ax;"
                         "mov %%ax,%%ds;"
 
-                        /* Exception counter for debugging*/
-                        //"movl $0x100,0x280000;"
+                        /* Count exception #a or #b to avoid infinite exception*/
+                        "movl $0xa,0x280000;"
 
 			"jmp testcase;"
 

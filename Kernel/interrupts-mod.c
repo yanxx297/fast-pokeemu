@@ -313,6 +313,10 @@ void int_handler_10(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
     uint32_t *d = &(tss0.eip);
 	asm volatile (
     		"begin10:"
+                "decl 0x280000;"
+                "jnz code10;"
+                "hlt;"
+                "code10:"
     		"mov %%cr0,%%eax;"
     		"and $0x80000000,%%eax;"
     		"cmpl $0x80000000,%%eax;"
@@ -339,6 +343,10 @@ void int_handler_11(uint32_t code, uint32_t eip, uint32_t cs, uint32_t eflags)
     uint32_t *d = &(tss0.eip);
     asm volatile (
     		"begin11:"
+                "decl 0x280000;"
+                "jnz code11;"
+                "hlt;"
+                "code11:"
     		"mov %%cr0,%%eax;"
     		"and $0x80000000,%%eax;"
     		"cmpl $0x80000000,%%eax;"
