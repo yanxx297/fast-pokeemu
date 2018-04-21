@@ -6,3 +6,9 @@
 	path = emu/qemu
         url = https://github.umn.edu/yanxx297/qemu
         ignore = dirty
+[submodule "tools/mbuild"]
+	path = tools/mbuild
+	url = https://github.com/intelxed/mbuild
+[submodule "tools/xed"]
+	path = tools/xed
+	url = https://github.com/intelxed/xed
