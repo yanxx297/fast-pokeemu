@@ -6,8 +6,8 @@ IN?=/export/scratch/tmp/aggreg_list
 OUT?=/export/scratch/tmp/out/
 TMP_DIR?=/export/scratch/tmp/
 TIMEOUT?=10
-
-EMUPATH=./../emu/qemu-0.12.4/run-testcase
+LOOP?=1
+EMUPATH?=./../emu/qemu-0.12.4/run-testcase
 
 
 SUBDIRS := $(sort $(dir $(wildcard $(IN)/*/.)))
@@ -24,7 +24,7 @@ $(addprefix $(OUT), $(shell basename $1))/time:: ;
 		testcase:$(shell cat $(val)) \
 		timeout:$(TIMEOUT) \
 		outdir:$(OUTDIR) \
-		script:$(EMUPATH) mode:$(MODE) tmp:$(TMP);)
+		script:$(EMUPATH) mode:$(MODE) tmp:$(TMP) loop:$(LOOP);)
 	mv $(OUTDIR) $(addprefix $(OUT)/, $(shell basename $1));
 endef
 

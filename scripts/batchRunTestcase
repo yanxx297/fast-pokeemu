@@ -6,8 +6,8 @@ IN?=/export/scratch/tmp/sample
 OUT?=/export/scratch/tmp/out/
 TMP_DIR?=/export/scratch/tmp/
 TIMEOUT?=10
-
-EMUPATH=./../emu/qemu-0.12.4/run-testcase
+LOOP?=1
+EMUPATH?=./../emu/qemu-0.12.4/run-testcase
 LOG=/log
 
 
@@ -25,7 +25,7 @@ $(addprefix $(OUT), $(shell basename $1))/time:
 	testcase:$(tc)testcase \
 	timeout:$(TIMEOUT) \
 	outdir:$(OUTDIR) \
-	script:$(EMUPATH) mode:$(MODE) tmp:$(TMP);)
+	script:$(EMUPATH) mode:$(MODE) tmp:$(TMP) loop:$(LOOP);)
 	mv $(OUTDIR) $(addprefix $(OUT), $(shell basename $1))
 #	./aggreg_tc_from_dump.sh $1 $(outputs)/ > $(addsuffix $(LOG), $(outputs))
 endef
