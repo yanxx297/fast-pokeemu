@@ -26,7 +26,7 @@ OUTDIR = sys.argv[4]
 print OUTDIR
 FUZZBALL_ENV_ARGS = os.getenv("FUZZBALL_ARGS", "")
 FUZZBALL_MAX_ITERS = os.getenv("FUZZBALL_MAX_ITERATIONS", "4096")
-FUZZBALL_ARGS = "-solver z3vc -linux-syscalls -trace-iterations -zero-memory " \
+FUZZBALL_ARGS = "-solver smtlib -solver-path ../z3/build/z3 -linux-syscalls -trace-iterations -zero-memory " \
     "-paths-limit %s -output-dir %s %s -total-timeout 7200" % \
     (FUZZBALL_MAX_ITERS, OUTDIR, FUZZBALL_ENV_ARGS)
     #-implied-value-conc 

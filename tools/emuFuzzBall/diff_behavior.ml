@@ -243,8 +243,6 @@ let merge_progs prog1 prog2 =
 
 (* ===--------------------------------------------------------------------=== *)
 let main argv = 
-  Hashtbl.add Options_solver.solvers_table "z3vc"
-    (fun _ -> Some new Z3vc_query_engine.z3vc_engine);
   let qe = Options_solver.construct_solver "" in
   let prog1 = Sys.argv.(1) in
   let prog2 = Sys.argv.(2) in

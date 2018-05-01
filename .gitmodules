@@ -12,3 +12,6 @@
 [submodule "tools/xed"]
 	path = tools/xed
 	url = https://github.com/intelxed/xed
+[submodule "tools/z3"]
+	path = tools/z3
+	url = https://github.com/Z3Prover/z3
