@@ -1,8 +1,8 @@
-#Usage: make -f batchRunTestcase -j 6
+#Usage: make -f runCPUexplr -j 6
 
 #Config
-FILE:=../../scripts/insn4
-TMP:=/export/scratch/tmp/
+FILE:=../../scripts/insn
+TMP:=/export/scratch/tmp/out/
 
 slash:=/
 SHELLCODE:= $(shell cut -d '	' -f -1 $(FILE))
