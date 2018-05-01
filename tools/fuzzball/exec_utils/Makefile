@@ -19,7 +19,7 @@ export INCDIRS = $(VINE_OCAMLDIR) $(VINE_TRACEDIR) $(VINE_EXECDIR) \
 export OCAMLDEP = ocamldep -I $(VINE_OCAMLDIR) -I $(VINE_TRACEDIR) \
                    -I $(VINE_EXECDIR) -I $(STP_OCAMLDIR)
 
-OCAMLFLAGS = -warn-error Aelz -dtypes #-w A
+OCAMLFLAGS = #-w A
 
 # default subprojects to build
 ifndef SUBPROJS
