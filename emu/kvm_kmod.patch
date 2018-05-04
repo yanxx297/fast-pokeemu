@@ -1,0 +1,171 @@
+diff -ru linux-4.4/arch/x86/kvm/vmx.c linux-source-4.4.0mod/arch/x86/kvm/vmx.c
+--- linux-4.4/arch/x86/kvm/vmx.c	2018-04-27 23:12:35.304242638 -0500
++++ linux-source-4.4.0mod/arch/x86/kvm/vmx.c	2018-04-24 23:38:25.079104025 -0500
+@@ -52,6 +52,8 @@
+ #include "trace.h"
+ #include "pmu.h"
+ 
++#define PASS_EVERYTHING_TO_USERSPACE                                                                                                                                                                         
++#define DEBUG_PASS_EVERYTHING_TO_USERSPACE
+ #define __ex(x) __kvm_handle_fault_on_reboot(x)
+ #define __ex_clear(x, reg) \
+ 	____kvm_handle_fault_on_reboot(x, "xor " reg " , " reg)
+@@ -87,6 +89,10 @@
+ static bool __read_mostly vmm_exclusive = 1;
+ module_param(vmm_exclusive, bool, S_IRUGO);
+ 
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++static u32 __exception_bitmap = 0;
++#endif
++
+ static bool __read_mostly fasteoi = 1;
+ module_param(fasteoi, bool, S_IRUGO);
+ 
+@@ -1659,8 +1665,16 @@
+ 	 */
+ 	if (is_guest_mode(vcpu))
+ 		eb |= get_vmcs12(vcpu)->exception_bitmap;
+-
++#ifdef PASS_EVERYTHING_TO_USERSPACE                                                                                                                                                                          
++        // LM: Trap all exceptions
++         __exception_bitmap = eb;
++         vmcs_write32(EXCEPTION_BITMAP, 0xffffffe7);
++#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++         printk(KERN_ERR "Updated exception bitmap %x,", vmcs_read32(EXCEPTION_BITMAP));
++#endif
++#else
+ 	vmcs_write32(EXCEPTION_BITMAP, eb);
++#endif
+ }
+ 
+ static void clear_atomic_switch_msr_special(struct vcpu_vmx *vmx,
+@@ -4828,9 +4842,15 @@
+ 		vmx->ple_window = ple_window;
+ 		vmx->ple_window_dirty = true;
+ 	}
+-
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++        // printk(KERN_ERR "PAGE_FAULT_ERROR_CODE_MASK %x\n", !!bypass_guest_pf);
++        // printk(KERN_ERR "PAGE_FAULT_ERROR_CODE_MATCH %x\n", !!bypass_guest_pf);
++        vmcs_write32(PAGE_FAULT_ERROR_CODE_MASK, 0x0);
++        vmcs_write32(PAGE_FAULT_ERROR_CODE_MATCH, 0x0);
++#else
+ 	vmcs_write32(PAGE_FAULT_ERROR_CODE_MASK, 0);
+ 	vmcs_write32(PAGE_FAULT_ERROR_CODE_MATCH, 0);
++#endif
+ 	vmcs_write32(CR3_TARGET_COUNT, 0);           /* 22.2.1 */
+ 
+ 	vmcs_write16(HOST_FS_SELECTOR, 0);            /* 22.2.4 */
+@@ -5246,6 +5266,21 @@
+ 	vect_info = vmx->idt_vectoring_info;
+ 	intr_info = vmx->exit_intr_info;
+ 
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++        // LM: pass all exceptions to usespace
++        error_code = 0;
++        if (intr_info & INTR_INFO_DELIVER_CODE_MASK)
++                error_code = vmcs_read32(VM_EXIT_INTR_ERROR_CODE);
++        ex_no = intr_info & INTR_INFO_VECTOR_MASK;
++        if (ex_no == 0xe) {  // set cr2
++                vcpu->arch.cr2 = vmcs_readl(EXIT_QUALIFICATION);
++        }
++        kvm_run->exit_reason = KVM_EXIT_EXCEPTION;
++        kvm_run->ex.exception = ex_no;
++        kvm_run->ex.error_code = error_code;
++        return 0;
++#endif
++
+ 	if (is_machine_check(intr_info))
+ 		return handle_machine_check(vcpu);
+ 
+@@ -5719,7 +5754,12 @@
+ 
+ static int handle_halt(struct kvm_vcpu *vcpu)
+ {
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++        vcpu->run->exit_reason = KVM_EXIT_HLT;
++        return 0;
++#else
+ 	return kvm_emulate_halt(vcpu);
++#endif
+ }
+ 
+ static int handle_vmcall(struct kvm_vcpu *vcpu)
+@@ -6238,6 +6278,8 @@
+ 	if (!cpu_has_vmx_ple())
+ 		ple_gap = 0;
+ 
++	printk(KERN_ERR "KVM setup done, ept is %s\n", enable_ept ? "enabled" : "disabled");
++
+ 	if (!cpu_has_vmx_apicv())
+ 		enable_apicv = 0;
+ 
+@@ -8082,6 +8124,11 @@
+ 
+ 	trace_kvm_exit(exit_reason, vcpu, KVM_ISA_VMX);
+ 
++        //#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++        printk(KERN_ERR "VMExit at %x reason %x bitmap %x\n", 
++               kvm_rip_read(vcpu), exit_reason);
++        //#endif    
++
+ 	/*
+ 	 * Flush logged GPAs PML buffer, this will make dirty_bitmap more
+ 	 * updated. Another good is, in kvm_vm_ioctl_get_dirty_log, before
+@@ -8158,9 +8205,35 @@
+ 		}
+ 	}
+ 
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++        if (exit_reason < kvm_vmx_max_exit_handlers
++            && kvm_vmx_exit_handlers[exit_reason]) {
++          int r;
++          r = kvm_vmx_exit_handlers[exit_reason](vcpu);
++          // Instruction handled correctly but exception injected into
++          // the guest
++          if (r == 1 && vcpu->arch.exception.pending) {
++#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++            printk(KERN_ERR "Detected %s pending exception %x\n",
++                   (1 << vcpu->arch.exception.nr) &
++                   vmcs_read32(EXCEPTION_BITMAP) ?
++                   "masked" : "non masked", vcpu->arch.exception.nr);
++#endif
++            if ((1 << vcpu->arch.exception.nr) & vmcs_read32(EXCEPTION_BITMAP)) {
++              vcpu->run->exit_reason = KVM_EXIT_EXCEPTION;
++              vcpu->run->ex.exception = vcpu->arch.exception.nr;
++              vcpu->run->ex.error_code = vcpu->arch.exception.has_error_code ?
++                vcpu->arch.exception.error_code : 0;
++              return 0;
++            }
++          }
++          return r;
++        }
++#else
+ 	if (exit_reason < kvm_vmx_max_exit_handlers
+ 	    && kvm_vmx_exit_handlers[exit_reason])
+ 		return kvm_vmx_exit_handlers[exit_reason](vcpu);
++#endif
+ 	else {
+ 		WARN_ONCE(1, "vmx: unexpected exit reason 0x%x\n", exit_reason);
+ 		kvm_queue_exception(vcpu, UD_VECTOR);
+@@ -8799,6 +8872,9 @@
+ 	vmx->loaded_vmcs->vmcs = alloc_vmcs();
+ 	if (!vmx->loaded_vmcs->vmcs)
+ 		goto free_msrs;
++	
++	printk(KERN_ERR "VMCS init\n");
++
+ 	if (!vmm_exclusive)
+ 		kvm_cpu_vmxon(__pa(per_cpu(vmxarea, raw_smp_processor_id())));
+ 	loaded_vmcs_init(vmx->loaded_vmcs);
+diff -ru linux-4.4/include/uapi/linux/kvm.h linux-source-4.4.0mod/include/uapi/linux/kvm.h
+--- linux-4.4/include/uapi/linux/kvm.h	2018-04-27 23:12:37.244296016 -0500
++++ linux-source-4.4.0mod/include/uapi/linux/kvm.h	2018-04-24 23:31:18.647639652 -0500
+@@ -12,7 +12,7 @@
+ #include <linux/ioctl.h>
+ #include <asm/kvm.h>
+ 
+-#define KVM_API_VERSION 12
++#define KVM_API_VERSION 2411
+ 
+ /* *** Deprecated interfaces *** */
