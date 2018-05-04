@@ -1,6 +1,6 @@
 #! /bin/bash
 
-in=/home/yanxx297/Project/pokemu-oras/data/state-explr-1
+in=/home/yanxx297/Project/pokemu-oras/data/state-explr
 out=/home/yanxx297/Project/pokemu-oras/data/20180418/
 single=false
 aggreg=false
@@ -37,6 +37,7 @@ if (( $start >= 10 )); then
         exit 0
 fi
 
+mkdir -p /tmp/out
 if (( $start <= 0 )) && [ "$aggreg" == true ]; then
         echo "Run aggreg-1 and aggreg-10000 on both qemu-1.0 and most recent version"
         git -C ../emu/qemu checkout master
@@ -100,10 +101,17 @@ elif (( $start <= 1 )); then
         done
         ln -s $out/state-explr $out/state-explr-1
         ln -s $out/state-explr $out/state-explr-10000
+        if [ "$single" == true ]; then
+                exit 0
+        fi
 fi
 
-if (( $start <= 2 )) $$ [ "$aggreg" == true ]; then
-        echo "Rerun single tests"
+if (( $start <= 2 )); then
+        if [ "$aggreg" == true ]; then
+                echo "Rerun single tests"
+        else
+                echo "Run all valid single tests"
+        fi
         git -C ../emu/qemu checkout master
         cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase; cd -
         ./run-testcase-offline.sh -m 0 -in $out/state-explr-1 -out $out/single-1-new/ -e ../emu/qemu/run-testcase;
@@ -155,8 +163,7 @@ fi
 if (( $start <= 4 )); then
         mkdir -p $out/bisect_1
         for file in $out/diffs_1/*; do
-                cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase; cd -
-                cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase-debug; cd -
+                cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase; chmod +x run-testcase-debug; cd -
                 python run_test_case.py testcase:$in/$(basename $file)/$(sort -R $file| head -n 1)/testcase\
                         timeout:10 outdir:/tmp/out script:/home/yanxx297/Project/pokemu-oras/emu/qemu/run-testcase-debug mode:0
                 cd ../emu/qemu
@@ -167,8 +174,7 @@ if (( $start <= 4 )); then
         done
         mkdir -p $out/bisect_10000
         for file in $out/diffs_10000/*; do
-                cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase; cd -
-                cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase-debug; cd -
+                cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase; chmod +x run-testcase-debug; cd -
                 python run_test_case.py testcase:$in/$(basename $file)/$(sort -R $file| head -n 1)/testcase\
                         timeout:10 outdir:/tmp/out script:/home/yanxx297/Project/pokemu-oras/emu/qemu/run-testcase-debug mode:3 loop:10000
                 cd ../emu/qemu

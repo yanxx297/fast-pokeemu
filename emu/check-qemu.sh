@@ -23,7 +23,8 @@ while [ "$1" != "" ]; do
 	esac 
 	shift
 done
-if [ -e kemufuzzer.c ]; then        
+if [ -e kemufuzzer.c ]; then 
+        git clean -xdff -e bisect.sh -e check-qemu.sh
         seccomp=""
         if grep -q disable-seccomp configure; then
                 seccomp="--disable-seccomp"
@@ -31,26 +32,32 @@ if [ -e kemufuzzer.c ]; then
         ./configure --disable-linux-user --target-list=i386-softmmu --enable-kemufuzzer --disable-kvm --disable-werror --cc="ccache cc" $seccomp
         make
         rv=$?
-        # Quit eariler if compilation fails.
-        if [ $rv -gt 127 ]; then
-                if [[ "$revert" == true ]]; then
-                        exit 0
+        # Terminate bisecting if compilation fails.
+        if [ $rv -ne 0 ]; then
+                make distclean
+                if [ $rv -gt 127 ]; then
+                        if [[ "$revert" == true ]]; then
+                                exit 0
+                        else
+                                exit 127
+                        fi
                 else
-                        exit 127
-                fi
-        elif [ $rv -ne 0 ]; then
-                if [[ "$revert" == true ]]; then
-                        exit 0
-                else
-                        exit $rv
+                        if [[ "$revert" == true ]]; then
+                                exit 0
+                        else
+                                exit $rv
+                        fi
                 fi
         fi
         if [[ "$test_qemu" == true ]];then
                 chmod +x run-testcase
-                ./run-testcase /tmp/floppy-dbg /tmp/out/dbg.post /tmp/out
-                ../kvm-run/run-testcase /tmp/out/dbg.post.pre /tmp/out/00000000-kvm.post
-                python ../../scripts/diff_cpustate.py /tmp/out/dbg.post.post /tmp/out/00000000-kvm.post
+                timeout 10 ./run-testcase /tmp/floppy-dbg /tmp/out/dbg.post /tmp/out
                 rv=$?
+                if [ $rv -eq 0 ]; then
+                        timeout 10 ../kvm-run/run-testcase /tmp/out/dbg.post.pre /tmp/out/00000000-kvm.post
+                        python ../../scripts/diff_cpustate.py /tmp/out/dbg.post.post /tmp/out/00000000-kvm.post
+                        rv=$?
+                fi
         fi
         if [ $rv -gt 127 ]; then
                 if [[ "$clean" == true ]]; then

@@ -1,5 +1,5 @@
 #! /bin/bash
-git bisect start HEAD afc6ffd005af42b7f411e660f493ef91fcaefa39
+git bisect start HEAD 80c58fdf0e93f79fce323677a5b96769e99feb6e
 git bisect run ./check-qemu.sh -c -t -r
 git bisect log > $1
 git checkout .
