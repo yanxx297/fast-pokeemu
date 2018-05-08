@@ -24,12 +24,19 @@ while [ "$1" != "" ]; do
 	shift
 done
 if [ -e kemufuzzer.c ]; then 
-        git clean -xdff -e bisect.sh -e check-qemu.sh
+        git clean -xdff -e bisect.sh -e check-qemu.sh -e ui/keycodemapdb/
+        if ! [ -e ui/keycodemapdb/ ] && grep -q keycodemapdb .gitmodules; then
+                git clone https://github.com/qemu/keycodemapdb.git ui/keycodemapdb
+        fi
         seccomp=""
         if grep -q disable-seccomp configure; then
                 seccomp="--disable-seccomp"
         fi
-        ./configure --disable-linux-user --target-list=i386-softmmu --enable-kemufuzzer --disable-kvm --disable-werror --cc="ccache cc" $seccomp
+        capstone=""
+        if grep -q disable-capstone configure; then
+                seccomp="--disable-capstone"
+        fi
+        ./configure --disable-linux-user --target-list=i386-softmmu --enable-kemufuzzer --disable-kvm --disable-werror --cc="ccache cc" --disable-fdt $seccomp $capstone  
         make
         rv=$?
         # Terminate bisecting if compilation fails.
