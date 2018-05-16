@@ -1,7 +1,4 @@
 #! /bin/bash
-default='\033[0m'
-dim_color='\033[1;33m'
-highlight='\033[1;31m'
 out=/tmp
 shellcode=
 aggreg=
@@ -59,27 +56,27 @@ do
 done < ../data/instructions.csv
 
 if [ -d ../data/state-explr/$insn ]; then
-	echo "State files alreay exist for $insn, skip machine state exploring..."
+	echo -e "\e[1mState files alreay exist for $insn, skip machine state exploring...\e[21m"
 	cp -r ../data/state-explr/$insn $out/state-explr/$insn
 else
-	echo "Machine states for $insn absent. Start regeneration..."
+	echo -e "\e[1mMachine states for $insn absent. Start regeneration...\e[21m"
 	cd ../tools/emuFuzzBall
-	echo -e ${dim_color}
+        echo -e "\e[2m"
 	python run-emu-fuzzball.py ../WhiteBochs-old/fuzzball-whitebochs ../../base.snap $shellcode $out/state-explr/$insn
-	echo -e ${default}
+        echo -e "\e[22m"
 	cd -
 fi
 
 if [ -d ../data/state-explr/$insn ] && ( [ -d ../data/aggreg_list/$insn ] || [ "$aggreg" == false ]); then
-	echo "No need to regenerate aggregation list."
+	echo -e "\e[1mNo need to regenerate aggregation list.\e[21m"
 	cp -r ../data/aggreg_list/$insn $out/aggreg_list/
 else
-	echo "Prerun tests to regenerate aggregation list...(may take a while)"
+	echo -e "\e[1mPrerun tests to regenerate aggregation list...(may take a while)\e[21m"
 	./run-testcase-offline.sh -m 3 -in $out/state-explr -out $out/single-m3/ -e $emu_path
 	./run-testcase-offline.sh -kvm -in $out/state-explr -out $out/single-m3/
 	mkdir $out/aggreg_list/$insn
-	for file in $out/single-m3/*.diff; do
-		echo $out/state-explr/$(basename $file .diff)/testcase >> $out/aggreg_list/$insn/log
+	for file in $out/single-m3/$insn/*.diff; do
+		echo $out/state-explr/$insn/$(basename $file .diff)/testcase >> $out/aggreg_list/$insn/log
 	done
 	var=$(tr "\n" "," < $out/aggreg_list/$insn/log)
 	echo ${var::-1} > $out/aggreg_list/$insn/log
@@ -88,13 +85,33 @@ else
 fi
 
 if [ "$aggreg" == true ]; then
-	echo "Test the instruction in Fast PokeEMU mode"
+	echo -e "\e[1mTest the instruction in Fast PokeEMU mode\e[21m"
 	./run-testcase-offline.sh -aggreg -m 3 -in $out/aggreg_list/ -out $out/aggreg/ -e $emu_path
 	./run-testcase-offline.sh -kvm -in $out/state-explr -out $out/aggreg/
+        echo -e "\e[1m"
+        if [ -e $out/aggreg/$insn/mismatch ]; then
+                echo -e "This aggregation \e[31mmismatches\e[39m."
+        elif ! [ -e $out/aggreg/$insn/mismatch ] && [ -e $out/aggreg/$insn/match ]; then
+                echo -e "This aggregation \e[31mmatches\e[39m."
+        else
+                echo "Fail to run the full experiment." 
+                echo "Make sure you are using modified KVM kernel module for Fast PokeEMU."
+        fi
+        echo -e "\e[21m"
 elif [ "$aggreg" == false ]; then
-	echo 'Test the instruction in vanilla PokeEMU mode'
+	echo -e '\e[1mTest the instruction in vanilla PokeEMU mode\e[21m'
 	./run-testcase-offline.sh -m 0 -in $out/state-explr -out $out/single/ -e $emu_path
 	./run-testcase-offline.sh -kvm -in $out/state-explr -out $out/single/
+        echo -e "\e[1m"
+        echo "For the $(echo "$(cat $out/single/$insn/match| wc -l)+$(cat $out/single/$insn/mismatch| wc -l)"| bc) tests in $insn"
+        if [ -e $out/single/$insn/match ] && ! [ -e $out/single/$insn/mismatch ]; then
+                echo -e "all of them \e[31mmatch\e[39m"
+        elif ! [ -e $out/single/$insn/match ] && [ -e $out/single/$insn/mismatch ]; then
+                echo -e "all of them \e[31mmismatch\e[39m"
+        else
+                echo "$(cat $out/single/$insn/match| wc -l) match, and $(cat $out/single/$insn/mismatch| wc -l) mismatch"
+        fi
+        echo -e "\e[21m"
 fi
 
 if [ "$clean" == true ]; then

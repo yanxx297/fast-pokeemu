@@ -19,6 +19,7 @@ $(addprefix $(OUT), $1)/ktime:
 		err=$$$$?;\
 		if [ $$$$err == 0 ]; then\
 			echo $$$$tcname >> $(OUTDIR)/match;\
+                        rm $(OUTDIR)/$$$$tcname.diff;\
 		elif [ $$$$err == 2 ]; then\
 			echo $$$$tcname >> $(OUTDIR)/mismatch;\
                 elif [ $$$$err == 1 ]; then\
@@ -26,7 +27,7 @@ $(addprefix $(OUT), $1)/ktime:
 		fi;\
 	done;
 	find $(OUTDIR) -type f -empty -delete
-	rm $(OUTDIR)/*.pre $(OUTDIR)/*.post $(OUTDIR)/*.kvm
+	rm -f $(OUTDIR)/*.pre $(OUTDIR)/*.post $(OUTDIR)/*.kvm
 endef
 
 $(foreach dir,$(INSN_LIST),$(eval $(call run-target,$(dir))))
