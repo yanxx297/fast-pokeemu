@@ -6,10 +6,10 @@ More design details and experiment results of Fast PokeEMU are in
 [this paper](http://www-users.cs.umn.edu/~yanxx297/vee18-fast-pokeemu.pdf). 
 
 ## Table of Content
-- [Build Fast PokeEMU](#Build)
-- [Testing QEMU](#Testing_QEMU)
-	- [A simple example](#Sample_Example)
-- [Historical Bug Experiment](#Historical_Bug_Experiment)
+- [Build Fast PokeEMU](#build)
+- [Testing QEMU](#testing-qemu)
+	- [A simple example](#sample-example)
+- [Historical Bug Experiment](#historical-bug-experiment)
 
 
 ## Build
@@ -66,7 +66,7 @@ make
 Simpily run `make` in `tools/WhiteBochs-old/`.
 
 #### Build Pyxed
-Download [PIN](https://software.intel.com/en-us/articles/pin-a-binary-instrumentation-tool-downloadsa),
+Download [PIN](https://software.intel.com/en-us/articles/pin-a-binary-instrumentation-tool-downloads),
 extract to `tools/` and rename the folder to `pin`.
 After that, apply our patch `pyxed.patch` to pyxed and compile it.
 
