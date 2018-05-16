@@ -8,7 +8,7 @@ out_dir=
 timeout=10
 loop=1
 tmp_dir=/tmp
-emu_path=../emu/qemu-0.12.4/run-testcase
+emu_path=../emu/qemu/run-testcase
 
 while [ "$1" != "" ]; do
 	case $1 in
