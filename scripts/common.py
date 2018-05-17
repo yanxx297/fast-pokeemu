@@ -391,11 +391,6 @@ def load_fuzzball_tc(f, full = False):
             
         var = var.split("_")
         
-        #For disasm (insn exploring)
-        #_, n, d, s, i = var
-        #var = (n)
-        
-        #For testcase generation
         _, t, n, d, s, i = var
         var = (t, n)  
         
