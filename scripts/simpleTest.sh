@@ -30,8 +30,14 @@ while [ "$1" != "" ]; do
 			shellcode=$1
 			;;
                 -h | --help )
-                        echo "Usage: ./simpleTest.sh [-s <shellcode>] [-e <path/to/emulator/run-testcase>]
-	[--single-test] [--aggreg-test]"
+                        echo "Usage: ./simpleTest.sh [-s|--shellcode <shellcode>] [-e|--emu <path/to/emulator/run-testcase>]"
+			echo "	[--single-test] [--aggreg-test] [--disable-clean] [--out <output/dir>] [-h|--help]"
+			echo "	[--disable-clean]"
+			echo "--aggreg-test|--single-test"
+			echo "			Select from aggregation mode or single test mode; must choose one"
+			echo "--disable-clean		Don't delete of temporary files"
+			echo "--out			Decide the location of outputs; $out by default"
+			echo "-e|--emu		Pointer to a run-testcase script running a certain version of QEMU; $emu_path by default"
 			exit 0
                         ;;
         esac

@@ -8,7 +8,13 @@ More design details and experiment results of Fast PokeEMU are in
 ## Table of Content
 - [Build Fast PokeEMU](#build)
 - [Testing QEMU](#testing-qemu)
-	- [A simple example](#sample-example)
+	- [A simple example](#simple-example)
+	- [Effectiveness Experiment](#effectiveness-experiment)
+	- [Details](#details-of-fast-pokeEMU)
+		- [Instruction Exploring](#instruction-exploring)
+		- [Machine State Exploring](#machine-state-exploring)
+		- [Test Case Execution](#test-case-execution)
+		- [Compare Machine States](#compare-machine-states)
 - [Historical Bug Experiment](#historical-bug-experiment)
 
 
@@ -113,7 +119,29 @@ Note that vanilla kvm's api version is 12, while the modified kvm is 2411.
 
 ## Testing QEMU
 ### Simple Example
-### Detailed Instruction
+You can simply test one instruction using `simpleTest.sh`.
+This script takes the hex string of an instruction as input, generate a set of tests, and runs those tests either one by one (vanilla PokeEMU style turned on by `--single-test`) or at once (Fast PokeEMU style turned on by `--aggreg-test`.)
+For more details about each step of (Fast) PokeEMU, see [the next section](#full-test).
+
+In Fast PokeEMU mode, you may need to rerun single tests to generate a list of valid tests to aggregate.
+This is due to the incompletenes of PokeEMU's exception handler.
+Note that in practice this is a one-time effort as long as you don't [regenerate machine states](#machine-state-exploring) or redo any other previous steps.
+
+As a example, we run Fast PokeEMU tests for `add %al,(%eax)` using this one-line command.
+```bash
+./simpleTest.sh -s \\x00\\x00 --aggreg-test
+# 00 00 is the hex string format of add %al,(%eax)
+```
+Alternatively, you can replace `--aggreg-test` with `--single-test` to test this instruction using vanilla PokeEMU.
+For a full list of options, run `./simpleTest.sh -h`.
+
+You can test any instruction by replacing `\\\\x00\\\\x00` with any string from the 1st column of `instruction.csv` 
+(don't forget to replace \\ with \\\\), 
+or the hex string of any other valid Intel X86 instruction.
+
+### Effectiveness Experiment
+
+### Details of Fast PokeEMU
 #### Instruction Exploring
 Run symbolic execution with 3 symbolic instruction bytes as input.
 This step uses fuzzball-whitedisasm.
@@ -145,7 +173,6 @@ stored its results in .../scripts/instructions.csv:
 Notes:
 - Uncomment lines after "#For disasm" in scripts/commcon.py
 - Don't print anything in load_fuzzball_tc (in common.py) because the output of this function is the input to concrete-whitedisasm
-
 
 
 #### Machine State Exploring
@@ -184,8 +211,7 @@ To run kvm-run, simply enter the emu/kvm-run directory and run the following cmd
 
 Note that the testcase is already included in the *.pre file.
 
-
-### Comparing Machine State Dumps
+#### Compare Machine States
 Enter scripts/ and run the following command:
 
 	python diff_cpustate.py /path/to/memdump1 /path/to/memdump2
@@ -198,7 +224,5 @@ Result can be read in the following way:
 | Green | the same	|
 | Yellow| different	|
 | Red 	| invalid dumps|
-
-### Effectiveness Experiment
 
 ## Historical Bug Experiment
