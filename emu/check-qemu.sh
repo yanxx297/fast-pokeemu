@@ -3,8 +3,13 @@ test_qemu=false
 clean=false
 qemu_dir=.
 revert=false
+cc="ccache"
 while [ "$1" != "" ]; do
 	case $1 in
+		--cache )
+			shift
+			cc=$1
+			;;
                 -r | --revert )
                         revert=true
                         ;;
@@ -36,7 +41,7 @@ if [ -e kemufuzzer.c ]; then
         if grep -q disable-capstone configure; then
                 seccomp="--disable-capstone"
         fi
-        ./configure --disable-linux-user --target-list=i386-softmmu --enable-kemufuzzer --disable-kvm --disable-werror --cc="ccache cc" --disable-fdt $seccomp $capstone  
+        ./configure --disable-linux-user --target-list=i386-softmmu --enable-kemufuzzer --disable-kvm --disable-werror --cc=$cc" cc" --disable-fdt $seccomp $capstone
         make
         rv=$?
         # Terminate bisecting if compilation fails.
