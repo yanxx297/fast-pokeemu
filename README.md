@@ -143,7 +143,7 @@ or the hex string of any other valid Intel X86 instruction.
 
 Some other examples you can test quickly.
 | Instruction | Hex string |
-|-------|:---------:|
+| ------- | --------- |
 | btr	%eax,0x0 | \\\\x0f\\\\xb3\\\\x05\\\\x00\\\\x00\\\\x00\\\\x00 |
 | bsf	(%eax),%ax | \\\\0x66\\\\0x0f\\\\0xbc\\\\0x00 |
 | mov	%cr0,%eax | \\\\x3e\\\\x0f\\\\x22\\\\x00 |
@@ -239,7 +239,7 @@ Set how many times you want to repeat random testing.
 If not set, each test only run once by default (equal to loop:1.)
 As mentioned in the table bellow, this option only make sense in mode 3.
 | Number | Mode | Aggregation Support | Random Testing |
-| ------ | ------ | ------ | :------:|
+| ------ | ------ | ------ | ------ |
 | 0 | Vanilla PokeEMU | No | No |
 | 1 | Simple aggregation | Yes | No |
 | 2 | Feistel aggregation | Yes | No |
