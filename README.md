@@ -142,6 +142,7 @@ You can test any instruction by replacing `\\\\x00\\\\x00` with any string from 
 or the hex string of any other valid Intel X86 instruction.
 
 Some other examples you can test quickly.
+
 | Instruction | Hex string |
 | ------- | --------- |
 | btr	%eax,0x0 | \\\\x0f\\\\xb3\\\\x05\\\\x00\\\\x00\\\\x00\\\\x00 |
@@ -238,6 +239,7 @@ See the table bellow for more details.
 Set how many times you want to repeat random testing.
 If not set, each test only run once by default (equal to loop:1.)
 As mentioned in the table bellow, this option only make sense in mode 3.
+
 | Number | Mode | Aggregation Support | Random Testing |
 | ------ | ------ | ------ | ------ |
 | 0 | Vanilla PokeEMU | No | No |
