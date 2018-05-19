@@ -1207,6 +1207,7 @@ def gen_mem2reg(mem, reg, size = 4):
         if reg == "cr0":
             asm += "mov %s,%%eax;" \
                     "orl $0x80000001,%%eax;" \
+                    "and $0xe005003f,%%eax;" \
                     "mov %%eax,%%%s;" % (mem, reg)
         else:
             asm += "mov %s,%%eax;" \
