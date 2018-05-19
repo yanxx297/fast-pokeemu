@@ -15,7 +15,7 @@ def rawhexstr (str):
         res += "\\\\x%s" % s
     return res
 
-for idx, line in enumerate(csv.reader(open('instructions.csv', 'rb'), delimiter = '\t')):
+for idx, line in enumerate(csv.reader(open('../data/instructions.csv', 'rb'), delimiter = '\t')):
     shellcode, _, insn, typ, _ = line;
     data[typ].append(shellcode)
     

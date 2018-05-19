@@ -1,9 +1,7 @@
 #! /bin/bash
 dir=/tmp
-in=/home/yanxx297/Project/pokemu-oras/data/state-explr
+in=../data/state-explr
 out=$dir/out/
-q_out=$out/qemu/
-k_out=$out/kvm/
 start=10
 single=false
 

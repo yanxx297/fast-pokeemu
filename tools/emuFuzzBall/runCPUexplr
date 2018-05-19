@@ -2,7 +2,7 @@
 
 #Config
 FILE:=../../scripts/insn
-TMP:=/export/scratch/tmp/out/
+TMP:=/tmp/out/
 
 slash:=/
 SHELLCODE:= $(shell cut -d '	' -f -1 $(FILE))
@@ -19,8 +19,8 @@ $(addprefix $(TMP),$(notdir $1))/exitstatus:: ;
 	$(eval dst := $(addprefix $(TMP),$(dir)))
 	$(eval src:= $(shell mktemp -d))
 	printf $(code)
-	python run-emu-fuzzball.py ~/Project/pokemu-oras/tools/WhiteBochs-old/fuzzball-whitebochs \
-	 ~/Project/pokemu-oras/base.snap $(code) $(src)
+	python run-emu-fuzzball.py ../WhiteBochs-old/fuzzball-whitebochs \
+	../../base.snap $(code) $(src)
 	mv $(src) $(dst)
 endef
 

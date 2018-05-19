@@ -1,7 +1,7 @@
 #! /bin/bash
 
-in=/home/yanxx297/Project/pokemu-oras/data/state-explr
-out=/home/yanxx297/Project/pokemu-oras/data/20180418/
+in=../data/state-explr
+out=/tmp
 single=false
 aggreg=false
 clean=false
