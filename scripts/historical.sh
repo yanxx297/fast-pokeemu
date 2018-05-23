@@ -48,7 +48,7 @@ if (( $start <= 0 )) && [ "$aggreg" == true ]; then
         ./run-testcase-offline.sh -kvm -in $in -out $out/aggreg-10000-new/;
         cd ../emu/qemu && make distclean; cd -
         git -C ../emu/qemu checkout .
-        git -C ../emu/qemu checkout afc6ffd005af42b7f411e660f493ef91fcaefa39
+        git -C ../emu/qemu checkout $(git -C ../emu/qemu rev-list HEAD | tail -n 1)
         cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase; cd -
         ./run-testcase-offline.sh -aggreg -m 3 -in $out/aggreg_list/ -out $out/aggreg-1-old/ -e ../emu/qemu/run-testcase;
         ./run-testcase-offline.sh -kvm -in $in -out $out/aggreg-1-old/;
@@ -120,7 +120,7 @@ if (( $start <= 2 )); then
         ./run-testcase-offline.sh -kvm -in $out/state-explr-10000 -out $out/single-10000-new/;
         cd ../emu/qemu && make distclean; cd -
         git -C ../emu/qemu checkout .
-        git -C ../emu/qemu checkout afc6ffd005af42b7f411e660f493ef91fcaefa39
+        git -C ../emu/qemu checkout $(git -C ../emu/qemu rev-list HEAD | tail -n 1)
         cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase; cd -
         ./run-testcase-offline.sh -m 0 -in $out/state-explr-1 -out $out/single-1-old/ -e ../emu/qemu/run-testcase;
         ./run-testcase-offline.sh -kvm -in $out/state-explr-1 -out $out/single-1-old/;
