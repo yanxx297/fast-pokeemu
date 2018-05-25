@@ -30,7 +30,7 @@
 #define MAX_MSRS                   0x20
 #define HYPERCALL_LEN               0x2	// length of a "hypercall" instruction (in bytes)
 
-static int MSRs_to_save[] = {
+static unsigned int MSRs_to_save[] = {
   X86_MSR_IA32_SYSENTER_CS,
   X86_MSR_IA32_SYSENTER_ESP,
   X86_MSR_IA32_SYSENTER_EIP,

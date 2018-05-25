@@ -30,6 +30,12 @@
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
 
+/* Define to 1 if your libopcodes disassembler() takes one argument. */
+#undef HAVE_FUNC_DISASSEMBLER_1
+
+/* Define to 1 if your libopcodes disassembler() takes four arguments. */
+#undef HAVE_FUNC_DISASSEMBLER_4
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
