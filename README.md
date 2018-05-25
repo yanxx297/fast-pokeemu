@@ -137,8 +137,8 @@ As a example, we run Fast PokeEMU tests for `add %al,(%eax)` using this one-line
 Alternatively, you can replace `--aggreg-test` with `--single-test` to test this instruction using vanilla PokeEMU.
 For a full list of options, run `./simpleTest.sh -h`.
 
-You can test any instruction by replacing `\\\\x00\\\\x00` with any string from the 1st column of `instruction.csv` 
-(remember to replace `\\` with `\\\\`), 
+You can test any instruction by replacing `\\x00\\x00` with any string from the 1st column of `instruction.csv` 
+(remember to replace `\` with `\\`), 
 or the hex string of any other valid Intel X86 instruction.
 
 Some other examples you can test quickly.
