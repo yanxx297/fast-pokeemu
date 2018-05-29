@@ -1,0 +1,173 @@
+--- linux-4.16.5-orig/include/uapi/linux/kvm.h	2018-04-26 04:00:39.000000000 -0500
++++ linux-4.16.5/include/uapi/linux/kvm.h	2018-05-28 21:01:52.154268152 -0500
+@@ -13,7 +13,7 @@
+ #include <linux/ioctl.h>
+ #include <asm/kvm.h>
+ 
+-#define KVM_API_VERSION 12
++#define KVM_API_VERSION 2411
+ 
+ /* *** Deprecated interfaces *** */
+ 
+--- linux-4.16.5-orig/arch/x86/kvm/vmx.c	2018-04-26 04:00:39.000000000 -0500
++++ linux-4.16.5/arch/x86/kvm/vmx.c	2018-05-28 21:10:12.367502710 -0500
+@@ -57,6 +57,8 @@
+ #include "trace.h"
+ #include "pmu.h"
+ 
++#define PASS_EVERYTHING_TO_USERSPACE                                                                                                                                                                         
++#define DEBUG_PASS_EVERYTHING_TO_USERSPACE
+ #define __ex(x) __kvm_handle_fault_on_reboot(x)
+ #define __ex_clear(x, reg) \
+ 	____kvm_handle_fault_on_reboot(x, "xor " reg " , " reg)
+@@ -92,6 +94,10 @@ module_param_named(eptad, enable_ept_ad_
+ static bool __read_mostly emulate_invalid_guest_state = true;
+ module_param(emulate_invalid_guest_state, bool, S_IRUGO);
+ 
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++static u32 __exception_bitmap = 0;
++#endif
++
+ static bool __read_mostly fasteoi = 1;
+ module_param(fasteoi, bool, S_IRUGO);
+ 
+@@ -1881,8 +1887,16 @@ static void update_exception_bitmap(stru
+ 	 */
+ 	if (is_guest_mode(vcpu))
+ 		eb |= get_vmcs12(vcpu)->exception_bitmap;
+-
++#ifdef PASS_EVERYTHING_TO_USERSPACE                                                                                                                                                                          
++        // LM: Trap all exceptions
++         __exception_bitmap = eb;
++         vmcs_write32(EXCEPTION_BITMAP, 0xffffffe7);
++#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++         printk(KERN_ERR "Updated exception bitmap %x,", vmcs_read32(EXCEPTION_BITMAP));
++#endif
++#else
+ 	vmcs_write32(EXCEPTION_BITMAP, eb);
++#endif
+ }
+ 
+ /*
+@@ -5702,9 +5716,15 @@ static void vmx_vcpu_setup(struct vcpu_v
+ 		vmx->ple_window = ple_window;
+ 		vmx->ple_window_dirty = true;
+ 	}
+-
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++        // printk(KERN_ERR "PAGE_FAULT_ERROR_CODE_MASK %x\n", !!bypass_guest_pf);
++        // printk(KERN_ERR "PAGE_FAULT_ERROR_CODE_MATCH %x\n", !!bypass_guest_pf);
++        vmcs_write32(PAGE_FAULT_ERROR_CODE_MASK, 0x0);
++        vmcs_write32(PAGE_FAULT_ERROR_CODE_MATCH, 0x0);
++#else
+ 	vmcs_write32(PAGE_FAULT_ERROR_CODE_MASK, 0);
+ 	vmcs_write32(PAGE_FAULT_ERROR_CODE_MATCH, 0);
++#endif
+ 	vmcs_write32(CR3_TARGET_COUNT, 0);           /* 22.2.1 */
+ 
+ 	vmcs_write16(HOST_FS_SELECTOR, 0);            /* 22.2.4 */
+@@ -6129,6 +6149,21 @@ static int handle_exception(struct kvm_v
+ 	vect_info = vmx->idt_vectoring_info;
+ 	intr_info = vmx->exit_intr_info;
+ 
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++        // LM: pass all exceptions to usespace
++        error_code = 0;
++        if (intr_info & INTR_INFO_DELIVER_CODE_MASK)
++                error_code = vmcs_read32(VM_EXIT_INTR_ERROR_CODE);
++        ex_no = intr_info & INTR_INFO_VECTOR_MASK;
++        if (ex_no == 0xe) {  // set cr2
++                vcpu->arch.cr2 = vmcs_readl(EXIT_QUALIFICATION);
++        }
++        kvm_run->exit_reason = KVM_EXIT_EXCEPTION;
++        kvm_run->ex.exception = ex_no;
++        kvm_run->ex.error_code = error_code;
++        return 0;
++#endif
++
+ 	if (is_machine_check(intr_info))
+ 		return handle_machine_check(vcpu);
+ 
+@@ -6559,7 +6594,12 @@ static int handle_interrupt_window(struc
+ 
+ static int handle_halt(struct kvm_vcpu *vcpu)
+ {
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++        vcpu->run->exit_reason = KVM_EXIT_HLT;
++        return 0;
++#else
+ 	return kvm_emulate_halt(vcpu);
++#endif
+ }
+ 
+ static int handle_vmcall(struct kvm_vcpu *vcpu)
+@@ -7044,6 +7084,10 @@ static __init int hardware_setup(void)
+ 		ple_window_shrink = 0;
+ 	}
+ 
++#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++	printk(KERN_ERR "KVM setup done, ept is %s\n", enable_ept ? "enabled" : "disabled");
++#endif
++
+ 	if (!cpu_has_vmx_apicv()) {
+ 		enable_apicv = 0;
+ 		kvm_x86_ops->sync_pir_to_irr = NULL;
+@@ -8890,6 +8934,11 @@ static int vmx_handle_exit(struct kvm_vc
+ 
+ 	trace_kvm_exit(exit_reason, vcpu, KVM_ISA_VMX);
+ 
++        //#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++        printk(KERN_ERR "VMExit at %x reason %x bitmap %x\n", 
++               kvm_rip_read(vcpu), exit_reason);
++        //#endif    
++
+ 	/*
+ 	 * Flush logged GPAs PML buffer, this will make dirty_bitmap more
+ 	 * updated. Another good is, in kvm_vm_ioctl_get_dirty_log, before
+@@ -8967,9 +9016,35 @@ static int vmx_handle_exit(struct kvm_vc
+ 		}
+ 	}
+ 
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++        if (exit_reason < kvm_vmx_max_exit_handlers
++            && kvm_vmx_exit_handlers[exit_reason]) {
++          int r;
++          r = kvm_vmx_exit_handlers[exit_reason](vcpu);
++          // Instruction handled correctly but exception injected into
++          // the guest
++          if (r == 1 && vcpu->arch.exception.pending) {
++#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++            printk(KERN_ERR "Detected %s pending exception %x\n",
++                   (1 << vcpu->arch.exception.nr) &
++                   vmcs_read32(EXCEPTION_BITMAP) ?
++                   "masked" : "non masked", vcpu->arch.exception.nr);
++#endif
++            if ((1 << vcpu->arch.exception.nr) & vmcs_read32(EXCEPTION_BITMAP)) {
++              vcpu->run->exit_reason = KVM_EXIT_EXCEPTION;
++              vcpu->run->ex.exception = vcpu->arch.exception.nr;
++              vcpu->run->ex.error_code = vcpu->arch.exception.has_error_code ?
++                vcpu->arch.exception.error_code : 0;
++              return 0;
++            }
++          }
++          return r;
++        }
++#else
+ 	if (exit_reason < kvm_vmx_max_exit_handlers
+ 	    && kvm_vmx_exit_handlers[exit_reason])
+ 		return kvm_vmx_exit_handlers[exit_reason](vcpu);
++#endif
+ 	else {
+ 		vcpu_unimpl(vcpu, "vmx: unexpected exit reason 0x%x\n",
+ 				exit_reason);
+@@ -9756,6 +9831,10 @@ static struct kvm_vcpu *vmx_create_vcpu(
+ 	if (err < 0)
+ 		goto free_msrs;
+ 
++#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++	printk(KERN_ERR "VMCS init\n");
++#endif
++
+ 	msr_bitmap = vmx->vmcs01.msr_bitmap;
+ 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE, MSR_TYPE_RW);
+ 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE, MSR_TYPE_RW);
