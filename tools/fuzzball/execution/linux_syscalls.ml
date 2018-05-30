@@ -2550,7 +2550,7 @@ object(self)
 	   | (false, X86) ->
 	       ["Linux"; (* sysname *)
 		nodename; (* nodename *)
-		"2.6.32-5-amd64"; (* release *)
+		"3.2.0-1-amd64"; (* release *)
 		"#1 SMP Fri Mar 27 04:02:59 UTC 2011"; (* version *)
 		"i686"; (* machine *)
 		"example.com" (* domain *)
@@ -2558,7 +2558,7 @@ object(self)
 	   | (false, X64) ->
 	       ["Linux"; (* sysname *)
 		nodename; (* nodename *)
-		"2.6.32-5-amd64"; (* release *)
+		"3.2.0-1-amd64"; (* release *)
 		"#1 SMP Fri Mar 27 04:02:59 UTC 2011"; (* version *)
 		"x86_64"; (* machine *)
 		"example.com" (* domain *)
@@ -4280,13 +4280,14 @@ object(self)
 	 | (X86, 294) -> (* migrate_pages *)
 	     uh "Unhandled Linux/x86 system call migrate_pages (294)"
 	 | (ARM, 322)    (* openat *)
-	 | (X86, 295) -> (* openat *)
+	 | (X86, 295)    (* openat *)
+	 | (X64, 257) -> (* openat *)
          let (arg1, arg2, arg3) = read_3_regs () in
          let arg4 = (if (Int64.logand arg3 0o100L) <> 0L then
                        get_reg arg_regs.(3)
                      else
                        0L) in
-         let dirfd    = Int64.to_int arg1 and
+         let dirfd    = Int64.to_int (fix_s32 arg1) and
              path_buf = arg2 and
              flags    = Int64.to_int arg3 and
              mode     = Int64.to_int arg4 in
