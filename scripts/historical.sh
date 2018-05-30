@@ -165,7 +165,7 @@ if (( $start <= 4 )); then
         for file in $out/diffs_1/*; do
                 cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase; chmod +x run-testcase-debug; cd -
                 python run_test_case.py testcase:$in/$(basename $file)/$(sort -R $file| head -n 1)/testcase\
-                        timeout:10 outdir:/tmp/out script:/home/yanxx297/Project/pokemu-oras/emu/qemu/run-testcase-debug mode:0
+                        timeout:10 outdir:/tmp/out script:../emu/qemu/run-testcase-debug mode:0
                 cd ../emu/qemu
                 make distclean
                 git checkout .
@@ -176,7 +176,7 @@ if (( $start <= 4 )); then
         for file in $out/diffs_10000/*; do
                 cd ../emu/qemu && ./check-qemu.sh; chmod +x run-testcase; chmod +x run-testcase-debug; cd -
                 python run_test_case.py testcase:$in/$(basename $file)/$(sort -R $file| head -n 1)/testcase\
-                        timeout:10 outdir:/tmp/out script:/home/yanxx297/Project/pokemu-oras/emu/qemu/run-testcase-debug mode:3 loop:10000
+                        timeout:10 outdir:/tmp/out script:../emu/qemu/run-testcase-debug mode:3 loop:10000
                 cd ../emu/qemu
                 make distclean
                 git checkout .

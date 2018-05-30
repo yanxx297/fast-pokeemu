@@ -85,4 +85,4 @@ else
 	make -f batchRunTestcase -i -j 6
 fi
 
-rm -rf /tmp/tmp.*
+rm -rf $tmp_dir/tmp.*
