@@ -120,6 +120,8 @@ void VCPU::SetSregs(struct kvm_sregs *r) {
   int i;
 
   i = ioctl(cpu_fd, KVM_SET_SREGS, r);
+  if (i == -1)
+    fprintf(stderr, "KVM_SET_SREGS failed: %s\n", strerror(errno));
   assert(i != -1);
 }
 
@@ -302,6 +304,9 @@ KVM::KVM(const char *fname) {
 
   // Load state from disk
   f = fopen(fname, "r");
+  if (!f)
+    fprintf(stderr, "Failed to open state file %s for reading: %s\n",
+	    fname, strerror(errno));
   assert(f);
 
   r = fread(f, &h, sizeof(h));
@@ -514,6 +519,13 @@ void KVM::Load(const char *fname) {
     ksregs.cr4 = s.sregs_state.cr4;
     ksregs.cr8 = s.sregs_state.cr8;
     ksregs.efer = s.sregs_state.efer;
+
+    /* These parts of the KVM sregs state don't have any directly
+       corresponding data in the KEmuFuzzer sregs_state_t. Leaving
+       them uninitialized can sometimes cause KVM_SET_SREGS to return
+       EINVAL, whereas making them 0 seems safer. */
+    ksregs.apic_base = 0;
+    memset(&ksregs.interrupt_bitmap, 0, ((KVM_NR_INTERRUPTS + 7)/8));
 
     // Load fpu
     memcpy(&kfpu.fpr, &s.fpu_state.st, sizeof(s.fpu_state.st));
