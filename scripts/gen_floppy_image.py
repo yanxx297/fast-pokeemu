@@ -1354,7 +1354,7 @@ def get_explicit_op(inst, i):
         print "operand: %s" % name
         if is_explicit(op.get_visibility()):
             if count == i:
-                print "Find explicit!!!"
+                print "Find explicit"
                 if op.is_register() or op.is_memory_addressing_register():                 
                     print "    reg"
                     (op_str, op_len) = get_reg_op(inst, op, i)
@@ -1545,9 +1545,9 @@ def handle_mem_write(inst, op, i, isInit = False):
 def get_reg_op(inst, op, i):  
     reg = inst.get_reg(op.get_name())
     reg_str = reg_map[reg]
-#     reg_len = inst.get_operand_length_bits(i)
     reg_len = inst.get_operand_length(i)
-#     print "REGISTER %s (%d)" %(reg_str, reg_len)
+    if reg_str == "gdtr":
+        reg_str = ""
     return (reg_str, reg_len)
 
 
@@ -1650,9 +1650,9 @@ def handle_reg_write(inst, op, i, isInit = False):
             
     if op.is_written_only() or op.is_read_and_written():
         if op.is_written_only():
-            print "W"
+            print "reg_str: %s(W)" %reg_str
         elif op.is_read_and_written():
-            print "RW"
+            print "reg_str: %s(RW)" %reg_str
         if isInit:
             l = get_addr(reg_len)
             bak = get_addr(reg_len)
