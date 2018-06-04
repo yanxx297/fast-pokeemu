@@ -2,12 +2,12 @@
 
 #Config
 MODE?=0
-IN?=/export/scratch/tmp/aggreg_list
-OUT?=/export/scratch/tmp/out/
-TMP_DIR?=/export/scratch/tmp/
+IN?=../data/aggreg_list
+OUT?=/tmp/out/
+TMP_DIR?=/tmp/
 TIMEOUT?=10
 LOOP?=1
-EMUPATH?=./../emu/qemu-0.12.4/run-testcase
+EMUPATH?=./../emu/qemu/run-testcase
 
 
 SUBDIRS := $(sort $(dir $(wildcard $(IN)/*/.)))
@@ -25,6 +25,7 @@ $(addprefix $(OUT), $(shell basename $1))/time:: ;
 		timeout:$(TIMEOUT) \
 		outdir:$(OUTDIR) \
 		script:$(EMUPATH) mode:$(MODE) tmp:$(TMP) loop:$(LOOP);)
+	rm -rf $(addprefix $(OUT)/, $(shell basename $1))
 	mv $(OUTDIR) $(addprefix $(OUT)/, $(shell basename $1));
 endef
 

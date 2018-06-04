@@ -10,7 +10,7 @@ TIMEOUT?=10
 all:$(addsuffix /ktime, $(addprefix $(OUT), $(foreach dir, $(INSN_LIST), $(dir))))
 
 define run-target
-$(addprefix $(OUT), $1)/ktime:
+$(addprefix $(OUT), $1)/ktime::
 	$(eval OUTDIR:= $(addprefix $(OUT), $1))
 	for file in $(OUTDIR)/*.pre; do\
 		tcname=$$$$(basename $$$$file .pre);\
@@ -19,7 +19,6 @@ $(addprefix $(OUT), $1)/ktime:
 		err=$$$$?;\
 		if [ $$$$err == 0 ]; then\
 			echo $$$$tcname >> $(OUTDIR)/match;\
-                        rm $(OUTDIR)/$$$$tcname.diff;\
 		elif [ $$$$err == 2 ]; then\
 			echo $$$$tcname >> $(OUTDIR)/mismatch;\
                 elif [ $$$$err == 1 ]; then\
