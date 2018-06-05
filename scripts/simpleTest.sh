@@ -64,6 +64,7 @@ done < ../data/instructions.csv
 
 if [ -d ../data/state-explr/$insn ]; then
 	echo -e "\e[1mState files alreay exist for $insn, skip machine state exploring...\e[21m"
+	rm -rf $out/state-explr/$insn
 	cp -r ../data/state-explr/$insn $out/state-explr/$insn
 else
 	echo -e "\e[1mMachine states for $insn absent. Start regeneration...\e[21m"
@@ -76,7 +77,8 @@ fi
 
 if [ -d ../data/state-explr/$insn ] && ( [ -d ../data/aggreg_list/$insn ] || [ "$aggreg" == false ]); then
 	echo -e "\e[1mNo need to regenerate aggregation list.\e[21m"
-	cp -r ../data/aggreg_list/$insn $out/aggreg_list/
+	rm -rf $out/aggreg_list/$insn
+	cp -r ../data/aggreg_list/$insn/ $out/aggreg_list/
 else
 	echo -e "\e[1mPrerun tests to regenerate aggregation list...(may take a while)\e[21m"
 	./run-testcase-offline.sh -m 3 -in $out/state-explr -out $out/single-m3/ -e $emu_path
