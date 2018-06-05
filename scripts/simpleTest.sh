@@ -53,10 +53,11 @@ fi
 mkdir -p $out/state-explr
 mkdir -p $out/aggreg_list
 mkdir -p /tmp/out
+tmpfile=$(mktemp); echo $shellcode > $tmpfile
 while IFS=$'\t' read -r -a line
 do
 	if [ $shellcode == ${line[0]} ]; then
-		insn=${line[3]}
+		insn=${line[3]}$(sed 's/\\x//g' $tmpfile)
 		break
 	fi
 done < ../data/instructions.csv
