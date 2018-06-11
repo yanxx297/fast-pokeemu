@@ -2538,7 +2538,7 @@ def compile_gadgets(gadget, epilogue, directive = ""):
     if DEBUG >= 3:
         cmdline = "readelf --relocs %s" % tmpobj
         subprocess.call(cmdline.split())
-    cmdline = "ld -m elf_i386 -Ttext 0x219000 -o %s %s" % (tmpelf, tmpobj)
+    cmdline = "ld -m elf_i386 -Ttext 0x219000 -e 0x219000 -o %s %s" % (tmpelf, tmpobj)
     subprocess.call(cmdline.split())
 
     # Extract the asm of the gadgets (.text section) from the elf object
