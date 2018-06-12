@@ -175,7 +175,10 @@ sub run_singles
 	#print "q";
 	my $prestate = "$tc_out_dir/$se_dir.pre";
 	my $qemu_poststate = "$tc_out_dir/$se_dir.post";
-	die "Missing prestate image $prestate" unless -e $prestate;
+	if (not -e $prestate) {
+	    $fail_cnt++;
+	    next;
+	}
 	my $kvm_poststate = "$tc_out_dir/$se_dir.kvm.post";
 	open(RUN, "-|", "/usr/bin/timeout", $TIMEOUT,
 	     $kvm_script, $prestate, $kvm_poststate)
@@ -222,18 +225,21 @@ sub run_singles
 	"$fail_cnt failures\n";
     print PROG "$insn_var s$mode has $match_cnt match, $mismatch_cnt mismatch, "
 	."$fail_cnt failures\n";
+    my $stat = $mismatch_cnt > 0 ? 1 : 0;
     if ($make_agg) {
+	return ($stat, 0) if not @usable_tcs;
 	open(LIST, ">", "$subdir/aggreg.list")
 	    or die "Failed to open $subdir/aggreg.list for writing: $!";
 	print LIST join(",", @usable_tcs);
 	close LIST;
 	system($python, "$pokeemu_root/scripts/split_log.py",
 	       "$subdir/aggreg.list", 600);
+	return ($stat, 1);
     }
-    return $mismatch_cnt > 0 ? 1 : 0;
+    return $stat;
 }
 
-my $s3_stat = run_singles(3, 1);
+my($s3_stat, $viable) = run_singles(3, 1);
 my $s0_stat = run_singles(0);
 # run_singles(1);
 # run_singles(2);
@@ -284,7 +290,10 @@ sub run_aggregs
 	#print "q";
 	my $prestate = "$tc_out_dir/$group_num.pre";
 	my $qemu_poststate = "$tc_out_dir/$group_num.post";
-	die "Missing prestate image $prestate" unless -e $prestate;
+	if (not -e $prestate) {
+	    $fail_cnt++;
+	    next;
+	}
 	my $kvm_poststate = "$tc_out_dir/$group_num.kvm.post";
 	open(RUN, "-|", "/usr/bin/timeout", $TIMEOUT,
 	     $kvm_script, $prestate, $kvm_poststate)
@@ -329,17 +338,22 @@ sub run_aggregs
     return $mismatch_cnt > 0 ? 1 : 0;
 }
 
-my $m3_stat = run_aggregs(3);
+if ($viable) {
+    my $m3_stat = run_aggregs(3);
 
-my $class = $s0_stat . $s3_stat . $m3_stat;
+    my $class = $s0_stat . $s3_stat . $m3_stat;
 
-print "$class $insn_var\n";
-print PROG "$class $insn_var\n";
+    print "$class $insn_var\n";
+    print PROG "$class $insn_var\n";
 
-open(CLASS, ">>", "$out_dir/$class")
-    or die "Failed to open $out_dir/$class to append: $!";
-print CLASS "$insn_var\n";
-close CLASS;
+    open(CLASS, ">>", "$out_dir/$class")
+      or die "Failed to open $out_dir/$class to append: $!";
+    print CLASS "$insn_var\n";
+    close CLASS;
+} else {
+    print "unviable $insn_var\n";
+    print PROG "unviable $insn_var\n";
+}
 
 system("/bin/rm", "-rf", "$subdir/state-explr");
 system("/bin/rm", "-rf", "$subdir/single-m0");
