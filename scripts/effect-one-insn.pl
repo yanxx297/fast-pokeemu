@@ -130,6 +130,24 @@ close LOG;
 print "State exploration of $insn_var used $iters iteration(s), $time\n";
 print PROG "State exploration of $insn_var used $iters iteration(s), $time\n";
 
+sub copy_limited {
+    my($RUN_fh, $LOG_fh) = @_;
+    my $excn_count = 0;
+    my $max_excns = 100;
+    while (<$RUN_fh>) {
+	if (/^Exception /) {
+	    $excn_count++;
+	    if ($excn_count < $max_excns) {
+		print $LOG_fh $_;
+	    } elsif ($excn_count == $max_excns) {
+		chomp; print $LOG_fh $_, " (further exception msgs dropped)\n";
+	    }
+	} else {
+	    print $LOG_fh $_;
+	}
+    }
+}
+
 sub run_singles
 {
     my($mode, $make_agg) = @_;
@@ -168,9 +186,7 @@ sub run_singles
 	push @tc_args, "loop:1";
 	open(RUN, "-|", $python, "run_test_case.py", @tc_args)
 	    or die "Failed to run run_test_case.py: $!";
-	while (<RUN>) {
-	    print LOG $_;
-	}
+	copy_limited(\*RUN, \*LOG);
 	close RUN;
 	#print "q";
 	my $prestate = "$tc_out_dir/$se_dir.pre";
@@ -283,9 +299,7 @@ sub run_aggregs
 	push @tc_args, "loop:1";
 	open(RUN, "-|", $python, "run_test_case.py", @tc_args)
 	    or die "Failed to run run_test_case.py: $!";
-	while (<RUN>) {
-	    print LOG $_;
-	}
+	copy_limited(\*RUN, \*LOG);
 	close RUN;
 	#print "q";
 	my $prestate = "$tc_out_dir/$group_num.pre";
