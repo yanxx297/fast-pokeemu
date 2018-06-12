@@ -24,7 +24,7 @@ export KEMUFUZZER_PRE_STATE="$pre"
 export KEMUFUZZER_POST_STATE="$post"
 export KEMUFUZZER_TESTCASE_CHECKSUM="no checksum"
 
-tmpfile=$(mktemp)_
+tmpfile=$(mktemp)
 { TIMEFORMAT='%3R'; time $here/kvm $pre $post; } 2>$tmpfile
 ret=$?
 if [ $ret -eq 0 ]
@@ -36,5 +36,5 @@ fi
 
 cat $tmpfile
 cat $tmpfile >> $dir
-rm -f "$post"
+rm -f "$post" $tempfile
 exit $ret
