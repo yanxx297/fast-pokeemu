@@ -36,5 +36,6 @@ fi
 
 cat $tmpfile
 cat $tmpfile >> $dir
-rm -f "$post" $tempfile
+rm -f "$post"
+rm -f "$tmpfile"
 exit $ret
