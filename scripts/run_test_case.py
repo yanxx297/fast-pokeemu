@@ -91,17 +91,9 @@ def run_testcase(outdir, code, path, script, floppy, timeout, tmp):
         exectime = time.time() - t0
         print "done in %.3fs" % (exectime)
     except Timeout:
-        # Create a fake post state
+        # We no longer create a fake poststate here, and the prestate
+        # may not exist either.
         print "TIMEOUT!!!!"
-        pre = outprefix + ".pre"
-        post = outprefix + ".post"
-        assert os.path.isfile(pre)
-        pre = parse_header_from_file(pre)
-        create_dummy_state(outprefix + ".post", POST_TESTCASE|TIMEOUT_TESTCASE,
-                           emu = pre.emulator, 
-                           kernel_md5 = pre.kernel_checksum,
-                           kernel_version = pre.kernel_version,
-                           testcase_md5 = pre.testcase_checksum)
         exit(0)
 
 
