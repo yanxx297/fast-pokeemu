@@ -1,0 +1,84 @@
+--- linux-4.16.5-orig/include/uapi/linux/kvm.h	2018-04-26 04:00:39.000000000 -0500
++++ linux-4.16.5/include/uapi/linux/kvm.h	2018-06-14 19:01:52.871613650 -0500
+@@ -13,7 +13,7 @@
+ #include <linux/ioctl.h>
+ #include <asm/kvm.h>
+ 
+-#define KVM_API_VERSION 12
++#define KVM_API_VERSION 2411
+ 
+ /* *** Deprecated interfaces *** */
+ 
+--- linux-4.16.5-orig/arch/x86/kvm/vmx.c	2018-04-26 04:00:39.000000000 -0500
++++ linux-4.16.5/arch/x86/kvm/vmx.c	2018-06-14 20:49:33.693115084 -0500
+@@ -57,6 +57,8 @@
+ #include "trace.h"
+ #include "pmu.h"
+ 
++#define PASS_EVERYTHING_TO_USERSPACE                                                                                                                                                                         
++/* #define DEBUG_PASS_EVERYTHING_TO_USERSPACE */
+ #define __ex(x) __kvm_handle_fault_on_reboot(x)
+ #define __ex_clear(x, reg) \
+ 	____kvm_handle_fault_on_reboot(x, "xor " reg " , " reg)
+@@ -92,6 +94,10 @@ module_param_named(eptad, enable_ept_ad_
+ static bool __read_mostly emulate_invalid_guest_state = true;
+ module_param(emulate_invalid_guest_state, bool, S_IRUGO);
+ 
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++static u32 __exception_bitmap = 0;
++#endif
++
+ static bool __read_mostly fasteoi = 1;
+ module_param(fasteoi, bool, S_IRUGO);
+ 
+@@ -6559,7 +6565,12 @@ static int handle_interrupt_window(struc
+ 
+ static int handle_halt(struct kvm_vcpu *vcpu)
+ {
++#ifdef PASS_EVERYTHING_TO_USERSPACE
++        vcpu->run->exit_reason = KVM_EXIT_HLT;
++        return 0;
++#else
+ 	return kvm_emulate_halt(vcpu);
++#endif
+ }
+ 
+ static int handle_vmcall(struct kvm_vcpu *vcpu)
+@@ -7044,6 +7055,10 @@ static __init int hardware_setup(void)
+ 		ple_window_shrink = 0;
+ 	}
+ 
++#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++	printk(KERN_ERR "KVM setup done, ept is %s\n", enable_ept ? "enabled" : "disabled");
++#endif
++
+ 	if (!cpu_has_vmx_apicv()) {
+ 		enable_apicv = 0;
+ 		kvm_x86_ops->sync_pir_to_irr = NULL;
+@@ -8890,6 +8905,15 @@ static int vmx_handle_exit(struct kvm_vc
+ 
+ 	trace_kvm_exit(exit_reason, vcpu, KVM_ISA_VMX);
+ 
++#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++	/* Fast PokeEMU note: our testcases sometimes trigger CPU
++	   exceptions in a tight loop. If you are going to enable this
++	   debugging message, you may want to be careful about your
++	   syslog's disk space usage. */
++        printk(KERN_ERR "VMExit at %x reason %x bitmap %x\n", 
++               kvm_rip_read(vcpu), exit_reason);
++#endif    
++
+ 	/*
+ 	 * Flush logged GPAs PML buffer, this will make dirty_bitmap more
+ 	 * updated. Another good is, in kvm_vm_ioctl_get_dirty_log, before
+@@ -9756,6 +9780,10 @@ static struct kvm_vcpu *vmx_create_vcpu(
+ 	if (err < 0)
+ 		goto free_msrs;
+ 
++#ifdef DEBUG_PASS_EVERYTHING_TO_USERSPACE
++	printk(KERN_ERR "VMCS init\n");
++#endif
++
+ 	msr_bitmap = vmx->vmcs01.msr_bitmap;
+ 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE, MSR_TYPE_RW);
+ 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE, MSR_TYPE_RW);
