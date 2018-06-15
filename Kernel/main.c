@@ -470,6 +470,9 @@ void switch_to_testcase_task() {
                         /* To cancle out the effect of exception #5 raised only
                            on KVM, raise it manually on both */
                         "int $0x5;"
+			"mov %%cr0,%%eax;"
+			"andl $0xfffffff7,%%eax;"
+			"mov %%eax,%%cr0;"
                         /* QEMU doesn't set the accessed bit of new stack seg
                            correctly. As a workaround, we access those segments
                            before testcase by loading its descriptor and load
