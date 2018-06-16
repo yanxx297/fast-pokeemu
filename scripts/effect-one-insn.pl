@@ -204,6 +204,10 @@ sub run_singles
 	}
 	close RUN;
 	#print "k";
+	if (not -e $kvm_poststate) {
+	    $fail_cnt++;
+	    next;
+	}
 	my $diff_file = "$tc_out_dir/$se_dir.diff";
 	open(DIFF, ">", $diff_file)
 	    or die "Failed to open $diff_file for writing: $!";
@@ -317,6 +321,10 @@ sub run_aggregs
 	}
 	close RUN;
 	#print "k";
+	if (not -e $kvm_poststate) {
+	    $fail_cnt++;
+	    next;
+	}
 	my $diff_file = "$tc_out_dir/$group_num.diff";
 	open(DIFF, ">", $diff_file)
 	    or die "Failed to open $diff_file for writing: $!";
