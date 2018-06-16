@@ -377,10 +377,40 @@ if ($viable) {
     print PROG "unviable $insn_var\n";
 }
 
+sub harvest_diffs {
+    my($subdir, $kind) = @_;
+    opendir(RESDIR, "$subdir/$kind")
+      or die "Failed to open directory $subdir/$kind for reading: $!";
+    my @files = grep(/\.diff$/, readdir(RESDIR));
+    close RESDIR;
+    open(DIFFS, ">", "$subdir/$kind.diffs")
+      or die "Failed to open $subdir/$kind.diffs for writing: $!";
+    @files = sort @files;
+    for my $f (@files) {
+	$f =~ /^(\d+)\.diff/ or next;
+	my $num = $1;
+	print DIFFS "Test $num:\n";
+	open(DIFF, "<", "$subdir/$kind/$f")
+	  or die "Failed to open $subdir/$kind/$f for reading: $!";
+	while (<DIFF>) {
+	    print DIFFS $_;
+	}
+	close DIFF;
+    }
+    close DIFFS;
+    system("/usr/bin/xz", "$subdir/$kind.diffs");
+}
+
+
 system("/bin/rm", "-rf", "$subdir/state-explr");
-system("/bin/rm", "-rf", "$subdir/single-m0");
-system("/bin/rm", "-rf", "$subdir/single-m3");
-system("/bin/rm", "-rf", "$subdir/aggreg-m3");
+
+#system("/bin/rm", "-rf", "$subdir/single-m0");
+#system("/bin/rm", "-rf", "$subdir/single-m3");
+#system("/bin/rm", "-rf", "$subdir/aggreg-m3");
+harvest_diffs($subdir, "single-m0");
+harvest_diffs($subdir, "single-m3");
+harvest_diffs($subdir, "aggreg-m3");
+
 system("/usr/bin/xz", "$subdir/state-explr.log");
 system("/usr/bin/xz", "$subdir/single-m0.log");
 system("/usr/bin/xz", "$subdir/single-m3.log");
