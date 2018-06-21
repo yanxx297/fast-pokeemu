@@ -57,7 +57,7 @@ tmpfile=$(mktemp); echo $shellcode > $tmpfile
 while IFS=$'\t' read -r -a line
 do
 	if [ $shellcode == ${line[0]} ]; then
-		insn=${line[3]}$(sed 's/\\x//g' $tmpfile)
+		insn=${line[3]}-$(sed 's/\\x//g' $tmpfile)
 		break
 	fi
 done < ../data/instructions.csv
