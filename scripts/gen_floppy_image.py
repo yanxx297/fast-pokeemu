@@ -311,6 +311,8 @@ reg_map = [
   "mm5",
   "mm6",
   "mm7",
+  "ssp",
+  "", #"XED_REG_IA32_U_CET"
   "mxcsr",
   "", #"stackpush",
   "", #"stackpop",
@@ -492,6 +494,8 @@ reg_map = [
   "k7", 
   "mmx0", 
   "mmx7", 
+  "ssp",
+  "", #"XED_REG_MSR_LAST=XED_REG_IA32_U_CET"
   "mxcsr", 
   "mxcsr", 
   "", #"stackpush", 
