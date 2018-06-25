@@ -432,6 +432,8 @@ def normalize_states(dumps):
             c.fpu_state.mxcsr = 0
             c.fpu_state.mxcsr_mask = 0
             c.fpu_state.ftw = 0
+            c.fpu_state.fpuip = 0 # Not kept by QEMU
+            c.fpu_state.fpudp = 0 # Not kept by QEMU
             for xmm in c.fpu_state.xmm:
                 for i in range(len(xmm.data)):
                     xmm.data[i] = 0
