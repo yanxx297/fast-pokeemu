@@ -27,7 +27,7 @@ floppy.img: $(DEST)
 	mmd -i floppy.img boot/grub
 	mcopy -i floppy.img grub_stuff/boot/grub/* ::boot/grub
 	mcopy -i floppy.img kernel ::
-	/home/grad01/yan/Project/lib/grub-0.97/grub/grub --batch --device-map=/dev/null < grub_stuff/grub.cfg
+	#/home/grad01/yan/Project/lib/grub-0.97/grub/grub --batch --device-map=/dev/null < grub_stuff/grub.cfg
 
 disk: floppy.img 
 
