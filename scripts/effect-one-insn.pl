@@ -59,6 +59,9 @@ die "Instruction bytes should be an even number of hex digits"
 my $TIMEOUT = 10;
 $TIMEOUT = $ENV{"TIMEOUT"} if exists $ENV{"TIMEOUT"};
 
+my $DISABLE_CLEAN = 0;
+$DISABLE_CLEAN = 1 if exists $ENV{"DISABLE_CLEAN"};
+
 my $shellcode = $insn_bytes;
 $shellcode =~ s/(..)/\\x$1/g;
 
@@ -402,14 +405,16 @@ sub harvest_diffs {
 }
 
 
-system("/bin/rm", "-rf", "$subdir/state-explr");
 
-#system("/bin/rm", "-rf", "$subdir/single-m0");
-#system("/bin/rm", "-rf", "$subdir/single-m3");
-#system("/bin/rm", "-rf", "$subdir/aggreg-m3");
 harvest_diffs($subdir, "single-m0");
 harvest_diffs($subdir, "single-m3");
 harvest_diffs($subdir, "aggreg-m3");
+if (not $DISABLE_CLEAN) {
+    system("/bin/rm", "-rf", "$subdir/state-explr");
+    system("/bin/rm", "-rf", "$subdir/single-m0");
+    system("/bin/rm", "-rf", "$subdir/single-m3");
+    system("/bin/rm", "-rf", "$subdir/aggreg-m3");
+}
 
 system("/usr/bin/xz", "$subdir/state-explr.log");
 system("/usr/bin/xz", "$subdir/single-m0.log");
