@@ -1162,10 +1162,10 @@ def gen_reg2mem(reg, mem, size = 4):
     elif reg.startswith("st"):
         use += [Register("CR0")]
         if reg == "st(0)":
-            asm += "fstp %s;" % mem
+            asm += "fstpt %s;" % mem
         else:
             asm += "fxch %%%s;" \
-                "fstp %s;" \
+                "fstpt %s;" \
                 "fxch %%%s;" % (reg, mem, reg)
     elif reg == "xcr0":
         asm += "xgetbv;" \
@@ -1220,10 +1220,10 @@ def gen_mem2reg(mem, reg, size = 4):
         use += [Register("CR0")]
         define += [Register("ST(0)")]
         if reg == "st(0)":
-            asm += "fld %s;" % mem
+            asm += "fldt %s;" % mem
         else:
             asm += "fxch %%%s;" \
-                "fld %s;" \
+                "fldt %s;" \
                 "fxch %%%s;" % (reg, mem, reg)
     elif reg == "xcr0":
         asm += "mov %s,%%edx;" \
