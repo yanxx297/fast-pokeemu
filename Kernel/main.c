@@ -83,7 +83,7 @@ void switch_to_testcase_task(void) __attribute__ ((noinline));
 
 void init_memory(void);
 
-inline void init_fpu(void);
+static inline void init_fpu(void);
 
 void init_msr(void);
 
@@ -99,7 +99,7 @@ void kmain(int magic, multiboot_info_t *mbi)
 #ifdef DEBUG
   tssdesc_t *tssdesc;
 #endif
-  uint32_t esp0, esp1, esp2, esp3, espVM;
+  uint32_t esp0, esp1, esp2, esp3;
 
   if (magic != MULTIBOOT_BOOTLOADER_MAGIC)
     {
@@ -247,107 +247,107 @@ void kmain(int magic, multiboot_info_t *mbi)
 
   pde_t *p_dir = (pde_t *)((unsigned int)(&pd_EXCP) - mem_offset);
   // Divide Error
-  set_tss(&tssEXCP00, int_handler_0, esp0, get_eflags(),
+  set_tss(&tssEXCP00, (uint32_t)int_handler_0, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Debug Exception
-  set_tss(&tssEXCP01, int_handler_1, esp0, get_eflags(),
+  set_tss(&tssEXCP01, (uint32_t)int_handler_1, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // NMI Interrupt
-  set_tss(&tssEXCP02, int_handler_2, esp0, get_eflags(),
+  set_tss(&tssEXCP02, (uint32_t)int_handler_2, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Breakpoint
-  set_tss(&tssEXCP03, int_handler_3, esp0, get_eflags(),
+  set_tss(&tssEXCP03, (uint32_t)int_handler_3, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Overflow
-  set_tss(&tssEXCP04, int_handler_4, esp0, get_eflags(),
+  set_tss(&tssEXCP04, (uint32_t)int_handler_4, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // BOUND Range Exceeded
-  set_tss(&tssEXCP05, int_handler_5, esp0, get_eflags(),
+  set_tss(&tssEXCP05, (uint32_t)int_handler_5, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Invalid (Undefined) Opcode
-  set_tss(&tssEXCP06, int_handler_6, esp0, get_eflags(),
+  set_tss(&tssEXCP06, (uint32_t)int_handler_6, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Device Not Available
-  set_tss(&tssEXCP07, int_handler_7, esp0, get_eflags(),
+  set_tss(&tssEXCP07, (uint32_t)int_handler_7, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Double Fault
-  set_tss(&tssEXCP08, int_handler_8, esp0, get_eflags(),
+  set_tss(&tssEXCP08, (uint32_t)int_handler_8, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Coprocessor Segment Overrun (reserved)
-  set_tss(&tssEXCP09, int_handler_9, esp0, get_eflags(),
+  set_tss(&tssEXCP09, (uint32_t)int_handler_9, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Invalid TSS
-  set_tss(&tssEXCP10, int_handler_10, esp0, get_eflags(),
+  set_tss(&tssEXCP10, (uint32_t)int_handler_10, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Segment Not Present
-  set_tss(&tssEXCP11, int_handler_11, esp0, get_eflags(),
+  set_tss(&tssEXCP11, (uint32_t)int_handler_11, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Stack Segment Fault
-  set_tss(&tssEXCP12, int_handler_12, esp0, get_eflags(),
+  set_tss(&tssEXCP12, (uint32_t)int_handler_12, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // General Protection
-  set_tss(&tssEXCP13, int_handler_13, esp0, get_eflags(),
+  set_tss(&tssEXCP13, (uint32_t)int_handler_13, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Page Fault
-  set_tss(&tssEXCP14, int_handler_14, esp0, get_eflags(),
+  set_tss(&tssEXCP14, (uint32_t)int_handler_14, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Intel reserverd, Do not use.
-  set_tss(&tssEXCP15, int_handler_15, esp0, get_eflags(),
+  set_tss(&tssEXCP15, (uint32_t)int_handler_15, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // X87 FPU Floating Point Error (Math Fault)
-  set_tss(&tssEXCP16, int_handler_16, esp0, get_eflags(),
+  set_tss(&tssEXCP16, (uint32_t)int_handler_16, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Alighment Check
-  set_tss(&tssEXCP17, int_handler_17, esp0, get_eflags(),
+  set_tss(&tssEXCP17, (uint32_t)int_handler_17, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // Machine Check
-  set_tss(&tssEXCP18, int_handler_18, esp0, get_eflags(),
+  set_tss(&tssEXCP18, (uint32_t)int_handler_18, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // SIMD Floating-Point Exception
-  set_tss(&tssEXCP19, int_handler_19, esp0, get_eflags(),
+  set_tss(&tssEXCP19, (uint32_t)int_handler_19, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
   // TSS for User-defined exception
-  set_tss(&tssEXCP32, int_handler_32, esp0, get_eflags(),
+  set_tss(&tssEXCP32, (uint32_t)int_handler_32, esp0, get_eflags(),
 	  SEL_RPL(SEL_EXCP_CS,0), SEL_RPL(SEL_EXCP_DS,0), SEL_RPL(SEL_EXCP_SS,0), (get_cr3() & 0xfff) | (((uint32_t)(p_dir))&0xfffff000),
 	  SEL_RPL(SEL_EXCP_SS,0), SEL_RPL(SEL_EXCP_SS,1), SEL_RPL(SEL_EXCP_SS,2), esp0, esp1, esp2, 0xc8);
 
@@ -420,7 +420,7 @@ void init_memory(void)
 #undef zeropage
 }
 
-inline void init_fpu(void)
+static inline void init_fpu(void)
 {
   /* Enable FPU (clear CR0 bits 2 and 3) */
   set_cr0(get_cr0() & ~(1 << 2 | 1 << 3));
