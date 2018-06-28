@@ -41,7 +41,7 @@ if [ -e kemufuzzer.c ]; then
         if grep -q disable-capstone configure; then
                 seccomp="--disable-capstone"
         fi
-        ./configure --disable-linux-user --target-list=i386-softmmu --enable-kemufuzzer --disable-kvm --disable-werror --cc=$cc" cc" --disable-fdt $seccomp $capstone
+        ./configure --disable-linux-user --target-list=i386-softmmu --enable-kemufuzzer --disable-kvm --disable-werror --cc=$cc" cc" --disable-fdt --disable-docs --disable-libiscsi --disable-xen --disable-usb-redir $seccomp $capstone
         make
         rv=$?
         # Terminate bisecting if compilation fails.
