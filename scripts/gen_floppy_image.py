@@ -901,7 +901,7 @@ def gen_get_eip(r, r2 = None):
 # ===-------------------------------------------------------------------===
 def gen_cmp_imm(src, imm, t = "eax", size = 4):
     asm = ""
-    if src in reg_map:
+    if src in reg_map.values():
         reg = src
         if reg == "eflags":
             asm += "pushf;" \
@@ -1228,7 +1228,7 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
     kill = []
     use = []
     use__ = []
-    if src2 in reg_map:
+    if src2 in reg_map.values():
         use += [Register(src2.upper())]
     else:
         use += [src2]
@@ -1269,10 +1269,10 @@ def gen_feistel_cipher(src1, src2, dest, size = 4, clean = False):
         m = size2mov(size, src2)
         x = size2xor(size, src2)
         r = resize_reg(t, size)
-        format_str = "%s %%%s,%%%s;" if src2 in reg_map else "%s %s,%%%s;" 
+        format_str = "%s %%%s,%%%s;" if src2 in reg_map.values() else "%s %s,%%%s;"
         asm2 += format_str % (x, src2, r)
         if clean:
-            if src2 in reg_map:
+            if src2 in reg_map.values():
                 g3.asm += "%s %%%s,%%%s;" % (x, src2, src2)
             else:
                 l = random.randint(0, 0xffffffff)
