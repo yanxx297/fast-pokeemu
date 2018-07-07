@@ -43,6 +43,7 @@ Instructions for compiling VEX are as bellow.
 
 ```bash
 svn co -r2737 svn://svn.valgrind.org/vex/trunk vex-r2737
+# You may need to apply one of those vex-* patches in tools/fuzzball
 cd vex-r2737
 make -f Makefile-gcc
 ```
@@ -72,21 +73,32 @@ make
 Simply run `make` in [tools/WhiteBochs-old/](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/tools/WhiteBochs-old/).
 
 #### Pyxed
+[Pyxed](https://github.com/huku-/pyxed) is a python wrapper around Xed library (the decoder part of [PIN](https://software.intel.com/en-us/articles/pin-a-binary-instrumentation-tool-downloads).)
 Download [PIN](https://software.intel.com/en-us/articles/pin-a-binary-instrumentation-tool-downloads),
 extract to [tools/](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/tools/) and rename the folder to `pin`.
 After that, apply our patch `pyxed.patch` to pyxed and compile it.
+Note that the patch works best with PIN 3.6.
+If you want to use a different version of PIN, you may need to fix Pyxed accordingly.
 
-	cd tools/pyxed
-	patch -p1 < ../pyxed.patch
-	make
+```bash
+cd tools/pyxed
+patch -p1 < ../pyxed.patch
+make
+```
+
+You may receive error messages related to `libc-dynamic.so` when 
+[run_test_case.py](https://github.umn.edu/yanxx297/fast-pokeemu/blob/master/scripts/run_test_case.py) call pyxed.
+In this case, set `$LD_LIBRARY_PATH` to the PIN directory that contains the `libc-dynamic.so` file (`pin/intel64/runtime/pincrt` for example.)
+
 
 #### QEMU
 To test QEMU using Fast PokeEMU, QEMU must be patched to support specific format memory dump used by Fast PokeEMU.
 We already port this patch to a range of QEMU versions (1.0 - 2.21), and include those patched QEMUs in Fast PokeEMU as a submodule. 
-
-	cd emu/qemu
-	cp ../check-qemu.sh .
-	./check-qemu.sh
+```bash
+cd emu/qemu
+cp ../check-qemu.sh .
+./check-qemu.sh
+```
 
 #### KVM
 To run Fast PokeEMU testcases on kvm, you need a customized KVM kernel module and the software interface.
@@ -289,10 +301,14 @@ It then use each of those tests to identify the git commit that fix this bug by 
 For more details about the historical bug experiment, see the [relevant section](http://www-users.cs.umn.edu/~yanxx297/vee18-fast-pokeemu.pdf#subsection.5.4) in Fast PokeEMU paper.
 
 Similar to the [effectiveness experiment](#effectiveness-experiment), you need to set `$in` for machine states directory, and `$out` for output directory.
+(Alternatively, you can set input using ``-in``.)
 In addition, copy the aggregation list folder (named `aggreg_list`) generated in the effectiveness experiment to `$out`.
-After that, run the following command to run the full experiment, or replace 0 with other numbers (1-4) to start from the middle.
+After that, run the following command to run the historical bug experiment for vanilla PokeEMU and FastPokeEMU with 10000 loop iterations, or customize your own experiment with different setup.
 ```bash
-./historical.sh -s 0
+./historical.sh -in ../data/state-explr -m 0
+./historical.sh -in ../data/state-explr -m 3 -i 10000
+# -in <path/to/machine_states> 
+# -m <mode> -i <loop-iteration>
 ```
 By default, this script select tests by running all the tests one by one, check the comparison result on earliest and latest QEMU for each test, and select those tests that mismatch on earliest and match on latest QEMU.
 To speed up this process, you can run an aggregation of those tests for each instruction by turning on the option `--aggreg`.
@@ -301,3 +317,22 @@ Note that by taking this approach you will miss some valid tests for binary sear
 For example, commit [321c535](https://github.com/qemu/qemu/commit/321c535) fixes the undefined zero flag of the bsf instruction according to recent change in Intel specification, but the behavior of the parity flag is still undefined in both QEMU and the specification.
 In other words, QEMU and KVM may have inconsistent behavior on the parity flag, which has been triggered by some tests we generated.
 As a result, if you include those tests in the aggregation (there is no way to identify those tests without running all the tests separately), the testing result of this aggregation will be mismatch in both earliest and latest QEMU, even if the zero flag bug has been fixed in the latest version.
+
+Not all the commits identified by this experiment are fixes to real bugs.
+In other words, there are false positives in the result the historical bug experiment.
+Most false positives results are caused by randomness of Fast PokeEMU, but our patch searching approach can also fail if there are two or more bugs overlapping in the same range.
+For the former case, we can exclude those results by rerunning part of the experiment for several times, and only trust results that are consistent among every execution.
+
+It is harder to exclude false positive results caused by the latter reason, but as far as we know there are only 2 instructions in this group: MOVQ_PqQqM and RDMSR.
+For those two instructions, the bug leads to behavior overlaps with another bug that stop our tests from running.
+As a result, out search approach always stop on the patch that fixes the fatal bug.
+As long as we cannot exclude the fatal bug, there is no way to identify the fix to behavior difference bug.
+This is a drawback of our current design, and improving the search approach can be our future work.
+
+After excluding all false positives, the result of historical bug experiment is as bellow.
+
+| Fix | Instruction | Without random testing | With random testing |
+| ------ | ------ | ------ | ------ |
+| [321c535](https://github.com/qemu/qemu/commit/321c535) | BSF_GdEdR<br> BSR_GdEdR| Yes<br> Yes | Yes<br> Yes |
+| [dc1823c](https://github.com/qemu/qemu/commit/dc1823c) | BTR_EdGdM<br>BTR_EdGdR<br>BTR_EdIbM<br>BTR_EdIbR<br>BTR_EwGwM<br> BTC_EdGdM<br> BTC_EdGdR<br> BTC_EdIbM<br> BTC_EdIbR<br> BTC_EwGwM<br> BT_EdGdM<br>BT_EdGdR<br>BT_EdIbM<br>BT_EdIbR<br>BT_EwGwM<br> BTS_EdGdM<br>BTS_EdGdR<br>BTS_EdIbM<br>BTS_EdIbR<br>BTS_EwGwM| Yes<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br> | Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes<br>Yes |
+| [5c73b75](https://github.com/qemu/qemu/commit/5c73b75) | MOV_CdRd<br> MOV_DdRd<br> MOV_RdCd<br> MOV_RdDd| Yes<br>Yes<br>Yes<br>Yes<br> | Yes<br>Yes<br>Yes<br>Yes<br> |
