@@ -1,47 +1,21 @@
 diff --git a/Makefile b/Makefile
-index 1873d23..b54f9c1 100644
+index 137d807..b225a18 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -1,12 +1,12 @@
- PYTHON27_HEADERS=$(shell python2.7-config --includes)
- PYTHON27_LIBS=$(shell python2.7-config --libs)
+@@ -3,7 +3,7 @@ PYTHON27_LIBS=$(shell python2.7-config --libs)
  
--XED_PREFIX=pin-2.14/extras/xed-ia32
-+XED_PREFIX=$(shell pwd)/../pin/extras/xed-intel64
- # XED_PREFIX=pin-2.14-71313-clang.5.1-mac/extras/xed-ia32
- # XED_PREFIX=pin-2.14-71313-clang.5.1-mac/extras/xed-intel64
- # XED_PREFIX=pin-2.14-71313-gcc.4.4.7-linux/extras/xed-ia32
- # XED_PREFIX=pin-2.14-71313-gcc.4.4.7-linux/extras/xed-intel64
--XED_HEADERS=$(XED_PREFIX)/include
-+XED_HEADERS=$(XED_PREFIX)/include/xed
+ # Path to XED kit produced by "./mfile.py install". See XED's documentation for
+ # more information on how to compile it from source.
+-XED_PREFIX=xed-install-base-2018-07-05-mac-x86-64
++XED_PREFIX=$(shell pwd)/../xed/kits/xed-install-base-2018-07-13-lin-x86-64
+ 
+ XED_HEADERS=$(XED_PREFIX)/include/xed
  XED_LIBS=$(XED_PREFIX)/lib
- 
- W=-Wall -Wextra \
-@@ -17,7 +17,7 @@ W=-Wall -Wextra \
-     -Wno-strict-aliasing
+@@ -17,6 +17,7 @@ W=-Wall -Wextra \
  
  CFLAGS=-fPIC -O2 $(PYTHON27_HEADERS) -I$(XED_HEADERS) $(W) -ggdb
--LDFLAGS=$(PYTHON27_LIBS) -lpython2.7 -L$(XED_LIBS) -lxed -shared
-+LDFLAGS=$(PYTHON27_LIBS) -lpython2.7 -L$(XED_LIBS) -Wl,-rpath=$(XED_LIBS) -Wl,-rpath=$(XED_PREFIX)/../../intel64/runtime/pincrt -lxed -shared
+ LDFLAGS=$(PYTHON27_LIBS) -lpython2.7 -L$(XED_LIBS) -lxed -shared
++LDFLAGS+=-Wl,-rpath=$(XED_PREFIX)/../../obj
  
  OBJS=check.o rflags.o operand.o instruction.o decoder.o encoder.o pyxed.o
  BIN=pyxed.so
-diff --git a/pyxed.c b/pyxed.c
-index d73af5e..0fae18f 100644
---- a/pyxed.c
-+++ b/pyxed.c
-@@ -157,7 +157,13 @@ static void register_constants(PyObject *module)
-     /* Constants from "xed-reg-enum.h". */
-     for(i = XED_REG_INVALID; i <= XED_REG_LAST; i++)
-     {
--        name = xed_reg_enum_t2str((xed_reg_enum_t)i);
-+        if(i >= XED_REG_ST0 && i <= XED_REG_ST7){
-+			char buf[4];
-+			snprintf(buf, sizeof(buf), "ST%i", (i-XED_REG_ST0));
-+			name = buf;
-+		}else{
-+			name = xed_reg_enum_t2str((xed_reg_enum_t)i);
-+		}
-         snprintf(full_name, sizeof(full_name), "XED_REG_%s", name);
-         PyModule_AddObject(module, full_name, PyInt_FromLong(i));
-     }

@@ -73,22 +73,20 @@ make
 Simply run `make` in [tools/WhiteBochs-old/](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/tools/WhiteBochs-old/).
 
 #### Pyxed
-[Pyxed](https://github.com/huku-/pyxed) is a python wrapper around Xed library (the decoder part of [PIN](https://software.intel.com/en-us/articles/pin-a-binary-instrumentation-tool-downloads).)
-Download [PIN](https://software.intel.com/en-us/articles/pin-a-binary-instrumentation-tool-downloads),
-extract to [tools/](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/tools/) and rename the folder to `pin`.
-After that, apply our patch `pyxed.patch` to pyxed and compile it.
+[Pyxed](https://github.com/huku-/pyxed) is a python wrapper around [Xed](https://github.com/intelxed/xed) library
+We include Xed and its dependency as submodules.
+Compile Xed first, apply our patch `pyxed.patch` to pyxed and compile it.
 Note that the patch works best with PIN 3.6.
 If you want to use a different version of PIN, you may need to fix Pyxed accordingly.
 
 ```bash
-cd tools/pyxed
+cd tools/xed
+./mfile.py --shared install
+cd ../tools/pyxed
 patch -p1 < ../pyxed.patch
 make
 ```
 
-You may receive error messages related to `libc-dynamic.so` when 
-[run_test_case.py](https://github.umn.edu/yanxx297/fast-pokeemu/blob/master/scripts/run_test_case.py) call pyxed.
-In this case, set `$LD_LIBRARY_PATH` to the PIN directory that contains the `libc-dynamic.so` file (`pin/intel64/runtime/pincrt` for example.)
 
 
 #### QEMU
