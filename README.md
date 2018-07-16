@@ -160,18 +160,68 @@ Some other examples you can test quickly.
 | mov	%cr0,%eax | \\\\x3e\\\\x0f\\\\x22\\\\x00 |
 
 ### Effectiveness experiment
-Another useful script is `pokeEMU-offline.sh`, which runs the [effectiveness experiment](http://www-users.cs.umn.edu/%7Eyanxx297/vee18-fast-pokeemu.pdf#subsection.5.3) automatically.
-Before running this script, you need to [generate machine states](#machine-state-exploring) for all the instructions you want to involve if you haven't, and set the `$in` in `pokeEMU-offline.sh` to the directory of machine states.
+
+We use the phrase "effectiveness experiment" for experiments like the
+one in [section 5.3 of the VEE'18
+paper](http://www-users.cs.umn.edu/%7Eyanxx297/vee18-fast-pokeemu.pdf#subsection.5.3)
+which compare the fault-finding performance of Fast PokeEMU to that of
+vanilla PokeEMU.
+
+You have a choice of two scripts for running effectiveness
+experiments. `pokeEMU-offline.sh` is the script that we used to run
+the experiments in the paper, while `effect-one-insn.pl` runs similar
+experiments but in a different order that reduces the maximum amount
+of disk space required.
+
+#### Effectiveness experiments with `pokeEMU-offline.sh`
+
+Before running `pokeEMU-offline.sh`, you need to [generate machine states](#machine-state-exploring) for all the instructions you want to involve if you haven't, and set the `$in` in `pokeEMU-offline.sh` to the directory of machine states.
 
 When you are ready, run the following instruction to run the full experiment.
 It takes around 40 hours on a normal PC.
-The final results of this experiment are stored in `$out\out`, where `$out` is another variable in `pokeEMU-offline.sh` that you can change.
+The final results of this experiment are stored in `$dir/out`, where `$dir` is another variable in `pokeEMU-offline.sh` that you can change.
 ```bash
 ./pokeEMU-offline.sh -s 0
 # -s 0 starts from the very beginning.
 # You call also start from the middle of this experiment.
 # (See ./pokeEMU-offline.sh -h for more options.)
 ```
+
+#### Effectiveness experiments with `effect-one-insn.pl`
+
+The `effect-one-insn.pl` script runs all the parts of an effectiveness
+experiment that pertain to a single instruction variant (byte
+sequence). The script takes two arguments, an output directory and an
+instruction byte sequence. For instance:
+```bash
+perl effective-one-insn.pl /tmp/effect-out 013f
+```
+
+It will write experimental results in the output directory and also in
+a subdirectory of the output directory named after the instruction
+variant, e.g. `/tmp/effect-out/ADD_EdGdM-013f`.
+
+To run the experiment in parallel across multiple instructions, you
+may find it convenient to run under `xargs -n1 -P6`, where the
+argument to -P is the number of jobs to run in parallel. For instance:
+```bash
+cut -f1 data/insns | xargs -n1 -P6 perl scripts/effect-one-insn.pl /tmp/effect-out
+```
+
+In addition the following environment variables will affect the
+behavior of the script if they are present:
+
+`FUZZBALL_MAX_ITERATIONS`: (default 4096) maximum number of testcases
+to generate for a single instruction variant. This is a significant
+factor in the running time of experiments, so you may wish to set it
+to a small value initially.
+
+`TIMEOUT`: (default 10) maximum time, in seconds, to run one testcase.
+
+`DISABLE_CLEAN`: if set, retains all of the intermediate files from
+each run. Keeping these around can be useful for debugging, but all of
+the intermediate results from a long experiment will require a large
+amount of disk space.
 
 ### Details of Fast PokeEMU
 This section is useful if you want to rerun all the tests by yourself, or build your own tool on top of Fast PokeEMU.
