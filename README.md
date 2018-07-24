@@ -369,10 +369,14 @@ As a result, if you include those tests in the aggregation (there is no way to i
 Not all the commits identified by this experiment are fixes to real bugs.
 In other words, there are false positives in the result the historical bug experiment.
 Most false positives results are caused by randomness of Fast PokeEMU, but our patch searching approach can also fail if there are two or more bugs overlapping in the same range.
+
 For the former case, we can exclude those results by rerunning part of the experiment for several times, and only trust results that are consistent among every execution.
+[repeat-hisbug.sh](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/scripts/repeat-hisbug.sh)
+and [repeat-run-testcase.sh](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/scripts/repeat-run-testcase.sh)
+are two examples of false positive filtering.
 
 It is harder to exclude false positive results caused by the latter reason, but as far as we know there are only 2 instructions in this group: MOVQ_PqQqM and RDMSR.
-For those two instructions, the bug leads to behavior overlaps with another bug that stop our tests from running.
+For those two instructions, the bug leads to behavior difference overlaps with another bug that stop our tests from running.
 As a result, out search approach always stop on the patch that fixes the fatal bug.
 As long as we cannot exclude the fatal bug, there is no way to identify the fix to behavior difference bug.
 This is a drawback of our current design, and improving the search approach can be our future work.
