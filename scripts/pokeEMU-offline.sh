@@ -17,6 +17,10 @@ is_match () {
 
 while [ "$1" != "" ]; do
         case $1 in
+		-in )
+			shift
+			in=$1
+			;;
                 -n )
                         single=true
                         ;;
