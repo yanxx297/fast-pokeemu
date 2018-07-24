@@ -46,7 +46,9 @@ if [ -e kemufuzzer.c ]; then
         rv=$?
         # Terminate bisecting if compilation fails.
         if [ $rv -ne 0 ]; then
-                make distclean
+		if [[ "$clean" == true ]]; then
+			make distclean
+		fi
                 if [ $rv -gt 127 ]; then
                         if [[ "$revert" == true ]]; then
                                 exit 0
