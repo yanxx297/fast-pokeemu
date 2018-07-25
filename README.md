@@ -3,7 +3,9 @@
 Fast PokeEMU is the successor of [PokeEMU](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.225.5080&rep=rep1&type=pdf) 
 which integrate testcase aggregation, random testing and additional technique for space saving.
 More design details and experiment results of Fast PokeEMU are in
-[this paper](http://www-users.cs.umn.edu/~yanxx297/vee18-fast-pokeemu.pdf). 
+[this paper](http://www-users.cs.umn.edu/~yanxx297/vee18-fast-pokeemu.pdf).
+
+If you have any question building or using this tool, feel free to file an issue or contact yanxx297@umn.edu
 
 ## Table of contents
 - [Build Fast PokeEMU](#build)
@@ -20,16 +22,17 @@ More design details and experiment results of Fast PokeEMU are in
 
 ## Build Fast PokeEMU
 The Fast PokeEMU consists of several components, each of which has its own building process.
-For simplicity, we include the binaries for all components.
-You may still want to check [KVM setup](#Build_KVM) since it requires a specific version of Linux Kernel to run the kernel module we compiled.
+For simplicity, we include the binaries for all those components.
+You may still want to check [KVM setup](#KVM) since it requires a specific version of Linux Kernel to run the kernel module we compiled.
 
 #### FuzzBALL
-This is a simplified version of [FuzzBALL installation document](https://github.umn.edu/yanxx297/fast-pokeemu/blob/master/tools/fuzzball/INSTALL).
+Bellow is a summary of [FuzzBALL installation document](tools/fuzzball/INSTALL).
 More details can be found in the original document, including a full list of required packages.
-Most dependencies required of FuzzBALL are available as packages, but you have to compile VEX and STP.
+Most dependencies required by FuzzBALL are available as packages, but you have to compile VEX and STP.
 
-For STP, download the certain version from SVN and apply the corresponding patch.
-When compilation finished, copy the stp binary and libstp.a to tools/fuzzball/stp
+For STP, download version r1673 from SVN repository and apply the corresponding patch.
+When compilation finished, copy the stp binary and libstp.a to tools/fuzzball/stp.
+(Alternatively, you can use the latest version from STP git repository.)
 
 ```bash
 svn co -r1673 https://svn.code.sf.net/p/stp-fast-prover/code/trunk/stp stp-r1673+vine
@@ -48,7 +51,7 @@ cd vex-r2737
 make -f Makefile-gcc
 ```
 
-After that, follow the instructions bellow to compile vanilla FuzzBALL in [tools/fuzzball/](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/tools/fuzzball/).
+After that, follow the instructions bellow to compile vanilla FuzzBALL in [tools/fuzzball/](tools/fuzzball/).
 Note that you should tell the location of VEX to FuzzBALL using configure option.
 
 ```bash
@@ -57,8 +60,8 @@ Note that you should tell the location of VEX to FuzzBALL using configure option
 make
 ```
 
-To compile the modified version of FuzzBALL required by Fast PokeEMU , switch to [tools/emuFuzzBall/](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/tools/emuFuzzBall/) and run `make`.
-You should find a binary named `emu_fuzzball` if succeed.
+To compile the modified version of FuzzBALL required by Fast PokeEMU , switch to [tools/emuFuzzBall/](tools/emuFuzzBall/) and run `make`.
+You can find a binary named `emu_fuzzball` if succeed.
 
 PokeEMU version FuzzBALL use [Z3](https://github.com/Z3Prover/z3) as its default solver.
 Before you can use emu_fuzzball, make sure you compile Z3.
@@ -70,14 +73,12 @@ make
 ```
 
 #### WhiteBochs
-Simply run `make` in [tools/WhiteBochs-old/](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/tools/WhiteBochs-old/).
+Simply run `make` in [tools/WhiteBochs-old/](tools/WhiteBochs-old/).
 
 #### Pyxed
 [Pyxed](https://github.com/huku-/pyxed) is a python wrapper around [Xed](https://github.com/intelxed/xed) library
-We include Xed and its dependency as submodules.
-Compile Xed first, apply our patch `pyxed.patch` to pyxed and compile it.
-Note that the patch works best with PIN 3.6.
-If you want to use a different version of PIN, you may need to fix Pyxed accordingly.
+We include Pyxed, Xed and its dependency (mbuild) as submodules.
+Compile Xed first, then apply our patch `pyxed.patch` to pyxed and compile pyxed.
 
 ```bash
 cd tools/xed
@@ -87,56 +88,57 @@ patch -p1 < ../pyxed.patch
 make
 ```
 
-
-
 #### QEMU
-To test QEMU using Fast PokeEMU, QEMU must be patched to support specific format memory dump used by Fast PokeEMU.
+To test QEMU using Fast PokeEMU, you must patch QEMU to support specific a format memory dump used by Fast PokeEMU.
 We already port this patch to a range of QEMU versions (1.0 - 2.21), and include those patched QEMUs in Fast PokeEMU as a submodule. 
 ```bash
 cd emu/qemu
+# check-qemu.sh compiles various versions of QEMU.
+# You can also compile QEMU manually.
 cp ../check-qemu.sh .
 ./check-qemu.sh
 ```
 
 #### KVM
-To run Fast PokeEMU testcases on kvm, you need a customized KVM kernel module and the software interface.
+To run Fast PokeEMU testcases on KVM, you need a customized KVM kernel module and the software interface.
 
-The software interface is in [emu/kvm-run](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/emu/kvm-run), 
+The software interface is in [emu/kvm-run](emu/kvm-run), 
 simply run `make` to build it.
 
-To build the KVM kernel module, you need to download linux kernel source code, apply the patch `kvm_kmod.patch` and recompile it.
-Though it is possible to apply the patch to any linux kernel source code, we only have tested it on
-[linux 4.4.0-45.66 in Ubuntu](https://launchpad.net/ubuntu/+source/linux/4.4.0-45.66), which is the environment we used for all the experiments described in the paper.
-
-	cd Linux-4.4
-	patch -p1 < ../Linux_4.4.0-45.66.diff
-	patch -p1 < ../kvm_kmod.diff
-	cp /boot/config-$(uname -r) .config
-	makd oldconfig
-	make
-
-
+To build the KVM kernel module, download linux kernel source code, apply the patch `kvm_kmod_*.patch` corresponding to your kernel version and recompile it.
+Currently we have patches for linux kernel 4.4, 4.13 and 4.16, and we used kernel 4.4 for the experiments described in the paper.
+It is also possible to apply the patch to any linux kernel source code.
+```bash
+cd Linux-4.4
+patch -p1 < ../Linux_4.4.0-45.66.diff
+patch -p1 < ../kvm_kmod.diff
+cp /boot/config-$(uname -r) .config
+makd oldconfig
+make
+```
 Alternatively, you can use the KVM kernel modules we compiled for Linux 4.4.0-45.
-They are in `kvm.ko` and `kvm-intel.ko` in [/emu](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/emu).
+They are in `kvm.ko` and `kvm-intel.ko` in [/emu](emu).
 Note that in this case you must switch your current kernel to the same version. 
 
 After that, either copy kvm.ko and kvm-intel.ko to `/lib/modules/$(uanme -r)/kernel/arch/x86/kvm` and reboot, or reload them as bellow.
 Note that vanilla kvm's api version is 12, while the modified kvm is 2411.
-
-	cd Linux-4.4/arch/x86/kvm
-	rmmod kvm-intel
-	rmmod kvm
-	insmod kvm.ko
-	insmod kvm-intel.ko
+```bash
+cd Linux-4.4/arch/x86/kvm
+rmmod kvm-intel
+rmmod kvm
+insmod kvm.ko
+insmod kvm-intel.ko
+# You can also use scripts/kmod.sh to switch between kernels
+```
 
 ## Testing QEMU
 ### Simple example
 You can simply test one instruction using `simpleTest.sh`.
 This script takes the hex string of an instruction as input, generate a set of tests, and runs those tests either one by one (vanilla PokeEMU style turned on by `--single-test`) or at once (Fast PokeEMU style turned on by `--aggreg-test`.)
-For more details about each step of (Fast) PokeEMU, see [the next section](#full-test).
+For more details about each step of Fast PokeEMU, see [the next section](#details-of-fast-pokeemu).
 
 In Fast PokeEMU mode, you may need to rerun single tests to generate a list of valid tests to aggregate.
-This is due to the incompletenes of PokeEMU's exception handler.
+This is due to the incompleteness of PokeEMU's exception handler.
 Note that in practice this is a one-time effort as long as you don't [regenerate machine states](#machine-state-exploring) or redo any other previous steps.
 
 As a example, we run Fast PokeEMU tests for `add %al,(%eax)` using this one-line command.
@@ -147,7 +149,7 @@ As a example, we run Fast PokeEMU tests for `add %al,(%eax)` using this one-line
 Alternatively, you can replace `--aggreg-test` with `--single-test` to test this instruction using vanilla PokeEMU.
 For a full list of options, run `./simpleTest.sh -h`.
 
-You can test any instruction by replacing `\\x00\\x00` with any string from the 1st column of `instruction.csv` 
+You can test any instruction by replacing `\\x00\\x00` with either strings from the 1st column of `instruction.csv` 
 (remember to replace `\` with `\\`), 
 or the hex string of any other valid Intel X86 instruction.
 
@@ -227,8 +229,8 @@ amount of disk space.
 This section is useful if you want to rerun all the tests by yourself, or build your own tool on top of Fast PokeEMU.
 
 #### Instruction exploring
-This step collect a list of x86 instructions by combining symbolic and concolic execution of Bochs, and randomly select one instruction from each mnemonic.
-The output is 1078 instructions, each of which stands for a instruction variation defined in Bochs.
+In this step, we collect a list of x86 instructions by symbolic execution of Bochs, and randomly select one instruction from each mnemonic.
+The output is a set of instructions (1078 in total), each of which stands for a instruction variation defined in Bochs.
 For more details, check section 3.2 of the [PokeEMU paper](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.225.5080&rep=rep1&type=pdf)
 
 The first step is to explore the instruction decoder of Bochs symbolically. 
@@ -239,7 +241,7 @@ python run-fuzzball.py ../WhiteBochs-old/fuzzball-whitedisasm
 You can set the environment variable `$FUZZBALL_OUTDIR` to control where the output goes.
 The default location is `/tmp/fuzzball-fuzzball-whitedisasm-output`.
 
-Next, collect instruction indormation (including mnemonic, shellcode, length and corresponding function in Bochs) by parsing the outputs of symbolic execution.
+Next, collect instruction information (including mnemonic, shellcode, length and corresponding function in Bochs) by parsing the outputs of symbolic execution.
 ```bash
 perl scripts/collect-p1-shellcode.pl /tmp/fuzzball-fuzzball-whitedisasm-output| \
 ./tools/WhiteBochs-old/whitedisasm-many
@@ -259,15 +261,14 @@ python select_insn_rand.py > insn
 With the shellcode of an instruction, you can generate a set of machine states by symboliccally exploring the instruction interpreter of Bochs, each of which corresponds to a test case that can test a unique behavior of this instruction.
 ```bash
 cd tools/emuFuzzBall/
-python run-emu-fuzzball.py ../WhiteBochs-old/ \
-fuzzball-whitebochs ../../base.snap <shellcode> \
-<\path\to\output\dir>
+python run-emu-fuzzball.py ../WhiteBochs-old/ fuzzball-whitebochs ../../base.snap \
+<shellcode> <\path\to\output\dir>
 ```
-The shellcode is in the format of `\\x__\\x__\\x__...` where each __ is one byte (or 2 letters corresponding to a hexadecimal value.)
-Note that if the input shellcode is not in full length, the actually instruction executed by bochs will be a mixture of the given shellcode and what left in inital memory.
+The shellcode is in the format of `\\x__\\x__\\x__...` where each `__` is one byte (or 2 letters corresponding to a hexadecimal value.)
+Note that if the input shellcode is not in full length, the actually instruction executed by bochs will be a mixture of the given shellcode and what left in baseline memory.
 
 Use `runCPUexplr` if you want to generate states for multiple instructions.
-By default, this Makefile read instructions from a file named `insn`, and generate machine states for all of them in paralle.
+By default, this Makefile read instructions from a file named `insn`, and generate machine states for all of them in parallel.
 Change `$FILE` if you want to read a different instruction list, and `$TMP` if you want a different output folder (`/tmp/out` by default.)
 ```bash
 cd tools/emuFuzzBall/
@@ -276,10 +277,10 @@ make -f runCPUexplr -j 6
 
 
 #### Test case execution
-In this step, we generate executable test cases from  machine states, and run those tests on both QEMU and KVM.
-
+In this step, we generate executable test cases from  machine states, and run them on both QEMU and KVM.
 The test case generator `run_test_case.py` can create tests in a variey of styles, and execute the test case on QEMU.
-This script requires several arguments. 
+
+The required argument required by this script are described as bellow.
 ###### testcase
 The path to the `testcase` file(s) of one machine or multiple state(s).
 If you pass multiple files, connect each file by `,`.
@@ -290,14 +291,15 @@ Output folder.
 ###### script
 The path to a shellscript that runs QEMU.
 Use `run-testcase` for normal testing.
-The `run-testcase-debug` generate a floppy disk image `floppy-dbg` and a log of executed instructions `qemu.log` in `/tmp`, use this script if you want to manually run the test one KVM later or want to do debugging.
+The `run-testcase-debug` generate a floppy disk image `floppy-dbg` and a log of executed instructions `/tmp/qemu.log`, which can be useful if you want to manually run the test one KVM later or want to do debugging.
 Use `run-testcase-remote` if you want to connect QEMU to gdb remotely for further debugging.
+
 ###### mode
 Select the mode of the test case. 
 See the table bellow for more details.
 ###### loop
 Set how many times you want to repeat random testing.
-If not set, each test only run once by default (equal to loop:1.)
+If not set, each test only run once by default (equal to `loop:1`.)
 As mentioned in the table bellow, this option only make sense in mode 3.
 
 | Number | Mode | Aggregation Support | Random Testing |
@@ -307,7 +309,7 @@ As mentioned in the table bellow, this option only make sense in mode 3.
 | 2 | Feistel aggregation | Yes | No |
 | 3 | Feistel aggregation with looping | Yes | Yes |
 
-Some sxamples using this script 
+Here are some examples using this script.
 ```bash
 # Single test in vanilla PokeEMU mode
 python run_test_case.py testcase:../data/state-explr/ADD_EbGbM/00000000/testcase timeout:5 \
@@ -319,7 +321,8 @@ timeout:5 outdir:/tmp/out/ script:../emu/qemu/run-testcase mode:3 loop:10000
 ```
 To manually run the KVM test, set `script` to `run-testcase-debug` when you generate the test.
 After that, you will get the floppy disk image named `floppy-dbg`.
-Use this image to rerun the QEMU test, so that you can get the `*.pre` file (which is the machine state before running this test), and run it on KVM.
+Use this image to rerun the QEMU test, so that you can get the `*.pre` file (which is the machine state before running this test.)
+Finally, run the .pre file on KVM.
 ```bash
 cd emu/qemu
 ./run-testcase /tmp/floppy-dbg /tmp/out/dbg.post /tmp/out
@@ -341,6 +344,8 @@ cd scripts
 python diff_cpustate.py /tmp/out/dbg.post.post /tmp/out/00000000-kvm.post
 #python diff_cpustate.py </path/to/QEMU/memdump> </path/to/KVM/memdump>
 ```
+When you run diff_cpustate.py with only one memory dump, it will print all the important fields of the dumped CPU state.
+This information can be very helpful for debugging.
 
 ## Historical bug experiment
 Another experiment mentioned in the paper is to identify real world QEMU bugs, and evaluate the impact of random testing using those bugs.
@@ -369,15 +374,14 @@ As a result, if you include those tests in the aggregation (there is no way to i
 Not all the commits identified by this experiment are fixes to real bugs.
 In other words, there are false positives in the result the historical bug experiment.
 Most false positives results are caused by randomness of Fast PokeEMU, but our patch searching approach can also fail if there are two or more bugs overlapping in the same range.
-
 For the former case, we can exclude those results by rerunning part of the experiment for several times, and only trust results that are consistent among every execution.
 [repeat-hisbug.sh](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/scripts/repeat-hisbug.sh)
 and [repeat-run-testcase.sh](https://github.umn.edu/yanxx297/fast-pokeemu/tree/master/scripts/repeat-run-testcase.sh)
 are two examples of false positive filtering.
 
-It is harder to exclude false positive results caused by the latter reason, but as far as we know there are only 2 instructions in this group: MOVQ_PqQqM and RDMSR.
-For those two instructions, the bug leads to behavior difference overlaps with another bug that stop our tests from running.
-As a result, out search approach always stop on the patch that fixes the fatal bug.
+It is challenging to exclude false positive results caused by the latter reason, but as far as we know there are only 2 instructions in this group: MOVQ_PqQqM and RDMSR.
+For those two instructions, the bug leads to behavior difference overlaps with another bug that stop our tests from running (which we call a `fatal bug`.)
+As a result, our binary search approach always stop on the patch that fixes the fatal bug.
 As long as we cannot exclude the fatal bug, there is no way to identify the fix to behavior difference bug.
 This is a drawback of our current design, and improving the search approach can be our future work.
 
