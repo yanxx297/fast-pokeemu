@@ -18,6 +18,18 @@ appreciate the previous authors' contributions, but since they aren't
 responsible for any recent changes, your probably shouldn't bother
 them with bug reports.
 
+Fast PokeEMU is free software. You may redistribute and/or modify it
+under the terms of the GNU General Public License (GPL) version 3 as
+published by the Free Software Foundation. This is the intersection of
+the licenses of KEmuFuzzer (GPL 3) and FuzzBALL (GPL 2+). This
+software is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details. You should have received a
+copy of the GNU General Public License along with this program, in the
+file COPYING.  It can also be obtained from the [GNU
+Project](http://www.gnu.org/licenses/).
+
 ## Table of contents
 - [Build Fast PokeEMU](#build)
 - [Testing QEMU](#testing-qemu)
