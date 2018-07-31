@@ -4,7 +4,7 @@
         ignore = dirty
 [submodule "emu/qemu"]
 	path = emu/qemu
-        url = https://github.umn.edu/yanxx297/qemu
+        url = https://github.com/yanxx297/qemu
         ignore = dirty
 [submodule "tools/mbuild"]
 	path = tools/mbuild
