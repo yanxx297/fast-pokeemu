@@ -31,18 +31,9 @@ copy of the GNU General Public License along with this program, in the
 file COPYING.  It can also be obtained from the [GNU
 Project](http://www.gnu.org/licenses/).
 
-## Table of contents
-- [Build Fast PokeEMU](#build)
-- [Testing QEMU](#testing-qemu)
-	- [A simple example](#simple-example)
-	- [Effectiveness Experiment](#effectiveness-experiment)
-	- [Details](#details-of-fast-pokeemu)
-		- [Instruction Exploring](#instruction-exploring)
-		- [Machine State Exploring](#machine-state-exploring)
-		- [Test Case Execution](#test-case-execution)
-		- [Compare Machine States](#compare-machine-states)
-- [Historical Bug Experiment](#historical-bug-experiment)
-
+## Prerequisites
+The building process of this project has only been tested under the **Ubuntu Linux Ubuntu Linux 16.04** with kernel version 4.4.0-45-generic.
+You may run into building issues if you build this project under different setups.
 
 ## Build Fast PokeEMU
 The Fast PokeEMU tool consists of several components, each of which has its own building process.
